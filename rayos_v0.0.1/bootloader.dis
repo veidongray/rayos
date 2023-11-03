@@ -1,0 +1,116 @@
+
+bootloader.elf:     file format elf32-i386
+
+
+Disassembly of section .boot_text:
+
+00007c00 <start>:
+    7c00:	fa                   	cli
+    7c01:	66 31 c0             	xor    %ax,%ax
+    7c04:	8e d8                	mov    %eax,%ds
+    7c06:	8e c0                	mov    %eax,%es
+    7c08:	8e d0                	mov    %eax,%ss
+    7c0a:	8e e0                	mov    %eax,%fs
+    7c0c:	8e e8                	mov    %eax,%gs
+
+00007c0e <seta20.1>:
+    7c0e:	e4 64                	in     $0x64,%al
+    7c10:	a8 02                	test   $0x2,%al
+    7c12:	75 fa                	jne    7c0e <seta20.1>
+    7c14:	b0 d1                	mov    $0xd1,%al
+    7c16:	e6 64                	out    %al,$0x64
+
+00007c18 <seta20.2>:
+    7c18:	e4 64                	in     $0x64,%al
+    7c1a:	a8 02                	test   $0x2,%al
+    7c1c:	75 fa                	jne    7c18 <seta20.2>
+    7c1e:	b0 df                	mov    $0xdf,%al
+    7c20:	e6 60                	out    %al,$0x60
+    7c22:	0f 01 16             	lgdtl  (%esi)
+    7c25:	b8 7d 0f 20 c0       	mov    $0xc0200f7d,%eax
+    7c2a:	66 83 c8 01          	or     $0x1,%ax
+    7c2e:	0f 22 c0             	mov    %eax,%cr0
+    7c31:	ea 36 7c 08 00   	ljmp   $0x10b8,$0x87c36
+
+00007c36 <start32>:
+    7c36:	b8 10 00 00 00       	mov    $0x10,%eax
+    7c3b:	8e d8                	mov    %eax,%ds
+    7c3d:	8e c0                	mov    %eax,%es
+    7c3f:	8e d0                	mov    %eax,%ss
+    7c41:	31 c0                	xor    %eax,%eax
+    7c43:	8e e0                	mov    %eax,%fs
+    7c45:	8e e8                	mov    %eax,%gs
+
+00007c47 <read_kernel>:
+    7c47:	bb 01 00 00 00       	mov    $0x1,%ebx
+    7c4c:	b9 10 00 00 00       	mov    $0x10,%ecx
+    7c51:	bf 00 00 10 00       	mov    $0x100000,%edi
+    7c56:	88 c8                	mov    %cl,%al
+    7c58:	66 ba f2 01          	mov    $0x1f2,%dx
+    7c5c:	ee                   	out    %al,(%dx)
+    7c5d:	88 d8                	mov    %bl,%al
+    7c5f:	66 ba f3 01          	mov    $0x1f3,%dx
+    7c63:	ee                   	out    %al,(%dx)
+    7c64:	c1 eb 08             	shr    $0x8,%ebx
+    7c67:	88 d8                	mov    %bl,%al
+    7c69:	66 ba f4 01          	mov    $0x1f4,%dx
+    7c6d:	ee                   	out    %al,(%dx)
+    7c6e:	c1 eb 08             	shr    $0x8,%ebx
+    7c71:	88 d8                	mov    %bl,%al
+    7c73:	66 ba f5 01          	mov    $0x1f5,%dx
+    7c77:	ee                   	out    %al,(%dx)
+    7c78:	c1 eb 08             	shr    $0x8,%ebx
+    7c7b:	80 e3 0f             	and    $0xf,%bl
+    7c7e:	80 cb e0             	or     $0xe0,%bl
+    7c81:	88 d8                	mov    %bl,%al
+    7c83:	66 ba f6 01          	mov    $0x1f6,%dx
+    7c87:	ee                   	out    %al,(%dx)
+    7c88:	b0 20                	mov    $0x20,%al
+    7c8a:	66 ba f7 01          	mov    $0x1f7,%dx
+    7c8e:	ee                   	out    %al,(%dx)
+
+00007c8f <wait_hhd>:
+    7c8f:	ec                   	in     (%dx),%al
+    7c90:	24 88                	and    $0x88,%al
+    7c92:	3c 08                	cmp    $0x8,%al
+    7c94:	75 f9                	jne    7c8f <wait_hhd>
+    7c96:	89 c8                	mov    %ecx,%eax
+    7c98:	66 ba 00 01          	mov    $0x100,%dx
+    7c9c:	66 f7 e2             	mul    %dx
+    7c9f:	89 c1                	mov    %eax,%ecx
+    7ca1:	89 fb                	mov    %edi,%ebx
+    7ca3:	66 ba f0 01          	mov    $0x1f0,%dx
+
+00007ca7 <read_data>:
+    7ca7:	66 ed                	in     (%dx),%ax
+    7ca9:	66 89 03             	mov    %ax,(%ebx)
+    7cac:	83 c3 02             	add    $0x2,%ebx
+    7caf:	e2 f6                	loop   7ca7 <read_data>
+
+00007cb1 <start_kernel>:
+    7cb1:	bc 00 00 20 00       	mov    $0x200000,%esp
+    7cb6:	e8 45 83 0f 00       	call   100000 <_bf+0xf8242>
+    7cbb:	f4                   	hlt
+
+Disassembly of section .boot_gdt:
+
+00007da0 <gdt>:
+	...
+    7da8:	ff                   	(bad)
+    7da9:	ff 00                	incl   (%eax)
+    7dab:	00 00                	add    %al,(%eax)
+    7dad:	9a cf 00 ff ff 00 00 	lcall  $0x0,$0xffff00cf
+    7db4:	00 92 cf 00      	add    %dl,0x1700cf(%edx)
+
+00007db8 <gdtdesc>:
+    7db8:	17                   	pop    %ss
+    7db9:	00                   	.byte 0x0
+    7dba:	a0                   	.byte 0xa0
+    7dbb:	7d 00                	jge    7dbd <gdtdesc+0x5>
+	...
+
+Disassembly of section .boot_flag:
+
+00007dbe <_bf>:
+    7dbe:	55                   	push   %ebp
+    7dbf:	aa                   	stos   %al,%es:(%edi)

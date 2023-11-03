@@ -1,0 +1,16 @@
+#include "x86.h"
+
+void init_8259a(void)
+{
+    outb(0x20, 0x11);
+    outb(0xa0, 0x11);
+    /* master IRQ number from 0x20 */
+    outb(0x21, 0x20);
+    /* slave IRQ number from 0x28 */
+    outb(0xa1, 0x28);
+    outb(0x21, 0x4);
+    outb(0xa1, 0x2);
+    /* default mask all interrupt */
+    outb(0x21, 0xff);
+    outb(0xa1, 0xff);
+}
