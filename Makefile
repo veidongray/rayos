@@ -9,5 +9,8 @@ mkiso: build
 qemu: mkiso
 	qemu-system-i386 -cdrom rayos.iso
 
+qemu-dbg: mkiso
+	qemu-system-i386 -S -gdb tcp::1234 -cdrom rayos.iso
+
 clean:
 	rm -rf *.iso vmrayos iso/boot/vmrayos src/*.o
