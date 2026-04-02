@@ -1,0 +1,11 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "run-qemu",
+            "type": "shell",
+            "command": "qemu-system-i386 -cdrom ${workspaceFolder}/rayos.iso -s -S",
+            "isBackground": true
+        }
+    ]
+}

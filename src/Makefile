@@ -5,9 +5,9 @@ CFLAGS = -m32 \
     -mno-red-zone \
     -mno-sse -mno-sse2 -mno-mmx -mno-80387 \
     -Wall -Wextra -Werror \
-    -g \
-    -std=gnu99 \
-    -nostdlib
+    -g -fno-omit-frame-pointer \
+    -fno-asynchronous-unwind-tables \
+    -std=gnu99
 
 OBJS = head.o main.o
 

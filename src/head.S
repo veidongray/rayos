@@ -13,13 +13,14 @@ mboot:
     .long 8                   # size = 8 bytes
 end_mboot:
 
-.code32                       # 切换到 32 位模式
+.code32		# to 32-bit mode
 .section .text
 .global _start
 .type _start, @function
 _start:
     # Set up the stack
     mov $stack_top, %esp
+    # Never return
     call main
     hlt
 
