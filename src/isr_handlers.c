@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include "../inc/print.h"
+#include "print.h"
 
 void exception_handler(uint32_t vector) {
     vector = vector; // Suppress unused variable warning

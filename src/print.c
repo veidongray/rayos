@@ -1,11 +1,8 @@
-#include "../inc/print.h"
+#include "print.h"
 #include <stdint.h>
 
-uint8_t *vgaptr = (uint8_t *)0xB8000;
-
-uint8_t **get_vgaptr(void) {
-    return &vgaptr;
-}
+static uint8_t *cgaptr = (uint8_t *)0xB8000;
+static uint8_t **get_cgaptr(void) { return &cgaptr; }
 
 char *itoa( int value, char * str, int base )
 {
@@ -47,15 +44,15 @@ char *itoa( int value, char * str, int base )
 
 int cga_putc(const char ch)
 {
-    uint8_t **vga = get_vgaptr();
+    uint8_t **cga = get_cgaptr();
     if (ch >= 32) {
-        **vga = ch;
-        *vga += 2;
-        if (*vga >= (uint8_t *)(0xB8000 + 4000)) {
-            *vga = (uint8_t *)0xB8000;
+        **cga = ch;
+        *cga += 2;
+        if (*cga >= (uint8_t *)(0xB8000 + 4000)) {
+            *cga = (uint8_t *)0xB8000;
         }
     } else if (ch == '\n' || ch == '\r') {
-        *vga += 160 - ((*vga - (uint8_t *)0xB8000) % 160);
+        *cga += 160 - ((*cga - (uint8_t *)0xB8000) % 160);
     }
     return ch;
 }

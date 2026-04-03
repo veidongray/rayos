@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 
-uint8_t **get_vgaptr(void);
+
+int cga_init(void);
 char *itoa( int value, char *str, int base);
 int cga_putc(const char ch);
 int cga_puts(const char *str);

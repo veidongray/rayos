@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include "../inc/print.h"
+#include "print.h"
 
 struct gdt_entry {
     uint16_t limit;
@@ -77,16 +77,25 @@ void main(void)
     load_gdt(descriptors, sizeof(descriptors));
 	extern void gdt_flush(struct gtdr *gdtr);
     gdt_flush(&gdt_descriptor);
-    cga_puts("GDT initialization...\n");
+    cga_printf("GDT initialization...\n");
+    for (int i = 0; i < 5; ++i) {
+        cga_printf("GDT Entry %d: Base=0x%X, Limit=0x%X, Access=0x%X, Granularity=0x%X\n",
+                   i, (descriptors[i].base_high << 24) | (descriptors[i].base_mid << 16) | descriptors[i].base_low,
+                   descriptors[i].limit, descriptors[i].access, descriptors[i].granularity);
+    }
 
     extern void *isr_stub_table[];
     for (int i = 0; i < 32; ++i) {
         set_idt_entry(i, isr_stub_table[i], 0x8E);
     }
     load_idt(idt, sizeof(idt));
+    cga_printf("IDT loaded with 32 entries.\n");
+    for (int i = 0; i < 4; ++i) {
+        cga_printf("IDT Entry %d: ISR Address=0x%X\n", i, (idt[i].isr_high << 16) | idt[i].isr_low);
+    }
     asm volatile ("sti"); // Enable interrupts
 
-    cga_puts("IDT initialization...\n");
+    cga_printf("IDT initialization...\n");
     
     while (1) {
         asm volatile ("hlt\r\n");
