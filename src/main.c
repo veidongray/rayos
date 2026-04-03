@@ -90,12 +90,10 @@ void main(void)
     }
     load_idt(idt, sizeof(idt));
     cga_printf("IDT loaded with 32 entries.\n");
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 32; ++i) {
         cga_printf("IDT Entry %d: ISR Address=0x%X\n", i, (idt[i].isr_high << 16) | idt[i].isr_low);
     }
     asm volatile ("sti"); // Enable interrupts
-
-    cga_printf("IDT initialization...\n");
     
     while (1) {
         asm volatile ("hlt\r\n");
