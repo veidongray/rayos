@@ -64,8 +64,6 @@ char *itoa( int value, char * str, int base )
 
 int cga_putc(const char ch)
 {
-    int i;
-    uint8_t buffer[4000];
     uint8_t **cga = get_cgaptr();
     if (ch >= 32) {
         **cga = ch;
