@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "../inc/print.h"
 
 struct gdt_entry {
     uint16_t limit;
@@ -13,6 +14,19 @@ struct gtdr{
     uint16_t limit;
     uint32_t base;
 } __attribute__((packed)) gdt_descriptor;
+
+struct idt_entry {
+	uint16_t    isr_low;      // The lower 16 bits of the ISR's address
+	uint16_t    kernel_cs;    // The GDT segment selector that the CPU will load into CS before calling the ISR
+	uint8_t     reserved;     // Set to zero
+	uint8_t     attributes;   // Type and attributes; see the IDT page
+	uint16_t    isr_high;     // The higher 16 bits of the ISR's address
+} __attribute__((packed));
+
+struct idtr {
+	uint16_t	limit;
+	uint32_t	base;
+} __attribute__((packed));
 
 int create_gdt_entry(struct gdt_entry *entry, uint32_t base, uint32_t limit, uint8_t access, uint8_t granularity) {
     entry->base_low = base & 0xFFFF;
@@ -33,28 +47,23 @@ int load_gdt(struct gdt_entry *gdt, uint16_t size) {
     return 0;
 }
 
+static struct idt_entry idt[256];
+void set_idt_entry(uint8_t vector, void* isr, uint8_t flags) {
+    struct idt_entry* descriptor = &idt[vector];
 
-uint8_t *vga = (uint8_t *)0xB8000;
-
-int putc(char ch)
-{
-    if (ch >= 32) {
-        *vga = ch;
-        vga += 2;
-        if (vga >= (uint8_t *)(0xB8000 + 4000)) {
-            vga = (uint8_t *)0xB8000;
-        }
-    }
-    return ch;
+    descriptor->isr_low        = (uint32_t)isr & 0xFFFF;
+    descriptor->kernel_cs      = 0x08; // this value can be whatever offset your kernel code selector is in your GDT
+    descriptor->attributes     = flags;
+    descriptor->isr_high       = (uint32_t)isr >> 16;
+    descriptor->reserved       = 0;
 }
 
-int puts(char *str)
-{
-    int i;
-    for (i = 0; i < 2000 && str[i] != '\0'; ++i) {
-        putc(str[i]);
-    }
-    return i;
+void load_idt(struct idt_entry* idt, uint16_t size) {
+    struct idtr idtr;
+    idtr.limit = size - 1;
+    idtr.base = (uint32_t)idt;
+
+    asm volatile ("lidt %0" : : "m"(idtr));
 }
 
 void main(void)
@@ -68,6 +77,17 @@ void main(void)
     load_gdt(descriptors, sizeof(descriptors));
 	extern void gdt_flush(struct gtdr *gdtr);
     gdt_flush(&gdt_descriptor);
+    cga_puts("GDT initialization...\n");
+
+    extern void *isr_stub_table[];
+    for (int i = 0; i < 32; ++i) {
+        set_idt_entry(i, isr_stub_table[i], 0x8E);
+    }
+    load_idt(idt, sizeof(idt));
+    asm volatile ("sti"); // Enable interrupts
+
+    cga_puts("IDT initialization...\n");
+    
     while (1) {
         asm volatile ("hlt\r\n");
     }

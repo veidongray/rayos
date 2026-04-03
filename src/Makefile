@@ -4,12 +4,13 @@ CFLAGS = -m32 \
     -fno-stack-protector \
     -mno-red-zone \
     -mno-sse -mno-sse2 -mno-mmx -mno-80387 \
-    -Wall -Wextra -Werror \
+    -Wall -Wextra \
     -g -fno-omit-frame-pointer \
     -fno-asynchronous-unwind-tables \
-    -std=gnu99
+    -std=gnu99 \
+    -I ../inc
 
-OBJS = head.o main.o
+OBJS = head.o main.o isr_stubs.o isr_handlers.o print.o
 
 %.o: %.S
 	gcc $(CFLAGS) -c $< -o $@

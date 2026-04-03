@@ -4,7 +4,7 @@
         {
             "label": "run-qemu",
             "type": "shell",
-            "command": "qemu-system-i386 -cdrom ${workspaceFolder}/rayos.iso -s -S",
+            "command": "make qemu-dbg -C ${workspaceFolder}",
             "isBackground": true
         }
     ]
