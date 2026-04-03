@@ -4,12 +4,12 @@
 static uint8_t *cgaptr = (uint8_t *)0xB8000;
 static uint8_t **get_cgaptr(void) { return &cgaptr; }
 
-int cga_shift(uint8_t *ptr)
+int cga_shift(uint8_t **ptr)
 {
     int i;
     uint8_t buffer[4000];
-    if (ptr >= (uint8_t *)(0xB8000 + 4000)) {
-        ptr = (uint8_t *)0xB8000 + 4000 - 160;
+    if (*ptr >= (uint8_t *)(0xB8000 + 4000)) {
+        *ptr = (uint8_t *)0xB8000 + 4000 - 160;
         for (i = 0; i < 4000 - 160; ++i) {
             buffer[i] = ((uint8_t *)0xB8000)[i + 160];
         }
@@ -70,10 +70,10 @@ int cga_putc(const char ch)
     if (ch >= 32) {
         **cga = ch;
         *cga += 2;
-        cga_shift(*cga);
+        cga_shift(&*cga);
     } else if (ch == '\n' || ch == '\r') {
         *cga += 160 - ((*cga - (uint8_t *)0xB8000) % 160);
-        cga_shift(*cga);
+        cga_shift(&*cga);
     }
     return ch;
 }
