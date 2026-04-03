@@ -10,7 +10,7 @@ CFLAGS = -m32 \
     -std=gnu99 \
     -I ../inc
 
-OBJS = head.o main.o isr_stubs.o isr_handlers.o print.o
+OBJS = head.o main.o isr_stubs.o isr_handlers.o print.o pic.o io.o gdt.o idt.o systicks.o
 
 %.o: %.S
 	gcc $(CFLAGS) -c $< -o $@

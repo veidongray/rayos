@@ -68,10 +68,10 @@ int cga_putc(const char ch)
     if (ch >= 32) {
         **cga = ch;
         *cga += 2;
-        cga_shift(&*cga);
+        cga_shift(cga);
     } else if (ch == '\n' || ch == '\r') {
         *cga += 160 - ((*cga - (uint8_t *)0xB8000) % 160);
-        cga_shift(&*cga);
+        cga_shift(cga);
     }
     return ch;
 }
