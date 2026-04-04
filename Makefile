@@ -1,6 +1,6 @@
 build:
 	$(MAKE) -C src built-in.o
-	ld -m elf_i386 -T linker.ld -o vmrayos src/built-in.o
+	$(LD) -m elf_i386 -T linker.ld -o vmrayos src/built-in.o
 
 mkiso: build
 	cp vmrayos iso/boot/
@@ -13,4 +13,4 @@ qemu-dbg: mkiso
 	qemu-system-i386 -S -gdb tcp::1234 -cdrom rayos.iso
 
 clean:
-	rm -rf *.iso vmrayos iso/boot/vmrayos src/*.o
+	$(RM) *.iso vmrayos iso/boot/vmrayos src/*.o

@@ -29,10 +29,10 @@
 
 void timer_init(void)
 {
-    // 发送控制字：配置通道0为模式2（方波速率发生器）
+    // configure channel 0 to mode 2
     outb(PIT_COMMAND_PORT, PIT_CMD_CH0_MODE2);
     
-    // 写入分频系数（先低字节，后高字节）
+    // write DIVISOR LSB first.
     outb(PIT_CHANNEL0_PORT, (uint8_t)(PIT_DIVISOR & 0xFF));        // LSB
     outb(PIT_CHANNEL0_PORT, (uint8_t)((PIT_DIVISOR >> 8) & 0xFF)); // MSB
 }
@@ -108,4 +108,14 @@ void pic_sendEOI(uint8_t irq)
 		outb(PIC2_COMMAND,PIC_EOI);
 	
 	outb(PIC1_COMMAND,PIC_EOI);
+}
+
+void enable_irq(void)
+{
+    asm volatile ("sti");
+}
+
+void disable_irq(void)
+{
+    asm volatile ("cli");
 }

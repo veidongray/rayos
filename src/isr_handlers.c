@@ -6,10 +6,12 @@
 void exception_handler(uint32_t vector) {
     if (vector == IRQ0_VECTOR) {
         set_systicks(get_systicks() + 1);
-        cga_printf("systicks = %u\n", get_systicks());
+    } else if (vector == IRQ14_VECTOR) {
+        cga_printf("Page fault!\n");
+        disable_irq();
     } else {
         cga_printf("Unhandled exception: %d\n", vector);
-        asm volatile ("cli; hlt"); // Completely hangs the computer
+        disable_irq();
     }
     pic_sendEOI(vector);
 }
