@@ -46,9 +46,9 @@ gdt_flush:
     leave
     ret
 
-.global loadPageDirectory
-.type loadPageDirectory, @function
-loadPageDirectory:
+.global load_page_directory
+.type load_page_directory, @function
+load_page_directory:
     push %ebp
     mov %esp, %ebp
     mov 8(%esp), %eax
@@ -57,9 +57,9 @@ loadPageDirectory:
     pop %ebp
     ret
 
-.global enablePaging
-.type enablePaging, @function
-enablePaging:
+.global enable_paging
+.type enable_paging, @function
+enable_paging:
     push %ebp
     mov %esp, %ebp
     mov %cr0, %eax
@@ -72,5 +72,5 @@ enablePaging:
 .section .bss
 .align 16
 stack:
-    .space 4 * 1024 * 1024  # 4MB stack
+    .space 1 * 1024 * 1024  # 1MB stack
 stack_top:

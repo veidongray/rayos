@@ -17,7 +17,7 @@ CFLAGS = -m32                               \
     -fno-stack-protector                    \
     -mno-red-zone                           \
     -mno-sse -mno-sse2 -mno-mmx -mno-80387  \
-    -Wall -Wextra -Werror                   \
+    -Wall -Wextra                           \
     -g -fno-omit-frame-pointer              \
     -fno-asynchronous-unwind-tables         \
     -std=gnu99                              \

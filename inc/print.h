@@ -3,9 +3,9 @@
 
 #include <stdint.h>
 
-
 int cga_init(void);
-char *itoa( int value, char *str, int base);
+char *itoa(int value, char *str, int base);
+char *uitoa(uint32_t value, char *str, int base);
 int cga_putc(const char ch);
 int cga_puts(const char *str);
 int cga_printf(const char *format, ...);
