@@ -47,13 +47,13 @@ ISR_STUB(28)  # Reserved
 ISR_STUB(29)  # Reserved
 ISR_STUB(30)  # Reserved
 ISR_STUB(31)  # Reserved
-ISR_STUB(32)
-ISR_STUB(33)
-ISR_STUB(34)
-ISR_STUB(35)
-ISR_STUB(36)
-ISR_STUB(37)
-ISR_STUB(38)
+ISR_STUB(32)  # PIT timer
+ISR_STUB(33)  # Keyboard
+ISR_STUB(34)  # Slave
+ISR_STUB(35)  # COM2/COM4
+ISR_STUB(36)  # COM1/COM3
+ISR_STUB(37)  # LPT2/Sound
+ISR_STUB(38)  # Soft disk controller
 ISR_STUB(39)
 ISR_STUB(40)
 ISR_STUB(41)

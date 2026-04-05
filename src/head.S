@@ -19,7 +19,7 @@ end_mboot:
 .type _start, @function
 _start:
     # Set up the stack
-    mov $stack_top, %esp
+    mov $kstack_top, %esp
     # Never return
     call main
     hlt
@@ -71,6 +71,6 @@ enable_paging:
 
 .section .bss
 .align 16
-stack:
-    .space 1 * 1024 * 1024  # 1MB stack
-stack_top:
+kstack:
+    .space 64 * 1024  # 512KB stack
+kstack_top:

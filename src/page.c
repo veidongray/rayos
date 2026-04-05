@@ -1,124 +1,58 @@
 #include "page.h"
 #include "print.h"
 
-static pd_t kernel_page_directory_entry[1024] __attribute__((aligned(4096)));
-static pt_t kernel_page_table_entry[8][1024] __attribute__((aligned(4096)));
-struct vm_area
-{
-    pd_t pd[1024];
-    pd_t pt[1024][1024];
-};
+uint32_t page_directory[1024] __attribute__((aligned(4096)));
+uint32_t first_page_table[1024] __attribute__((aligned(4096)));
 
 int page_init(void)
 {
-    uint32_t i, j, len, size;
+    int i, j;
 
-    for (i = 0; i < 1024; ++i)
+    for (i = 0; i < 1024; i++)
     {
-        // fill global page directory
-        kernel_page_directory_entry[i] = 0x00000000;
+        // This sets the following flags to the pages:
+        //   Supervisor: Only kernel-mode can access them
+        //   Write Enabled: It can be both read from and written to
+        //   Not Present: The page table is not present
+        page_directory[i] = 0x00000002;
     }
-
-    /* Init kernel page from page[0 ~ len] and page[768 ~ 768 + len] */
-    size = (uint32_t)_kernel_end_aligned - (uint32_t)_kernel_start;
-    len = (size / 0x400000) + ((size % 0x400000) ? 1 : 0);
-
-    for (i = 0; i < len; ++i)
+    // we will fill all 1024 entries in the table, mapping 4 megabytes
+    for (i = 0; i < 1024; i++)
     {
-        for (j = 0; j < 1024; ++j)
-        {
-            // 4MB per page == 0x400000 bytes
-            kernel_page_table_entry[i][j] = ((i * 0x400000) + (j * 0x1000));
-            page_set_rw(&kernel_page_table_entry[i][j]);
-            page_set_present(&kernel_page_table_entry[i][j]);
-        }
+        // As the address is page aligned, it will always leave 12 bits zeroed.
+        // Those bits are used by the attributes ;)
+        first_page_table[i] = (i * 0x1000) | 0x00000003; // attributes: supervisor level, read/write, present.
     }
-
-    for (i = 0; i < len; ++i)
-    {
-        // for 0x00000000 ~ [size]
-        kernel_page_directory_entry[i] = (uint32_t)kernel_page_table_entry[i];
-        page_set_rw(&kernel_page_directory_entry[i]);
-        page_set_present(&kernel_page_directory_entry[i]);
-    }
-
-    for (i = 0; i < len; ++i)
-    {
-        // for 0xC0000000 ~ 0xFFFFFFFF
-        kernel_page_directory_entry[i + 768] = (uint32_t)kernel_page_table_entry[i];
-        page_set_rw(&kernel_page_directory_entry[i]);
-        page_set_present(&kernel_page_directory_entry[i]);
-    }
-
-    // last PDE to itslef
-    kernel_page_directory_entry[1023] = kernel_page_directory_entry;
-    page_set_rw(&kernel_page_directory_entry[1023]);
-    page_set_present(&kernel_page_directory_entry[1023]);
-
+    // attributes: supervisor level, read/write, present
+    page_directory[0] = ((uint32_t)first_page_table) | 0x00000003;
+    // 0xC0000000 map to 0x00000000
+    page_directory[768] = ((uint32_t)first_page_table) | 0x00000003;
+    // self-mapping
+    page_directory[1023] = ((uint32_t)page_directory) | 0x00000003;
+    /* Map:
+     * 0x00000000 ~ 0x00400000 to 0x00000000 ~ 0x00400000
+     * 0xC0000000 ~ 0xC0400000 to 0xC0000000 ~ 0xC0400000
+     * 0xFFFFF000 to page_directory
+     * ((uint32_t *)0xFFFFF000)[0] == page_directory[0]
+     * 0xFFC00000 to first_page_table
+     * ((uint32_t *)0xFFC00000)[0] == first_page_table[0]
+     */
     // And this inside a function
-    load_page_directory(kernel_page_directory_entry);
+    load_page_directory(page_directory);
     enable_paging();
-
-    cga_printf("Pageing:\n");
-    for (i = 768; i < len + 768; i += 4)
-    {
-        cga_printf("PDE[%u]: 0x%X PDE[%u]: 0x%X PDE[%u]: 0x%X PDE[%u]: 0x%X\n",
-                   i, kernel_page_directory_entry[i],
-                   i + 1, kernel_page_directory_entry[i + 1],
-                   i + 2, kernel_page_directory_entry[i + 2],
-                   i + 3, kernel_page_directory_entry[i + 3]);
-    }
-    cga_printf("last PDE[1023]: 0x%X\n", *(uint32_t *)0xfffff000);
     return 0;
 }
 
-int page_set_rw(uint32_t *page)
+uint32_t *get_physaddr(uint32_t *virtaddr)
 {
-    *page = *page | 0x00000002;
-    return *page;
-}
-
-int page_set_present(uint32_t *page)
-{
-    *page = *page | 0x00000001;
-    return *page;
-}
-
-uint32_t page_get_physaddr(uint32_t virtualaddr)
-{
-    uint32_t addr = 0;
-    uint32_t pd_index;
-    uint32_t pt_index;
-    pd_t *last_pde = (pd_t *)0xfffff000;
-    pt_t *pte;
-
-    pd_index = virtualaddr >> 22;
-    pt_index = (virtualaddr >> 12) & 0x3ff;
-
-    // check last pde[pd_index] whether set PRESENT bit
-    if (last_pde[pd_index] && 0x00000001)
-    {
-        pte = last_pde[pd_index] & 0xfffffffc;
+    uint32_t *addr = 0;
+    uint32_t pd_index = (uint32_t)virtaddr >> 22;
+    uint32_t pt_index = (uint32_t)virtaddr >> 12 & 0x3ff;
+    uint32_t *pd = (uint32_t *)0xFFFFF000;
+    uint32_t *pt = (uint32_t *)0xFFC00000;
+    if (pd[pd_index] & 0x00000001 && pt[pt_index] & 0x00000001) {
+        addr = (uint32_t)pt[pt_index] + ((uint32_t)virtaddr & 0xfff);
+        addr = (uint32_t)addr & ~0xfff;
     }
-    else
-    {
-        goto err;
-    }
-
-    // check the pte whether set PRESENT bit
-    if (*(uint32_t *)pte && 0x00000001)
-    {
-        addr = *(uint32_t *)pte & 0xfffffffc;
-    }
-    else
-    {
-        goto err;
-    }
-
-    // add page offsets
-    addr += (pt_index * 0x1000) + (virtualaddr & 0xfff);
     return addr;
-err:
-    cga_printf("Error virtual address 0x%X\n", virtualaddr);
-    return 0;
 }

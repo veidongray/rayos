@@ -14,8 +14,6 @@ typedef uint32_t pt_t;
 extern void load_page_directory(uint32_t *);
 extern void enable_paging();
 int page_init(void);
-int page_set_rw(uint32_t *page);
-int page_set_present(uint32_t *page);
-uint32_t page_get_physaddr(uint32_t virtualaddr);
+uint32_t *get_physaddr(uint32_t *virtaddr);
 
 #endif // PAGE_H

@@ -9,6 +9,8 @@ void exception_handler(uint32_t vector) {
     } else if (vector == IRQ14_VECTOR) {
         cga_printf("Page fault!\n");
         disable_irq();
+    } else if (vector == IRQ1_VECTOR) {
+        cga_printf("Keyboard handle\n");
     } else {
         cga_printf("Unhandled exception: %d\n", vector);
         disable_irq();
