@@ -72,5 +72,5 @@ enable_paging:
 .section .bss
 .align 16
 kstack:
-    .space 64 * 1024  # 512KB stack
+    .space 64 * 1024  # 64KB stack
 kstack_top:

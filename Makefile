@@ -7,10 +7,10 @@ mkiso: build
 	grub-mkrescue -o rayos.iso iso/
 
 qemu: mkiso
-	qemu-system-i386 -cdrom rayos.iso
+	qemu-system-i386 -m 64M -cdrom rayos.iso
 
 qemu-dbg: mkiso
-	qemu-system-i386 -S -gdb tcp::1234 -cdrom rayos.iso
+	qemu-system-i386 -m 64M -S -gdb tcp::1234 -cdrom rayos.iso
 
 clean:
 	$(RM) *.iso vmrayos iso/boot/vmrayos src/*.o
