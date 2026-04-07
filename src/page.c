@@ -58,7 +58,17 @@ int page_init(void)
     // And this inside a function
     load_page_directory(page_directory);
     enable_paging();
-    alloc_page();
+    virtaddr_t virtaddr;
+    for (i = 0; i < 1024; ++i) {
+         virtaddr = alloc_page();
+    }
+    cga_printf("virtaddr: 0x%x\n", virtaddr);
+    *virtaddr = 0x12345678;
+    cga_printf("physaddr: 0x%x\n", get_physaddr(virtaddr));
+    cga_printf("value: 0x%x\n", *virtaddr);
+    map_page((uint32_t*)get_physaddr(virtaddr), (uint32_t *)(0xc0000000 + virtaddr), 0x00000003);
+    cga_printf("physaddr: 0x%x\n", get_physaddr((virtaddr_t)(0xc0000000 + virtaddr)));
+    cga_printf("value: 0x%x\n", *(uint32_t *)(0xc0000000 + virtaddr));
     return 0;
 }
 
@@ -102,8 +112,6 @@ virtaddr_t alloc_page(void)
     uint32_t i, j;
     pd_t pd;
     pt_t pt;
-    pt_t new_pt;
-    pg_t new_pg;
     physaddr_t physaddr;
     virtaddr_t virtaddr;
     uint32_t pd_index;
@@ -119,19 +127,17 @@ virtaddr_t alloc_page(void)
         {
             physaddr = (physaddr_t)(i * 0x1000);
             // find unused virtaddr
-            // for (j = 0; j < (uint32_t)0xfffff000; j += 0x1000)
-            // {
-            //     if (get_physaddr((virtaddr_t)j) == (physaddr_t)-1)
-            //     {
-            //         // found empty page
-            //         virtaddr = (virtaddr_t)j;
-            //         cga_printf("found virt %X\n", virtaddr);
-            //         goto found_virtaddr;
-            //     }
-            // }
+            for (j = 0; j < (uint32_t)0xfffff000; j += 0x1000)
+            {
+                if (get_physaddr((virtaddr_t)j) == (physaddr_t)-1)
+                {
+                    // found empty page
+                    virtaddr = (virtaddr_t)j;
+                    goto found_virtaddr;
+                }
+            }
         }
     }
-    virtaddr = 0x3FF000;
 
 found_virtaddr:
     pd_index = (uint32_t)virtaddr >> 22;
@@ -139,40 +145,32 @@ found_virtaddr:
     pd = (pd_t)0xFFFFF000;
     pt = (pt_t)(0xFFC00000 + (pd_index << 12));
     // check this pde whether need create
-    // if (!(pd[pd_index] & 0x00000001))
-    // {
-    //     if (get_physaddr((virtaddr_t)kernel_end) == (virtaddr_t)-1)
-    //     {
-    //         pt_t tmp_pt[1024];
-    //         virtaddr_t tmp = (uint32_t)kernel_end;
-            
-    //         if (get_physaddr((virtaddr_t)kernel_end) != (virtaddr_t)-1)
-    //         {
-    //             cga_printf("%X is map in system!\n", kernel_end);
-    //         }
-    //         else
-    //         {
-    //             cga_printf("%X is not map in system!\n", kernel_end);
-    //             return (virtaddr_t)-1;
-    //         }
-    //     }
-    //     set_bitmap(physaddr_bitmap, (uint32_t)physaddr / 0x1000);
-    //     return virtaddr;
-    // }
-
-    // if page table is present
-    if ((pd[pd_index] & 0x00000001))
+    if (!(pd[pd_index] & 0x00000001))
+    {
+        if (get_physaddr(virtaddr) == (virtaddr_t)-1)
+        {
+            pd[pd_index] = (uint32_t)((uint32_t)physaddr & ~0xfff) | 0x00000003;
+            kernel_end = (physaddr_t)((uint32_t)physaddr + 0x1000);
+            physaddr = (physaddr_t)((uint32_t)physaddr + 0x1000);
+            pt[pt_index] = (uint32_t)((uint32_t)physaddr & ~0xfff) | 0x00000003;
+            kernel_end = (physaddr_t)((uint32_t)physaddr + 0x1000);
+            set_bitmap(physaddr_bitmap, ((uint32_t)physaddr - 0x1000) >> 12);
+            set_bitmap(physaddr_bitmap, (uint32_t)physaddr >> 12);
+            if (get_physaddr(virtaddr) == (virtaddr_t)-1) return (virtaddr_t)-1;
+            return virtaddr;
+        }
+    }
+    else
     {
         // create a new page
-        if (get_physaddr((virtaddr_t)virtaddr) == (virtaddr_t)-1)
+        if (get_physaddr(virtaddr) == (virtaddr_t)-1)
         {
-            virtaddr_t tmp = (virtaddr_t)virtaddr;
-            pt[pt_index] |= (uint32_t)kernel_end & ~0xfff | 0x00000003;
-            kernel_end = (uint32_t)kernel_end + 0x1000;
-            new_pg = virtaddr;
-            set_bitmap(physaddr_bitmap, (uint32_t)physaddr / 0x1000);
+            pt[pt_index] = (uint32_t)((uint32_t)physaddr & ~0xfff) | 0x00000003;
+            kernel_end = (physaddr_t)((uint32_t)physaddr + 0x1000);
+            set_bitmap(physaddr_bitmap, (uint32_t)physaddr >> 12);
+            if (get_physaddr(virtaddr) == (virtaddr_t)-1) return (virtaddr_t)-1;
+            return virtaddr;
         }
-        return virtaddr;
     }
     return (virtaddr_t)-1;
 }
