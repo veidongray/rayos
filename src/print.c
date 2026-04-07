@@ -229,3 +229,17 @@ int cga_printf(const char *format, ...)
 
     return count;
 }
+
+int cga_init(void)
+{
+    uint8_t **cga = get_cgaptr();
+    uint32_t i;
+    for (i = 0; i < 4000; ++i)
+    {
+        cga_putc(' ');
+        cga_putc(0x07); // Light grey on black
+    }
+    *cga = (uint8_t *)0xB8000;
+    cga_info("CGA text mode initialized.\n");
+    return 0;
+}

@@ -38,11 +38,11 @@ int gdt_init(void)
     load_gdt(desc, sizeof(struct gdt_entry) * 5);
 	extern void gdt_flush(struct gdtr *gdtr);
     gdt_flush(get_gdtr());
-    cga_printf("GDT initialization...\n");
-    for (int i = 0; i < 5; ++i) {
-        cga_printf("GDT Entry %d: Base=0x%X, Limit=0x%X, Access=0x%X, Granularity=0x%X\n",
-                   i, (descriptors[i].base_high << 24) | (descriptors[i].base_mid << 16) | descriptors[i].base_low,
-                   descriptors[i].limit, descriptors[i].access, descriptors[i].granularity);
-    }
+    cga_info("GDT loaded with 5 entries.\n");
+    // for (int i = 0; i < 5; ++i) {
+    //     cga_printf("GDT Entry %d: Base=0x%X, Limit=0x%X, Access=0x%X, Granularity=0x%X\n",
+    //                i, (descriptors[i].base_high << 24) | (descriptors[i].base_mid << 16) | descriptors[i].base_low,
+    //                descriptors[i].limit, descriptors[i].access, descriptors[i].granularity);
+    // }
     return 0;
 }

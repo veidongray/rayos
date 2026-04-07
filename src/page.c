@@ -1,5 +1,6 @@
 #include "page.h"
 #include "print.h"
+#include "systicks.h"
 
 uint32_t page_directory[1024]
     __attribute__((aligned(4096)));
@@ -8,8 +9,6 @@ uint32_t first_page_table[1024]
 
 // 4K page per bit
 uint8_t physaddr_bitmap[0x20000];
-int free_page(virtaddr_t virtaddr);
-int flush_tlb(void);
 physaddr_t kernel_end = _kernel_end_aligned;
 
 int page_init(void)
@@ -53,7 +52,8 @@ int page_init(void)
     // And this inside a function
     load_page_directory(page_directory);
     enable_paging();
-    alloc_pages(4096);
+    cga_printf("[%u] Paging enabled. Kernel mapped to 0~0x%X and 0xC0000000~0x%X.\n",
+        get_systicks(), (uint32_t)klen * 0x1000, (uint32_t)klen * 0x1000 + 0xc0000000);
     return 0;
 }
 
@@ -82,11 +82,28 @@ int map_page(uint32_t *physaddr, uint32_t *virtaddr, uint32_t flags)
         new_pt = (pt_t)alloc_page();
         pd[pd_index] = (uint32_t)get_physaddr(new_pt) | 0x00000003;
         new_pt[pt_index] = (uint32_t)(((uint32_t)physaddr & ~0xfff) | flags);
+        flush_tlb();
         return 0;
     }
     if (!(pt[pt_index] & 0x00000001))
     {
         pt[pt_index] = (uint32_t)(((uint32_t)physaddr & ~0xfff) | flags);
+        flush_tlb();
+        return 0;
+    }
+    return -1;
+}
+
+int unmap_page(virtaddr_t virtaddr)
+{
+    uint32_t pd_index = (uint32_t)virtaddr >> 22;
+    uint32_t pt_index = (uint32_t)virtaddr >> 12 & 0x3ff;
+    pd_t pd = (pd_t)0xFFFFF000;
+    pt_t pt = (pt_t)(0xFFC00000 + (pd_index << 12));
+    if ((pd[pd_index] & 0x00000001) && (pt[pt_index] & 0x00000001))
+    {
+        pt[pt_index] = 0x00000000;
+        flush_tlb();
         return 0;
     }
     return -1;

@@ -7,16 +7,14 @@
 
 void main(void)
 {
+    cga_init();
     gdt_init();
     idt_init();
     page_init();
-    pic_remap(0x20, 0x28);
-    timer_init();
-    enable_irq();
-    
-    cga_printf("_kernel_start: 0x%X\n", (uint32_t)_kernel_start);
-    cga_printf("_kernel_end: 0x%X\n", (uint32_t)_kernel_end);
-    cga_printf("_kernel_end_aligned: 0x%X\n", (uint32_t)_kernel_end_aligned);
+
+    cga_info("kernel_end: 0x%X.\n", (uint32_t)kernel_end);
+    cga_info("Kernel initialized successfully.\n");
+    cga_info("Systicks %uHZ.\n", TIMER_FREQ);
     while (1)
     {
         asm volatile("hlt\r\n");

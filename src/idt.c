@@ -1,4 +1,5 @@
 #include "idt.h"
+#include "pic.h"
 #include "print.h"
 
 static struct idt_entry idt[256];
@@ -27,9 +28,12 @@ int idt_init(void)
         set_idt_entry(i, isr_stub_table[i], 0x8E);
     }
     load_idt(idt, sizeof(idt));
-    cga_printf("IDT loaded with 32 entries.\n");
-    for (int i = 0; i <= 47; ++i) {
-        cga_printf("IDT Entry %d: ISR Address=0x%X\n", i, (idt[i].isr_high << 16) | idt[i].isr_low);
-    }
+    cga_info("IDT loaded with 32 entries.\n");
+    // for (int i = 0; i <= 47; ++i) {
+    //     cga_printf("IDT Entry %d: ISR Address=0x%X\n", i, (idt[i].isr_high << 16) | idt[i].isr_low);
+    // }
+    pic_remap(0x20, 0x28);
+    timer_init();
+    enable_irq();
     return 0;
 }

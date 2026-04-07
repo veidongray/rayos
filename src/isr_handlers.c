@@ -7,12 +7,12 @@ void exception_handler(uint32_t vector) {
     if (vector == IRQ0_VECTOR) {
         set_systicks(get_systicks() + 1);
     } else if (vector == IRQ14_VECTOR) {
-        cga_printf("Page fault!\n");
+        cga_info("Page fault!\n");
         disable_irq();
     } else if (vector == IRQ1_VECTOR) {
-        cga_printf("Keyboard handle\n");
+        cga_info("Keyboard handle\n");
     } else {
-        cga_printf("Unhandled exception: %d\n", vector);
+        cga_info("Unhandled exception: %d\n", vector);
         disable_irq();
     }
     pic_sendEOI(vector);
