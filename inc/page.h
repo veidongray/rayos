@@ -18,5 +18,11 @@ extern void load_page_directory(uint32_t *);
 extern void enable_paging();
 int page_init(void);
 physaddr_t get_physaddr(virtaddr_t virtaddr);
+virtaddr_t alloc_page(void);
+virtaddr_t alloc_pages(uint32_t num);
+int map_page(uint32_t *physaddr, uint32_t *virtaddr, uint32_t flags);
+uint8_t get_bitmap(uint8_t *bm, uint32_t index);
+uint8_t set_bitmap(uint8_t *bm, uint32_t index);
+uint8_t clr_bitmap(uint8_t *bm, uint32_t index);
 
 #endif // PAGE_H

@@ -8,14 +8,9 @@ uint32_t first_page_table[1024]
 
 // 4K page per bit
 uint8_t physaddr_bitmap[0x20000];
-
+int free_page(virtaddr_t virtaddr);
+int flush_tlb(void);
 physaddr_t kernel_end = _kernel_end_aligned;
-
-virtaddr_t alloc_page(void);
-int map_page(uint32_t *physaddr, uint32_t *virtaddr, uint32_t flags);
-uint8_t get_bitmap(uint8_t *bm, uint32_t index);
-uint8_t set_bitmap(uint8_t *bm, uint32_t index);
-uint8_t clr_bitmap(uint8_t *bm, uint32_t index);
 
 int page_init(void)
 {
@@ -58,17 +53,7 @@ int page_init(void)
     // And this inside a function
     load_page_directory(page_directory);
     enable_paging();
-    virtaddr_t virtaddr;
-    for (i = 0; i < 1024; ++i) {
-         virtaddr = alloc_page();
-    }
-    cga_printf("virtaddr: 0x%x\n", virtaddr);
-    *virtaddr = 0x12345678;
-    cga_printf("physaddr: 0x%x\n", get_physaddr(virtaddr));
-    cga_printf("value: 0x%x\n", *virtaddr);
-    map_page((uint32_t*)get_physaddr(virtaddr), (uint32_t *)(0xc0000000 + virtaddr), 0x00000003);
-    cga_printf("physaddr: 0x%x\n", get_physaddr((virtaddr_t)(0xc0000000 + virtaddr)));
-    cga_printf("value: 0x%x\n", *(uint32_t *)(0xc0000000 + virtaddr));
+    alloc_pages(4096);
     return 0;
 }
 
@@ -125,9 +110,9 @@ virtaddr_t alloc_page(void)
     {
         if (!get_bitmap(physaddr_bitmap, i))
         {
-            physaddr = (physaddr_t)(i * 0x1000);
+            physaddr = (physaddr_t)(i * (uint32_t)0x1000);
             // find unused virtaddr
-            for (j = 0; j < (uint32_t)0xfffff000; j += 0x1000)
+            for (j = 0; j < (uint32_t)0xfffff000; j += (uint32_t)0x1000)
             {
                 if (get_physaddr((virtaddr_t)j) == (physaddr_t)-1)
                 {
@@ -157,6 +142,7 @@ found_virtaddr:
             set_bitmap(physaddr_bitmap, ((uint32_t)physaddr - 0x1000) >> 12);
             set_bitmap(physaddr_bitmap, (uint32_t)physaddr >> 12);
             if (get_physaddr(virtaddr) == (virtaddr_t)-1) return (virtaddr_t)-1;
+            flush_tlb();
             return virtaddr;
         }
     }
@@ -169,10 +155,57 @@ found_virtaddr:
             kernel_end = (physaddr_t)((uint32_t)physaddr + 0x1000);
             set_bitmap(physaddr_bitmap, (uint32_t)physaddr >> 12);
             if (get_physaddr(virtaddr) == (virtaddr_t)-1) return (virtaddr_t)-1;
+            flush_tlb();
             return virtaddr;
         }
     }
     return (virtaddr_t)-1;
+}
+
+int free_page(virtaddr_t virtaddr)
+{
+    uint32_t pd_index = (uint32_t)virtaddr >> 22;
+    uint32_t pt_index = (uint32_t)virtaddr >> 12 & 0x3ff;
+    pd_t pd = (pd_t)0xFFFFF000;
+    pt_t pt = (pt_t)(0xFFC00000 + (pd_index << 12));
+    if ((pd[pd_index] & 0x00000001) && (pt[pt_index] & 0x00000001))
+    {
+        uint32_t physaddr = pt[pt_index] & ~0xfff;
+        clr_bitmap(physaddr_bitmap, physaddr >> 12);
+        pt[pt_index] = 0x00000000;
+        flush_tlb();
+        return 0;
+    }
+    return -1;
+}
+
+virtaddr_t alloc_pages(uint32_t num)
+{
+    uint32_t i, j;
+    uint32_t *virtaddr_buffer[1024];
+    virtaddr_t virtaddr;
+
+    if (num == 0 || num > 1024) return (virtaddr_t)-1;
+    if (num == 1) return (virtaddr_t)alloc_page();
+    for (i = 0; i < num; ++i)
+    {
+        virtaddr_buffer[i] = (uint32_t *)alloc_page();
+        if (virtaddr_buffer[i] == (uint32_t *)-1)
+        {
+            for (j = 0; j < i; ++j)
+                free_page((virtaddr_t)virtaddr_buffer[j]);
+            return (virtaddr_t)-1;
+        }
+    }
+    for (i = 1; i < num; ++i) {
+        if ((uint32_t)virtaddr_buffer[i] != (uint32_t)((uint32_t)virtaddr_buffer[0] + (i * (uint32_t)0x1000))) {
+            for (j = 0; j < num; ++j)
+                free_page((virtaddr_t)virtaddr_buffer[j]);
+            return (virtaddr_t)-1;
+        }
+    }
+    virtaddr = (virtaddr_t)virtaddr_buffer[0];
+    return virtaddr;
 }
 
 uint8_t get_bitmap(uint8_t *bm, uint32_t index)
@@ -206,5 +239,12 @@ uint8_t clr_bitmap(uint8_t *bm, uint32_t index)
     j = index % 8;
     // MSB first
     bm[i] = bm[i] & ~((1 << 7) >> j);
+    return 0;
+}
+
+int flush_tlb(void)
+{
+    asm volatile("movl %cr3, %eax\r\n"
+                 "movl %eax, %cr3\r\n");
     return 0;
 }
