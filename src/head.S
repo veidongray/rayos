@@ -2,15 +2,20 @@
 .section .multiboot2
 .align 8
 mboot:
-    .long 0xe85250d6          # magic
-    .long 0                   # architecture (0 = i386)
-    .long end_mboot - mboot   # total size
+    .long 0xe85250d6                # magic
+    .long 0                         # architecture (0 = i386)
+    .long end_mboot - mboot         # total size
     .long -(0xe85250d6 + 0 + (end_mboot - mboot))  # checksum
 
-    # End tag (mandatory!)
-    .word 0                   # type = 0 (end tag)
-    .word 0                   # flags = 0
-    .long 8                   # size = 8 bytes
+    # Request memory map information (required!)
+    .word 6                         # type = MULTIBOOT_HEADER_TAG_MMAP
+    .word 0                         # flags = 0
+    .long 8                         # size = 8 bytes
+
+    # End tag (mandatory)
+    .word 0                         # type = 0 (end tag)
+    .word 0                         # flags = 0
+    .long 8                         # size = 8 bytes
 end_mboot:
 
 .code32		# to 32-bit mode
@@ -21,6 +26,11 @@ _start:
     # Set up the stack
     mov $kstack_top, %esp
     # Never return
+    # push tags for mmap from multiboot2
+    # pass the address of the multiboot info structure (in %ebx) to main
+    push %ebx
+    # push the grub magic number (in %eax) to main
+    push %eax
     call main
     hlt
 

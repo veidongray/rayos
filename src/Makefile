@@ -9,7 +9,8 @@ OBJS =  head.o          \
         gdt.o           \
         idt.o           \
         systicks.o      \
-        page.o
+        page.o          \
+        multiboot2.o
 
 CFLAGS = -m32                               \
     -ffreestanding                          \

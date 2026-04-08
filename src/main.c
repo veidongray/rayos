@@ -4,10 +4,10 @@
 #include "gdt.h"
 #include "idt.h"
 #include "page.h"
+#include "multiboot2.h"
 
-void main(void)
+void kernel_main(void)
 {
-    cga_init();
     gdt_init();
     idt_init();
     page_init();
@@ -19,4 +19,19 @@ void main(void)
     {
         asm volatile("hlt\r\n");
     }
+}
+
+void main(uint32_t grub_magic, uint32_t mbi_addr)
+{
+    cga_init();
+    if (grub_magic != 0x36d76289)
+    {
+        cga_info("Invalid multiboot magic number: 0x%X.\n", grub_magic);
+        while (1)
+        {
+            asm volatile("hlt\r\n");
+        }
+    }
+    parse_multiboot2_mmap((void*)mbi_addr);
+    kernel_main();
 }
