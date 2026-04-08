@@ -1,6 +1,7 @@
 #include "page.h"
 #include "print.h"
 #include "systicks.h"
+#include "multiboot2.h"
 
 uint32_t page_directory[1024]
     __attribute__((aligned(4096)));
@@ -9,7 +10,15 @@ uint32_t first_page_table[1024]
 
 // 4K page per bit
 uint8_t physaddr_bitmap[0x20000];
-physaddr_t kernel_end = _kernel_end_aligned;
+physaddr_t heap_top = _kernel_end_aligned;
+
+struct page {
+    physaddr_t base;
+    uint32_t flags;
+    uint32_t kref;
+} __attribute__((packed));
+
+struct page *page = (void *)0;
 
 int page_init(void)
 {
@@ -52,8 +61,41 @@ int page_init(void)
     // And this inside a function
     load_page_directory(page_directory);
     enable_paging();
-    cga_printf("[%u] Paging enabled. Kernel mapped to 0~0x%X and 0xC0000000~0x%X.\n",
-        get_systicks(), (uint32_t)klen * 0x1000, (uint32_t)klen * 0x1000 + 0xc0000000);
+    page = (struct page *)alloc_pages((((total_ram >> 12) * sizeof(struct page)) >> 12) + 1);
+    for (i = 0; i < ((uint32_t)total_ram >> 12); ++i)
+    {
+        page[i].base = (physaddr_t)(i * 0x1000);
+        page[i].flags = 0;
+        if (get_bitmap(physaddr_bitmap, i))
+        {
+            page[i].flags = 0x1; // used
+            page[i].kref = 1;
+        }
+        else
+        {
+            page[i].flags = 0;
+            page[i].kref = 0;
+        }
+    }
+    cga_info("page[%X].kref = %u, page[%X].base = 0x%X\n",
+        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].kref,
+        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].base);
+    map_page((uint32_t *)0x100000, (uint32_t *)0xB0100000, 0x00000003);
+    cga_info("page[%X].kref = %u, page[%X].base = 0x%X\n",
+        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].kref,
+        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].base);
+    map_page((uint32_t *)0x100000, (uint32_t *)0xB0200000, 0x00000003);
+    cga_info("page[%X].kref = %u, page[%X].base = 0x%X\n",
+        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].kref,
+        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].base);
+    unmap_page((virtaddr_t)0xB0100000);
+    cga_info("page[%X].kref = %u, page[%X].base = 0x%X\n",
+        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].kref,
+        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].base);
+    free_page((virtaddr_t)0xB0200000);
+    cga_info("page[%X].kref = %u, page[%X].base = 0x%X\n",
+        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].kref,
+        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].base);
     return 0;
 }
 
@@ -82,12 +124,14 @@ int map_page(uint32_t *physaddr, uint32_t *virtaddr, uint32_t flags)
         new_pt = (pt_t)alloc_page();
         pd[pd_index] = (uint32_t)get_physaddr(new_pt) | 0x00000003;
         new_pt[pt_index] = (uint32_t)(((uint32_t)physaddr & ~0xfff) | flags);
+        if (page) page[(uint32_t)physaddr >> 12].kref++;
         flush_tlb();
         return 0;
     }
     if (!(pt[pt_index] & 0x00000001))
     {
         pt[pt_index] = (uint32_t)(((uint32_t)physaddr & ~0xfff) | flags);
+        if (page) page[(uint32_t)physaddr >> 12].kref++;
         flush_tlb();
         return 0;
     }
@@ -100,9 +144,12 @@ int unmap_page(virtaddr_t virtaddr)
     uint32_t pt_index = (uint32_t)virtaddr >> 12 & 0x3ff;
     pd_t pd = (pd_t)0xFFFFF000;
     pt_t pt = (pt_t)(0xFFC00000 + (pd_index << 12));
+    physaddr_t physaddr;
+    if ((physaddr = get_physaddr(virtaddr)) == (physaddr_t)-1) return -1;
     if ((pd[pd_index] & 0x00000001) && (pt[pt_index] & 0x00000001))
     {
         pt[pt_index] = 0x00000000;
+        if (page) page[(uint32_t)physaddr >> 12].kref--;
         flush_tlb();
         return 0;
     }
@@ -152,13 +199,14 @@ found_virtaddr:
         if (get_physaddr(virtaddr) == (virtaddr_t)-1)
         {
             pd[pd_index] = (uint32_t)((uint32_t)physaddr & ~0xfff) | 0x00000003;
-            kernel_end = (physaddr_t)((uint32_t)physaddr + 0x1000);
+            heap_top = (physaddr_t)((uint32_t)physaddr + 0x1000);
             physaddr = (physaddr_t)((uint32_t)physaddr + 0x1000);
             pt[pt_index] = (uint32_t)((uint32_t)physaddr & ~0xfff) | 0x00000003;
-            kernel_end = (physaddr_t)((uint32_t)physaddr + 0x1000);
+            heap_top = (physaddr_t)((uint32_t)physaddr + 0x1000);
             set_bitmap(physaddr_bitmap, ((uint32_t)physaddr - 0x1000) >> 12);
             set_bitmap(physaddr_bitmap, (uint32_t)physaddr >> 12);
             if (get_physaddr(virtaddr) == (virtaddr_t)-1) return (virtaddr_t)-1;
+            if (page) page[(uint32_t)physaddr >> 12].kref++;
             flush_tlb();
             return virtaddr;
         }
@@ -169,9 +217,10 @@ found_virtaddr:
         if (get_physaddr(virtaddr) == (virtaddr_t)-1)
         {
             pt[pt_index] = (uint32_t)((uint32_t)physaddr & ~0xfff) | 0x00000003;
-            kernel_end = (physaddr_t)((uint32_t)physaddr + 0x1000);
+            heap_top = (physaddr_t)((uint32_t)physaddr + 0x1000);
             set_bitmap(physaddr_bitmap, (uint32_t)physaddr >> 12);
             if (get_physaddr(virtaddr) == (virtaddr_t)-1) return (virtaddr_t)-1;
+            if (page) page[(uint32_t)physaddr >> 12].kref++;
             flush_tlb();
             return virtaddr;
         }
@@ -189,6 +238,7 @@ int free_page(virtaddr_t virtaddr)
     {
         uint32_t physaddr = pt[pt_index] & ~0xfff;
         clr_bitmap(physaddr_bitmap, physaddr >> 12);
+        if (page) page[(uint32_t)physaddr >> 12].kref--;
         pt[pt_index] = 0x00000000;
         flush_tlb();
         return 0;
@@ -198,31 +248,40 @@ int free_page(virtaddr_t virtaddr)
 
 virtaddr_t alloc_pages(uint32_t num)
 {
-    uint32_t i, j;
-    uint32_t *virtaddr_buffer[1024];
-    virtaddr_t virtaddr;
+    uint32_t i, j, len, length;
+    virtaddr_t virtaddr[1024];
+
+    for (i = 0; i < num; ++i)
+        virtaddr[i] = 0;
 
     if (num == 0 || num > 1024) return (virtaddr_t)-1;
-    if (num == 1) return (virtaddr_t)alloc_page();
+    if (num == 1) return alloc_page();
+    for (i = 0x100000; i < 0xfffff000; i += 0x1000)
+    {
+        length = 0;
+        len = i + (num * 0x1000);
+        for (j = i; j < len; j += 0x1000)
+            if (get_physaddr((virtaddr_t)j) == (physaddr_t)-1)
+                length++;
+        if (length == num)
+            break;
+        i = (j - 0x1000) - (length * 0x1000);
+        len = 0xfffff000 - (0x1000 * num);
+        if (i > len)
+            return (virtaddr_t)-1;
+    }
     for (i = 0; i < num; ++i)
     {
-        virtaddr_buffer[i] = (uint32_t *)alloc_page();
-        if (virtaddr_buffer[i] == (uint32_t *)-1)
+        virtaddr[i] = alloc_page();
+        if (virtaddr[i] == (virtaddr_t)-1)
         {
+            // free already allocated pages
             for (j = 0; j < i; ++j)
-                free_page((virtaddr_t)virtaddr_buffer[j]);
+                free_page(virtaddr[j]);
             return (virtaddr_t)-1;
         }
     }
-    for (i = 1; i < num; ++i) {
-        if ((uint32_t)virtaddr_buffer[i] != (uint32_t)((uint32_t)virtaddr_buffer[0] + (i * (uint32_t)0x1000))) {
-            for (j = 0; j < num; ++j)
-                free_page((virtaddr_t)virtaddr_buffer[j]);
-            return (virtaddr_t)-1;
-        }
-    }
-    virtaddr = (virtaddr_t)virtaddr_buffer[0];
-    return virtaddr;
+    return virtaddr[0];
 }
 
 uint8_t get_bitmap(uint8_t *bm, uint32_t index)
