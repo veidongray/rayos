@@ -9,6 +9,9 @@ void exception_handler(uint32_t vector) {
     } else if (vector == IRQ14_VECTOR) {
         cga_info("Page fault!\n");
         disable_irq();
+    } else if (vector == IRQ13_VECTOR) {
+        cga_info("Protection fault!\n");
+        disable_irq();
     } else if (vector == IRQ1_VECTOR) {
         cga_info("Keyboard handle\n");
     } else {

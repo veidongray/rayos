@@ -24,78 +24,38 @@ int page_init(void)
 {
     uint32_t i, klen;
 
-    for (i = 0; i < 0x20000; ++i)
-        physaddr_bitmap[i] = 0x00;
+    
 
-    for (i = 0; i < 1024; i++)
-    {
-        // This sets the following flags to the pages:
-        //   Supervisor: Only kernel-mode can access them
-        //   Write Enabled: It can be both read from and written to
-        //   Not Present: The page table is not present
-        page_directory[i] = 0x00000002;
-    }
-    // we will fill all 1024 entries in the table, mapping 4 megabytes
-    klen = (uint32_t)_kernel_end_aligned / 0x1000;
-    for (i = 0; i < klen; i++)
-    {
-        // As the address is page aligned, it will always leave 12 bits zeroed.
-        // Those bits are used by the attributes ;)
-        first_page_table[i] = (i * 0x1000) | 0x00000003; // attributes: supervisor level, read/write, present.
-        set_bitmap(physaddr_bitmap, i);
-    }
-    // attributes: supervisor level, read/write, present
-    page_directory[0] = ((uint32_t)first_page_table) | 0x00000003;
-    // 0xC0000000 map to 0x00000000
-    page_directory[768] = ((uint32_t)first_page_table) | 0x00000003;
-    // self-mapping
-    page_directory[1023] = ((uint32_t)page_directory) | 0x00000003;
-    /* Map kernel to 0~4MB:
-     * 0x00000000 ~ 0x00400000 to 0x00000000 ~ 0x00400000
-     * 0xC0000000 ~ 0xC0400000 to 0xC0000000 ~ 0xC0400000
-     * 0xFFFFF000 to page_directory
-     * ((uint32_t *)0xFFFFF000)[0] == page_directory[0]
-     * 0xFFC00000 to first_page_table
-     * ((uint32_t *)0xFFC00000)[0] == first_page_table[0]
-     */
+
+    // for (i = 0; i < 0x20000; ++i)
+    //     physaddr_bitmap[i] = 0x00;
+
+    // for (i = 0; i < 1024; i++)
+    // {
+    //     // This sets the following flags to the pages:
+    //     //   Supervisor: Only kernel-mode can access them
+    //     //   Write Enabled: It can be both read from and written to
+    //     //   Not Present: The page table is not present
+    //     page_directory[i] = 0x00000002;
+    // }
+    // // we will fill all 1024 entries in the table, mapping 4 megabytes
+    // klen = (uint32_t)_kernel_end_aligned / 0x1000;
+    // for (i = 0; i < klen; i++)
+    // {
+    //     // As the address is page aligned, it will always leave 12 bits zeroed.
+    //     // Those bits are used by the attributes ;)
+    //     first_page_table[i] = (i * 0x1000) | 0x00000003; // attributes: supervisor level, read/write, present.
+    //     set_bitmap(physaddr_bitmap, i);
+    // }
+    // // attributes: supervisor level, read/write, present
+    // page_directory[0] = ((uint32_t)first_page_table) | 0x00000003;
+    // // 0xC0000000 map to 0x00000000
+    // page_directory[768] = ((uint32_t)first_page_table) | 0x00000003;
+    // // self-mapping
+    // page_directory[1023] = ((uint32_t)page_directory) | 0x00000003;
     // And this inside a function
-    load_page_directory(page_directory);
-    enable_paging();
-    page = (struct page *)alloc_pages((((total_ram >> 12) * sizeof(struct page)) >> 12) + 1);
-    for (i = 0; i < ((uint32_t)total_ram >> 12); ++i)
-    {
-        page[i].base = (physaddr_t)(i * 0x1000);
-        page[i].flags = 0;
-        if (get_bitmap(physaddr_bitmap, i))
-        {
-            page[i].flags = 0x1; // used
-            page[i].kref = 1;
-        }
-        else
-        {
-            page[i].flags = 0;
-            page[i].kref = 0;
-        }
-    }
-    cga_info("page[%X].kref = %u, page[%X].base = 0x%X\n",
-        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].kref,
-        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].base);
-    map_page((uint32_t *)0x100000, (uint32_t *)0xB0100000, 0x00000003);
-    cga_info("page[%X].kref = %u, page[%X].base = 0x%X\n",
-        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].kref,
-        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].base);
-    map_page((uint32_t *)0x100000, (uint32_t *)0xB0200000, 0x00000003);
-    cga_info("page[%X].kref = %u, page[%X].base = 0x%X\n",
-        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].kref,
-        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].base);
-    unmap_page((virtaddr_t)0xB0100000);
-    cga_info("page[%X].kref = %u, page[%X].base = 0x%X\n",
-        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].kref,
-        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].base);
-    free_page((virtaddr_t)0xB0200000);
-    cga_info("page[%X].kref = %u, page[%X].base = 0x%X\n",
-        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].kref,
-        (uint32_t)0x100000 >> 12, page[(uint32_t)0x100000 >> 12].base);
+    // load_page_directory(page_directory);
+    // enable_paging();
     return 0;
 }
 
