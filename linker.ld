@@ -1,25 +1,23 @@
 ENTRY(_start)
 
-KERNEL_VADDR = 0xC0010000;
-
 SECTIONS
 {
-    . = KERNEL_VADDR;
+    . = 1M;
     _kernel_start = .;
-    .text ALIGN(4K) : AT(ADDR(.text) - KERNEL_VADDR) {
+    .text ALIGN(4K) : {
 	*(.multiboot2)
 	*(.text)
     }
 
-    .rodata ALIGN(4K) : AT(ADDR(.rodata) - KERNEL_VADDR) {
+    .rodata ALIGN(4K) : {
 	*(.rodata)
     }
 
-    .data ALIGN(4K) : AT(ADDR(.data) - KERNEL_VADDR) {
+    .data ALIGN(4K) : {
 	*(.data)
     }
 
-    .bss ALIGN(4K) : AT(ADDR(.bss) - KERNEL_VADDR) {
+    .bss ALIGN(4K) : {
 	*(.bss)
 	*(COMMON)
     }
