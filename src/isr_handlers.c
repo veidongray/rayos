@@ -14,7 +14,6 @@ void exception_handler(uint32_t vector) {
     } else {
         cga_info("Unhandled exception: %d\n", vector);
         disable_irq();
-        asm volatile("hlt\r\n");
     }
     pic_sendEOI(vector);
 }

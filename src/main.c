@@ -12,7 +12,7 @@ void kernel_main(void)
     idt_init();
     page_init();
 
-    cga_info("heap_top: 0x%X.\n", (uint32_t)heap_top);
+    cga_info("kernel_end: 0x%X.\n", (uint32_t)kernel_end);
     cga_info("Kernel initialized successfully.\n");
     cga_info("Systicks %uHZ.\n", TIMER_FREQ);
     while (1)
