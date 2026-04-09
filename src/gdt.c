@@ -32,10 +32,8 @@ int gdt_init(void)
     struct gdt_entry *desc = get_gdt_entry();
     create_gdt_entry(&desc[0], 0, 0, 0, 0);
     create_gdt_entry(&desc[1], 0, 0xFFFFF, 0x9A, 0xCF);  // Kernel mode code segment
-    create_gdt_entry(&desc[2], 0, 0xFFFFF, 0x92, 0xCF);  // Kernel mode data segment
-    create_gdt_entry(&desc[3], 0, 0xFFFFF, 0xFA, 0xCF);  // User mode code segment
-    create_gdt_entry(&desc[4], 0, 0xFFFFF, 0xF2, 0xCF);  // User mode code segment
-    load_gdt(desc, sizeof(struct gdt_entry) * 5);
+    create_gdt_entry(&desc[2], 0, 0xFFFFF, 0x93, 0xCF);  // Kernel mode data segment
+    load_gdt(desc, sizeof(struct gdt_entry) * 3);
 	extern void gdt_flush(struct gdtr *gdtr);
     gdt_flush(get_gdtr());
     cga_info("GDT loaded with 5 entries.\n");

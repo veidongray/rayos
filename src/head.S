@@ -23,18 +23,48 @@ end_mboot:
 .global _start
 .type _start, @function
 _start:
-    # Set up the stack
-    mov $kstack_top, %esp
-    # Never return
-    # push tags for mmap from multiboot2
-    # pass the address of the multiboot info structure (in %ebx) to main
-    push %ebx
-    # push the grub magic number (in %eax) to main
-    push %eax
-    call main
-    hlt
+    # save multiboot info address and magic number for later use
+    addl $(KERN_OFFSET - 0x100000), %ebx
+    movl %ebx, _mboot_info - KERN_OFFSET + 0x100000
+    movl %eax, _mboot_magic - KERN_OFFSET + 0x100000
+    
+    # setup page
+    movl $(_boot_page_directory - KERN_OFFSET + 0x100000), %eax
+    movl $(_boot_page_table - KERN_OFFSET + 0x100000), %ebx
+    movl %ebx, (%eax)
+    orl $0x3, (%eax)
+    movl %ebx, 768 * 4(%eax)
+    orl $0x3, 768 * 4(%eax)
+    movl %eax, 1023 * 4(%eax)
+    orl $0x3, 1023 * 4(%eax)
 
-.section .text
+    movl $1024, %ecx
+    xorl %eax, %eax
+    orl $0x3, %eax
+    movl $(_boot_page_table - KERN_OFFSET + 0x100000), %edi
+_fill_page_table:
+    movl %eax, (%edi)
+    addl $0x1000, %eax
+    addl $0x4, %edi
+    loop _fill_page_table
+
+    # load page diretory
+    movl $(_boot_page_directory - KERN_OFFSET + 0x100000), %eax
+    movl %eax, %cr3
+
+    # enable page
+    movl %cr0, %eax
+    orl $0x80000000, %eax
+    movl %eax, %cr0
+
+    ljmp $0x10, $startup_32
+startup_32:
+    # Set up the stack
+    movl $kstack_top, %esp
+    jmp main
+    hlt
+    jmp startup_32
+
 .global gdt_flush
 .type gdt_flush, @function
 
@@ -82,5 +112,24 @@ enable_paging:
 .section .bss
 .align 16
 kstack:
-    .space 64 * 1024  # 64KB stack
+    .space 1024 * 1024  # 1MB stack
 kstack_top:
+
+.set KERN_OFFSET, 0xC0100000
+.align 4096
+.section .data
+.global	_boot_page_directory
+_boot_page_directory:
+    .space 4096
+    
+.global	_boot_page_table
+_boot_page_table:
+    .space 4096
+
+.global _mboot_info
+_mboot_info:
+    .long 0
+
+.global _mboot_magic
+_mboot_magic:
+    .long 0

@@ -1,25 +1,26 @@
 ENTRY(_start)
-
+KERN_BASE = 0xC0100000;
+VIRT_OFFSET = 0xC0000000;
 SECTIONS
 {
-    . = 1M;
+    . = KERN_BASE;
     _kernel_start = .;
-    .text ALIGN(4K) : {
-	*(.multiboot2)
-	*(.text)
+    .text ALIGN(4K) : AT(ADDR(.text) - VIRT_OFFSET) {
+	    *(.multiboot2)
+	    *(.text)
     }
 
-    .rodata ALIGN(4K) : {
-	*(.rodata)
+    .rodata ALIGN(4K) : AT(ADDR(.rodata) - VIRT_OFFSET) {
+	    *(.rodata)
     }
 
-    .data ALIGN(4K) : {
-	*(.data)
+    .data ALIGN(4K) : AT(ADDR(.data) - VIRT_OFFSET) {
+	    *(.data)
     }
 
-    .bss ALIGN(4K) : {
-	*(.bss)
-	*(COMMON)
+    .bss ALIGN(4K) : AT(ADDR(.bss) - VIRT_OFFSET) {
+	    *(.bss)
+	    *(COMMON)
     }
     _kernel_end = .;
     . = ALIGN(4K);

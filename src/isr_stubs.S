@@ -2,12 +2,12 @@
 .global	isr_stub_##num          ; \
 .type isr_stub_##num, @function ; \
 isr_stub_##num:                 ; \
-    push %ebp                   ; \
-    mov %esp, %ebp              ; \
-    push $num                   ; \
-    call exception_handler      ; \
-    leave                       ; \
-    iret                        ;
+    pushl %ebp                   ; \
+    movl %esp, %ebp              ; \
+    pushl $num                   ; \
+    calll exception_handler      ; \
+    leavel                       ; \
+    iretl                        ;
 
 #define ISR_TABLE_ENTRY(num) \
     .long isr_stub_##num;

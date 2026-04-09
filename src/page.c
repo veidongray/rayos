@@ -20,10 +20,12 @@ struct page {
 
 struct page *page = (void *)0;
 
+uint32_t aaa = 0x1234;
+
 int page_init(void)
 {
     uint32_t i, klen;
-
+    cga_info("aaa = 0x%X.\n", &aaa);
     for (i = 0; i < 0x20000; ++i)
         physaddr_bitmap[i] = 0x00;
 
