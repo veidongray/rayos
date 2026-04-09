@@ -1,16 +1,16 @@
 INCDIR = ../inc
-OBJS =  head.o          \
-        main.o          \
-        isr_stubs.o     \
-        isr_handlers.o  \
-        print.o         \
-        pic.o           \
-        io.o            \
-        gdt.o           \
-        idt.o           \
-        systicks.o      \
-        page.o          \
-        multiboot2.o
+OBJS =  head.o         # \
+#         main.o          \
+#         isr_stubs.o     \
+#         isr_handlers.o  \
+#         print.o         \
+#         pic.o           \
+#         io.o            \
+#         gdt.o           \
+#         idt.o           \
+#         systicks.o      \
+#         page.o          \
+#         multiboot2.o
 
 CFLAGS = -m32                               \
     -ffreestanding                          \
