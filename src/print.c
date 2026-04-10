@@ -1,19 +1,19 @@
 #include "print.h"
 #include <stdint.h>
 
-static uint8_t *cgaptr = (uint8_t *)0xB8000;
+static uint8_t *cgaptr = (uint8_t *)0xC00B8000;
 static uint8_t **get_cgaptr(void) { return &cgaptr; }
 
 int cga_shift(uint8_t **ptr)
 {
     int i;
     uint8_t buffer[4000];
-    if (*ptr >= (uint8_t *)(0xB8000 + 4000))
+    if (*ptr >= (uint8_t *)(0xC00B8000 + 4000))
     {
-        *ptr = (uint8_t *)0xB8000 + 4000 - 160;
+        *ptr = (uint8_t *)0xC00B8000 + 4000 - 160;
         for (i = 0; i < 4000 - 160; ++i)
         {
-            buffer[i] = ((uint8_t *)0xB8000)[i + 160];
+            buffer[i] = ((uint8_t *)0xC00B8000)[i + 160];
         }
         for (i = 4000 - 160; i < 4000; i += 2)
         {
@@ -22,7 +22,7 @@ int cga_shift(uint8_t **ptr)
         }
         for (i = 0; i < 4000; ++i)
         {
-            ((uint8_t *)0xB8000)[i] = buffer[i];
+            ((uint8_t *)0xC00B8000)[i] = buffer[i];
         }
     }
     return 0;
@@ -109,6 +109,10 @@ char *uitoa(uint32_t value, char *str, int base)
 
 int cga_putc(const char ch)
 {
+    // if not to disable interrupts,
+    // the output may be garbled when an interrupt occurs during writing to CGA memory
+    // 
+    disable_irq();
     uint8_t **cga = get_cgaptr();
     if (ch >= 32)
     {
@@ -118,9 +122,10 @@ int cga_putc(const char ch)
     }
     else if (ch == '\n' || ch == '\r')
     {
-        *cga += 160 - ((*cga - (uint8_t *)0xB8000) % 160);
+        *cga += 160 - ((*cga - (uint8_t *)0xC00B8000) % 160);
         cga_shift(cga);
     }
+    enable_irq();
     return ch;
 }
 
@@ -239,7 +244,7 @@ int cga_init(void)
         cga_putc(' ');
         cga_putc(0x07); // Light grey on black
     }
-    *cga = (uint8_t *)0xB8000;
-    cga_info("CGA text mode initialized.\n");
+    *cga = (uint8_t *)0xC00B8000;
+    // cga_info("CGA text mode initialized.\n");
     return 0;
 }

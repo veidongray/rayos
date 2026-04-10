@@ -20,7 +20,7 @@ extern void load_page_directory(uint32_t *);
 extern void enable_paging();
 int page_init(void);
 physaddr_t get_physaddr(virtaddr_t virtaddr);
-virtaddr_t alloc_page(void);
+physaddr_t alloc_page(void);
 virtaddr_t alloc_pages(uint32_t num);
 int map_page(uint32_t *physaddr, uint32_t *virtaddr, uint32_t flags);
 int unmap_page(virtaddr_t virtaddr);

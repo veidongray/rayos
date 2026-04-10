@@ -24,5 +24,5 @@ SECTIONS
     }
     _kernel_end = .;
     . = ALIGN(4K);
-    _kernel_end_aligned = .;
+    _kernel_end_aligned = . - VIRT_OFFSET;
 }
