@@ -10,7 +10,8 @@ OBJS =  head.o          \
         idt.o           \
         systicks.o      \
         page.o          \
-        multiboot2.o
+        multiboot2.o    \
+        switch_to.o     
 
 CFLAGS = -m32                               \
     -ffreestanding                          \

@@ -2,6 +2,14 @@
 #include "print.h"
 #include "pic.h"
 #include "systicks.h"
+struct task_struct {
+    uint32_t esp;
+    uint32_t eip;
+    uint32_t cr3;
+    struct task_struct *next;
+};
+
+extern struct task_struct *current_task;
 
 void exception_handler(uint32_t vector) {
     if (vector == IRQ0_VECTOR) {

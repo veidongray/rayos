@@ -65,6 +65,7 @@ startup_32:
     hlt
     jmp startup_32
 
+
 .global gdt_flush
 .type gdt_flush, @function
 
