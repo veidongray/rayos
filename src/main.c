@@ -32,30 +32,32 @@ struct task_struct {
 };
 
 
-uint32_t task0_stack[1024] = {0};
+uint32_t task0_stack[2048] = {0};
 struct task_struct task0 = {
-    .esp = (uint32_t)task0_stack + sizeof(task0_stack) - (4 * 9),
+    .esp = (uint32_t)task0_stack + sizeof(task0_stack) - 4,
     .eip = 0,
     .cr3 = 0,
     .next = 0,
 };
 
-uint32_t task1_stack[1024] = {0};
+uint32_t task1_stack[2048] = {0};
 struct task_struct task1 = {
-    .esp = (uint32_t)task1_stack + sizeof(task1_stack) - (4 * 9),
+    .esp = (uint32_t)task1_stack + sizeof(task1_stack) - 4,
     .eip = 0,
     .cr3 = 0,
     .next = 0,
 };
 
 struct task_struct *current_task = 0;
+struct task_struct *task_list[] = {&task0, &task1, NULL};
 uint32_t ticks = 0;
 void task0_func(void)
 {
+    switch_to_task(current_task->next);
     while (1)
     {
-        // cga_info("Task0000 is running. ticks = %u\n", ticks++);
-        context_switch(current_task, current_task->next);
+        cga_printf("Taskaaaa\n");
+        // context_switch(current_task, current_task->next);
         asm volatile("hlt\r\n");
     }
 }
@@ -64,8 +66,8 @@ void task1_func(void)
 {
     while (1)
     {
-        // cga_info("Task1111 is running. ticks = %u\n", ticks++);
-        context_switch(current_task->next, current_task);
+        cga_printf("Taskbbbb\n");
+        // context_switch(current_task->next, current_task);
         asm volatile("hlt\r\n");
     }
 }
@@ -74,8 +76,13 @@ void kernel_main(void)
 {
     uint32_t i = 0;
     gdt_init();
-    task0_stack[1015] = (uint32_t)task0_func;
-    task1_stack[1015] = (uint32_t)task1_func;
+    for (i = 0; i < 2048; i++)
+    {
+        task0_stack[i] = 0;
+        task1_stack[i] = 0;
+    }
+    task0_stack[2047] = (uint32_t)task0_func;
+    task1_stack[2047] = (uint32_t)task1_func;
     task0.eip = (uint32_t)task0_func;
     task1.eip = (uint32_t)task1_func;
     task0.cr3 = (uint32_t)_boot_page_directory - 0xc0000000; // identity-mapped page directory
