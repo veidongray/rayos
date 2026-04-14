@@ -32,28 +32,33 @@ struct task_struct {
 };
 
 
-uint32_t task0_stack[2048] = {0};
+uint32_t task0_stack[2048] __attribute__((aligned(4096)));
 struct task_struct task0 = {
-    .esp = (uint32_t)task0_stack + sizeof(task0_stack) - 4,
+    .esp = 0,
     .eip = 0,
     .cr3 = 0,
     .next = 0,
 };
 
-uint32_t task1_stack[2048] = {0};
+uint32_t task1_stack[2048] __attribute__((aligned(4096)));
 struct task_struct task1 = {
-    .esp = (uint32_t)task1_stack + sizeof(task1_stack) - 4,
+    .esp = 0,
+    .eip = 0,
+    .cr3 = 0,
+    .next = 0,
+};
+
+uint32_t task2_stack[2048] __attribute__((aligned(4096)));
+struct task_struct task2 = {
+    .esp = 0,
     .eip = 0,
     .cr3 = 0,
     .next = 0,
 };
 
 struct task_struct *current_task = 0;
-struct task_struct *task_list[] = {&task0, &task1, NULL};
-uint32_t ticks = 0;
 void task0_func(void)
 {
-    switch_to_task(current_task->next);
     while (1)
     {
         cga_printf("Taskaaaa\n");
@@ -72,6 +77,16 @@ void task1_func(void)
     }
 }
 
+void task2_func(void)
+{
+    while (1)
+    {
+        cga_printf("Taskcccc\n");
+        // context_switch(current_task->next, current_task);
+        asm volatile("hlt\r\n");
+    }
+}
+
 void kernel_main(void)
 {
     uint32_t i = 0;
@@ -80,15 +95,23 @@ void kernel_main(void)
     {
         task0_stack[i] = 0;
         task1_stack[i] = 0;
+        task2_stack[i] = 0;
     }
     task0_stack[2047] = (uint32_t)task0_func;
     task1_stack[2047] = (uint32_t)task1_func;
+    task2_stack[2047] = (uint32_t)task2_func;
+    task0.esp = (uint32_t)task0_stack + sizeof(task0_stack) - 4 * 8;
+    task1.esp = (uint32_t)task1_stack + sizeof(task1_stack) - 4 * 8;
+    task2.esp = (uint32_t)task2_stack + sizeof(task2_stack) - 4 * 8;
     task0.eip = (uint32_t)task0_func;
     task1.eip = (uint32_t)task1_func;
+    task2.eip = (uint32_t)task2_func;
     task0.cr3 = (uint32_t)_boot_page_directory - 0xc0000000; // identity-mapped page directory
     task1.cr3 = (uint32_t)_boot_page_directory - 0xc0000000; // identity-mapped page directory
+    task2.cr3 = (uint32_t)_boot_page_directory - 0xc0000000; // identity-mapped page directory
     task0.next = &task1;
-    task1.next = &task0;
+    task1.next = &task2;
+    task2.next = &task0;
     current_task = &task0;
     idt_init();
     cga_init();

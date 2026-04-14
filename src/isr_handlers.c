@@ -11,14 +11,35 @@ struct task_struct
 };
 
 extern struct task_struct *current_task;
-extern struct task_struct task0, task1;
+extern struct task_struct task0, task1, task2;
 
 void exception_handler(uint32_t vector)
 {
+    static uint32_t toggle = 0;
     pic_sendEOI(vector);
     if (vector == IRQ0_VECTOR)
     {
         set_systicks(get_systicks() + 1);
+        // Need wait for 100 ticks to start the first context switch
+        if (get_systicks() >= 100) {
+            if (toggle == 0) {
+                toggle = 1;
+                struct task_struct *tmp = current_task;
+                current_task = current_task->next;
+                context_switch(tmp, tmp->next);
+            }
+            else if (toggle == 1) {
+                toggle = 2;
+                struct task_struct *tmp = current_task;
+                current_task = current_task->next;
+                context_switch(&task1, &task2);
+            } else if (toggle == 2) {
+                toggle = 0;
+                struct task_struct *tmp = current_task;
+                current_task = current_task->next;
+                context_switch(&task2, &task0);
+            }
+        }
     }
     else if (vector == 14)
     {
