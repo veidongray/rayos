@@ -1,6 +1,12 @@
 INCDIR = ../inc
 OBJS =  head.o          \
-        main.o
+        main.o          \
+        print.o         \
+        multiboot2.o    \
+        gdt.o           \
+        gdt_asm.o       \
+        irq.o           \
+        irq_asm.o
 
 CFLAGS = -m32                               \
     -ffreestanding                          \

@@ -1,5 +1,5 @@
-#ifndef IDT_H
-#define IDT_H
+#ifndef IRQ_H
+#define IRQ_H
 
 #include <stdint.h>
 
@@ -20,4 +20,4 @@ void set_idt_entry(uint8_t vector, void* isr, uint8_t flags);
 void load_idt(struct idt_entry* idt, uint16_t size);
 int idt_init(void);
 
-#endif // IDT_H
+#endif // IRQ_H

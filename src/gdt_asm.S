@@ -1,3 +1,4 @@
+.section .note.GNU-stack,"",@progbits
 .section .text
 .global gdt_flush
 .type gdt_flush, @function

@@ -3,10 +3,11 @@ KERN_BASE = 0xC0100000;
 VIRT_OFFSET = 0xC0000000;
 SECTIONS
 {
+    _virt_offset = VIRT_OFFSET;
     . = KERN_BASE;
     _kernel_virt_start = .;
-    _kernel_phys_start = _kernel_virt_start - KERN_BASE;
-    
+    _kernel_phys_start = _kernel_virt_start - VIRT_OFFSET;
+
     .text ALIGN(4K) : AT(ADDR(.text) - VIRT_OFFSET) {
 	    *(.multiboot2)
 	    *(.text)
@@ -24,7 +25,9 @@ SECTIONS
 	    *(.bss)
 	    *(COMMON)
     }
-    _kernel_end = .;
+    _kernel_virt_end = .;
+    _kernel_phys_end = _kernel_virt_end - VIRT_OFFSET;
     . = ALIGN(4K);
-    _kernel_end_aligned = . - VIRT_OFFSET;
+    _kernel_virt_end_aligned = .;
+    _kernel_phys_end_aligned = _kernel_virt_end_aligned - VIRT_OFFSET;
 }

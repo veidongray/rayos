@@ -1,7 +1,7 @@
 #include "multiboot2.h"
 #include "print.h"
 
-uint32_t total_ram = 0;
+uint32_t host_total_mem = 0;
 
 void parse_multiboot2_mmap(void* mbi_addr) {
     uint8_t* ptr = (uint8_t*)mbi_addr + 8; // skip total_size + reserved
@@ -26,8 +26,7 @@ void parse_multiboot2_mmap(void* mbi_addr) {
 
             // total_mem is your physical RAM size in bytes!
             // You can store it globally or print it via serial
-            total_ram = total_mem + 0x100000; // Add 1MB for safety
-            cga_info("Total RAM: %u Bytes\n", (uint32_t)(total_ram));
+            host_total_mem = total_mem + 0x100000; // Add 1MB for safety
         }
 
         ptr += (tag->size + 7) & ~7; // align to 8-byte boundary

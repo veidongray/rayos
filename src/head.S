@@ -1,11 +1,11 @@
 .section .note.GNU-stack,"",@progbits
 .section .multiboot2
 .align 8
-mboot:
+_mboot:
     .long 0xe85250d6                # magic
     .long 0                         # architecture (0 = i386)
-    .long end_mboot - mboot         # total size
-    .long -(0xe85250d6 + 0 + (end_mboot - mboot))  # checksum
+    .long _end_mboot - _mboot         # total size
+    .long -(0xe85250d6 + 0 + (_end_mboot - _mboot))  # checksum
 
     # Request memory map information (required!)
     .word 6                         # type = MULTIBOOT_HEADER_TAG_MMAP
@@ -16,7 +16,7 @@ mboot:
     .word 0                         # type = 0 (end tag)
     .word 0                         # flags = 0
     .long 8                         # size = 8 bytes
-end_mboot:
+_end_mboot:
 
 .code32		# to 32-bit mode
 

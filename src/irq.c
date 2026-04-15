@@ -1,8 +1,7 @@
-#include "idt.h"
-#include "pic.h"
+#include "irq.h"
 #include "print.h"
 
-static struct idt_entry idt[256];
+static struct idt_entry idt[256] __attribute__((aligned(4096)));
 void set_idt_entry(uint8_t vector, void* isr, uint8_t flags) {
     struct idt_entry* descriptor = &idt[vector];
 
@@ -23,17 +22,11 @@ void load_idt(struct idt_entry* idt, uint16_t size) {
 
 int idt_init(void)
 {
-    extern void *isr_stub_table[];
-    for (int i = 0; i <= 47; ++i) {
-        set_idt_entry(i, isr_stub_table[i], 0x8E);
-    }
+    uint32_t i;
+
+    extern void default_isr(void);
+    for (i = 0; i < 256; ++i)
+        set_idt_entry(i, default_isr, 0);
     load_idt(idt, sizeof(idt));
-    cga_info("IDT loaded with 32 entries.\n");
-    // for (int i = 0; i <= 47; ++i) {
-    //     cga_printf("IDT Entry %d: ISR Address=0x%X\n", i, (idt[i].isr_high << 16) | idt[i].isr_low);
-    // }
-    pic_remap(0x20, 0x28);
-    timer_init();
-    enable_irq();
     return 0;
 }
