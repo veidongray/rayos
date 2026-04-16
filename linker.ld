@@ -1,10 +1,11 @@
 ENTRY(_start)
-KERN_BASE = 0xC0100000;
 VIRT_OFFSET = 0xC0000000;
+KERN_BASE = VIRT_OFFSET + 0x100000;
 SECTIONS
 {
-    _virt_offset = VIRT_OFFSET;
     . = KERN_BASE;
+    _virt_offset = VIRT_OFFSET;
+    _kernel_base = KERN_BASE;
     _kernel_virt_start = .;
     _kernel_phys_start = _kernel_virt_start - VIRT_OFFSET;
 

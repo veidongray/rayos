@@ -1,0 +1,17 @@
+.section .note.GNU-stack,"",@progbits
+.section .text
+.global default_isr
+default_isr:
+.default_loop:
+    hlt
+    jmp .default_loop
+
+.global isr_pic_timer
+isr_pic_timer:
+    call timer_interrupt_handler
+    iret
+
+.global	isr_page_fault
+isr_page_fault:
+    call page_fault_handler
+    iret

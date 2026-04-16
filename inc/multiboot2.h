@@ -18,8 +18,6 @@ struct multiboot2_mmap_entry {
     uint32_t reserved;
 } __attribute__((packed));
 
-extern uint32_t host_total_mem;
-
 void parse_multiboot2_mmap(void* mbi_addr);
 
 #endif // MULTIBOOT2_H

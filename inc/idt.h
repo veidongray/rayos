@@ -19,5 +19,7 @@ struct idtr {
 void set_idt_entry(uint8_t vector, void* isr, uint8_t flags);
 void load_idt(struct idt_entry* idt, uint16_t size);
 int idt_init(void);
+void enable_irq(void);
+void disable_irq(void);
 
 #endif // IRQ_H

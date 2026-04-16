@@ -5,8 +5,12 @@ OBJS =  head.o          \
         multiboot2.o    \
         gdt.o           \
         gdt_asm.o       \
-        irq.o           \
-        irq_asm.o
+        idt.o           \
+        idt_asm.o       \
+        pic_8259.o      \
+        io.o            \
+        paging.o        \
+        paging_asm.o
 
 CFLAGS = -m32                               \
     -ffreestanding                          \
