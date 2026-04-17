@@ -10,7 +10,8 @@ OBJS =  head.o          \
         pic_8259.o      \
         io.o            \
         paging.o        \
-        paging_asm.o
+        paging_asm.o    \
+        kheap.o
 
 CFLAGS = -m32                               \
     -ffreestanding                          \

@@ -19,6 +19,8 @@ extern void enable_paging();
 static uint32_t kpage_directory[1024] __attribute__((aligned(4096)));
 static uint32_t *kpage_tables;
 
+uint32_t *kheap_pool_start = 0;
+
 int page_init(void)
 {
     uint32_t i;
@@ -27,14 +29,12 @@ int page_init(void)
         (host_total_mem / 0x1000) + ((host_total_mem % 0x1000) ? 1 : 0); // Round up to nearest page
     uint32_t ktotal_page_tables =
         (ktotal_pages / 0x400) + ((ktotal_pages % 0x400) ? 1 : 0); // Each page table can map 1024 pages
-    cga_printf("Total Memory: %u bytes, Total Pages: %u, Total Page Tables: %u\n",
-        host_total_mem, ktotal_pages, ktotal_page_tables);
 
     uint32_t kernel_size =
         (uint32_t)_kernel_virt_end_aligned
-        - (uint32_t)_kernel_virt_start + (uint32_t)0x400
-        + (uint32_t)ktotal_page_tables * 0x400;
-    cga_printf("Kernel Size: %u bytes\n", kernel_size);
+        - (uint32_t)_kernel_virt_start + (uint32_t)0x1000
+        + (uint32_t)ktotal_page_tables * 0x1000;
+    kheap_pool_start = (uint32_t *)(kernel_size + (uint32_t)_kernel_base); // Start the heap right after the kernel and page tables
 
     kpage_tables = (uint32_t *)((uint32_t)_kernel_virt_end_aligned); // Place page tables right after the kernel
     // Map all memory up to the total memory size, including the kernel itself

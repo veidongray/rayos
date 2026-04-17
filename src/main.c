@@ -29,5 +29,17 @@ void main(void)
     gdt_init();
     idt_init();
     page_init();
+    cga_init();
+    kheap_init();
+    uint32_t *ptr, *prtt;
+    ptr = (uint32_t *)kmalloc(64);
+    cga_printf("ptr 64 %X\n", ptr);
+    prtt = (uint32_t *)kmalloc(48);
+    cga_printf("prtt 32 %X\n", prtt);
+    ptr = (uint32_t *)kmalloc(128);
+    cga_printf("ptr 128 %X\n", ptr);
+    kfree(prtt);
+    ptr = (uint32_t *)kmalloc(16);
+    cga_printf("ptr 32 %X\n", ptr);
     while (1) asm volatile("hlt\r\n");
 }
