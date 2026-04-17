@@ -57,13 +57,14 @@ void disable_irq(void)
 void timer_interrupt_handler(void)
 {
     pic_sendEOI(0); // Send End of Interrupt (EOI) signal to PIC
-    extern struct task_list *current;
-    if (current != 0)
+    if (current_runlist != 0)
     {
-        extern void context_switch(struct task_struct *, struct task_struct *);
-        struct task_list *t = current;
-        current = current->next;
-        context_switch(t->task, t->next->task);
+        struct task_struct *old_task, *new_task;
+        old_task = current_runlist->task;
+        new_task = current_runlist->next->task;
+        current_runlist = current_runlist->next;
+        current = new_task;
+        context_switch(old_task, new_task);
     }
 }
 

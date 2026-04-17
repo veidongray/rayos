@@ -2,7 +2,8 @@
 #include "kheap.h"
 #include "idt.h"
 
-struct task_list *current = 0;
+struct task_list *current_runlist = 0;
+struct task_struct *current;
 
 struct task_struct *kthread_create(void (*thread_func)(void *), void *arg, char *name)
 {
@@ -34,19 +35,19 @@ struct task_struct *kthread_create(void (*thread_func)(void *), void *arg, char 
     rl->prev = rl;
 
     disable_irq();
-    if (current == 0)
+    if (current_runlist == 0)
     {
         // means first thread
-        current = rl;
-        extern void switch_to_task(struct task_struct *);
-        switch_to_task(current->task);
+        current_runlist = rl;
+        switch_to_task(current_runlist->task);
     }
     else
     {
-        rl->next = current->next;
-        rl->prev = current;
+        // add new task to runlist
+        rl->next = current_runlist->next;
+        rl->prev = current_runlist;
         rl->next->prev = rl;
-        current->next = rl;
+        current_runlist->next = rl;
     }
     enable_irq();
     return kthread;
