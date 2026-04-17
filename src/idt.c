@@ -1,6 +1,7 @@
 #include "idt.h"
 #include "pic_8259.h"
 #include "print.h"
+#include "task.h"
 
 static struct idt_entry idt[256] __attribute__((aligned(4096)));
 void set_idt_entry(uint8_t vector, void* isr, uint8_t flags) {
@@ -56,6 +57,14 @@ void disable_irq(void)
 void timer_interrupt_handler(void)
 {
     pic_sendEOI(0); // Send End of Interrupt (EOI) signal to PIC
+    extern struct task_list *current;
+    if (current != 0)
+    {
+        extern void context_switch(struct task_struct *, struct task_struct *);
+        struct task_list *t = current;
+        current = current->next;
+        context_switch(t->task, t->next->task);
+    }
 }
 
 void page_fault_handler(uint32_t error_code)
@@ -64,5 +73,5 @@ void page_fault_handler(uint32_t error_code)
     asm volatile ("mov %%cr2, %0" : "=r" (faulting_address)); // Get the faulting address from CR2
 
     cga_printf("Page Fault! Error code: %x, Faulting address: %x\n", error_code, faulting_address);
-    while (1) asm volatile("hlt\r\n");
+    while (1) asm volatile("cli\r\nhlt\r\n");
 }

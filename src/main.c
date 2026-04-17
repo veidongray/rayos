@@ -3,13 +3,49 @@
 #include "gdt.h"
 #include "idt.h"
 #include "paging.h"
+#include "kheap.h"
+#include "task.h"
 #include <stdint.h>
 
 extern uint32_t _mboot_info[];
 extern uint32_t _mboot_magic[];
 extern uint32_t host_total_mem;
 
-void main(void)
+void second3_init(void *arg)
+{
+    extern struct task_list *current;
+    while (1) cga_printf("task: %s\n", current->task->name);
+}
+
+void second2_init(void *arg)
+{
+    kthread_create(second3_init, 0, "second3_init");
+    extern struct task_list *current;
+    while (1) cga_printf("task: %s\n", current->task->name);
+}
+
+void second1_init(void *arg)
+{
+    kthread_create(second2_init, 0, "second2_init");
+    extern struct task_list *current;
+    while (1) cga_printf("task: %s\n", current->task->name);
+}
+
+void second0_init(void *arg)
+{
+    kthread_create(second1_init, 0, "second1_init");
+    extern struct task_list *current;
+    while (1) cga_printf("task: %s\n", current->task->name);
+}
+
+void kernel_init(void *arg)
+{
+    kthread_create(second0_init, 0, "second0_init");
+    extern struct task_list *current;
+    while (1) cga_printf("task: %s\n", current->task->name);
+}
+
+void start_kernel(void)
 {
     if (_mboot_magic[0] == 0x36d76289)
         parse_multiboot2_mmap((uint32_t *)_mboot_info[0]);
@@ -20,8 +56,8 @@ void main(void)
         while (1) asm volatile("hlt\r\n");
     }
 
-    // Check if we have at least 4MB of memory, otherwise we can't do much
-    if (host_total_mem < 0x400000)
+    // Check if we have at least 8MB of memory, otherwise we can't do much
+    if (host_total_mem < 0x800000)
     {
         cga_printf("Not enough memory detected: %u bytes\n", host_total_mem);
         while (1) asm volatile("hlt\r\n");
@@ -31,15 +67,9 @@ void main(void)
     page_init();
     cga_init();
     kheap_init();
-    uint32_t *ptr, *prtt;
-    ptr = (uint32_t *)kmalloc(64);
-    cga_printf("ptr 64 %X\n", ptr);
-    prtt = (uint32_t *)kmalloc(48);
-    cga_printf("prtt 32 %X\n", prtt);
-    ptr = (uint32_t *)kmalloc(128);
-    cga_printf("ptr 128 %X\n", ptr);
-    kfree(prtt);
-    ptr = (uint32_t *)kmalloc(16);
-    cga_printf("ptr 32 %X\n", ptr);
+    struct task_struct *kinit;
+    kinit = kthread_create(kernel_init, 0, "kernel_init");
+    extern void switch_to_task(struct task_struct *);
+    switch_to_task(kinit);
     while (1) asm volatile("hlt\r\n");
 }

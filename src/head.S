@@ -65,7 +65,7 @@ _fill_page_table:
 startup_32:
     # Set up the stack
     movl $_kstack_top, %esp
-    jmp main
+    jmp start_kernel
     hlt
     jmp startup_32
 
