@@ -67,9 +67,6 @@ void start_kernel(void)
     page_init();
     cga_init();
     kheap_init();
-    struct task_struct *kinit;
-    kinit = kthread_create(kernel_init, 0, "kernel_init");
-    extern void switch_to_task(struct task_struct *);
-    switch_to_task(kinit);
+    kthread_create(kernel_init, 0, "kernel_init");
     while (1) asm volatile("hlt\r\n");
 }

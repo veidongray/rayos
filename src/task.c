@@ -10,7 +10,8 @@ struct task_struct *kthread_create(void (*thread_func)(void *), void *arg, char 
     struct task_struct *kthread = kmalloc(sizeof(struct task_struct));
     uint32_t *stack = (uint32_t *)kmalloc(sizeof(uint32_t) * 2048);
 
-    for (i = 0; i < 2048; i++) stack[i] = 0;
+    for (i = 0; i < 2048; i++)
+        stack[i] = 0;
 
     stack = &stack[2048];
     *(--stack) = (uint32_t)arg;
@@ -24,7 +25,8 @@ struct task_struct *kthread_create(void (*thread_func)(void *), void *arg, char 
     *(--stack) = 0x0; // edi
 
     kthread->esp = (uint32_t)stack;
-    for (i = 0; i < 32; i++) kthread->name[i] = name[i];
+    for (i = 0; i < 32; i++)
+        kthread->name[i] = name[i];
 
     struct task_list *rl = (struct task_list *)kmalloc(sizeof(struct task_list));
     rl->task = kthread;
@@ -33,7 +35,12 @@ struct task_struct *kthread_create(void (*thread_func)(void *), void *arg, char 
 
     disable_irq();
     if (current == 0)
+    {
+        // means first thread
         current = rl;
+        extern void switch_to_task(struct task_struct *);
+        switch_to_task(current->task);
+    }
     else
     {
         rl->next = current->next;
