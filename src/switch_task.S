@@ -3,7 +3,7 @@
 .global switch_to_task
 switch_to_task:
     movl 4(%esp), %edi
-    movl (%edi), %esp
+    movl %edi, %esp
     popl %edi
     popl %esi
     popl %ebp

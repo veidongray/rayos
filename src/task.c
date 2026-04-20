@@ -39,7 +39,8 @@ struct task_struct *kthread_create(void (*thread_func)(void *), void *arg, char 
     {
         // means first thread
         current_runlist = rl;
-        switch_to_task(current_runlist->task);
+        current = current_runlist->task;
+        switch_to_task((uint32_t *)kthread->esp);
     }
     else
     {
