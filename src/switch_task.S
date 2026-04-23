@@ -1,9 +1,10 @@
+.equ TASK_ESP, 0
 .section .note.GNU-stack,"",@progbits
 .section .text
-.global switch_to_task
-switch_to_task:
-    movl 4(%esp), %edi
-    movl %edi, %esp
+.global first_task
+first_task:
+    movl 4(%esp), %edi  # task_struct pointer
+    movl TASK_ESP(%edi), %esp
     popl %edi
     popl %esi
     popl %ebp
@@ -25,10 +26,10 @@ context_switch:
     pushl %esi
     pushl %edi
     movl 32(%esp), %esi   # current_task
-    movl %esp, (%esi)   # current_task->esp = esp
+    movl %esp, TASK_ESP(%esi)   # current_task->esp = esp
 resume:
     movl 36(%esp), %esi  # next_task
-    movl (%esi), %esp   # next_task->esp = esp
+    movl TASK_ESP(%esi), %esp   # next_task->esp = esp
     popl %edi
     popl %esi
     popl %ebp
@@ -38,3 +39,8 @@ resume:
     popl %eax
     sti
     retl
+
+.section .data
+.global	task_esp
+task_esp:
+    .long 0x12345678
