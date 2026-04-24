@@ -7,6 +7,7 @@
 #include "task.h"
 #include <stdint.h>
 #include <stddef.h>
+#include "libc/string.h"
 
 extern uint32_t _mboot_info[];
 extern uint32_t _mboot_magic[];
@@ -14,14 +15,24 @@ extern uint32_t host_total_mem;
 
 void second_init(void *arg)
 {
-    char *args = (char *)arg;
-    while (1) cga_printf("Running %X ...\n", args);
+    arg = arg;
+    char strbuf[32];
+    memset(strbuf, 'a', 31);
+    strbuf[31] = '\0';
+    cga_printf("Running %s, %d\n", strbuf, strlen(strbuf));
 }
 
 void kernel_init(void *arg)
 {
-    kthread_create(second_init, "aAbBcCdD", "second000_init");
-    while (1) asm volatile ("hlt\r\n");
+    arg = arg;
+    while (1) {
+        cga_printf("kernel_init ...\n");
+        kthread_create(second_init, 0, "second000_init");
+        kthread_create(second_init, 0, "second111_init");
+        kthread_create(second_init, 0, "second222_init");
+        for (int i = 0; i < 0xffffff; i++);
+        asm volatile ("hlt\r\n");
+    }
 }
 
 void start_kernel(void)

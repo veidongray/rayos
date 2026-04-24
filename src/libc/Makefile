@@ -1,18 +1,4 @@
-OBJS =  head.o          \
-        main.o          \
-        print.o         \
-        multiboot2.o    \
-        gdt.o           \
-        gdt_asm.o       \
-        idt.o           \
-        idt_asm.o       \
-        pic_8259.o      \
-        io.o            \
-        paging.o        \
-        paging_asm.o    \
-        kheap.o         \
-        switch_task.o   \
-        task.o
+OBJS =  string.o
 
 CFLAGS = -m32                               \
     -ffreestanding                          \

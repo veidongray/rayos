@@ -3,8 +3,9 @@
 .section .text
 .global first_task
 first_task:
+    movl task_esp, %eax # task_struct->esp offset
     movl 4(%esp), %edi  # task_struct pointer
-    movl TASK_ESP(%edi), %esp
+    movl (%eax, %edi), %esp
     popl %edi
     popl %esi
     popl %ebp
@@ -25,11 +26,12 @@ context_switch:
     pushl %ebp
     pushl %esi
     pushl %edi
+    movl task_esp, %eax # task_struct->esp offset
     movl 32(%esp), %esi   # current_task
-    movl %esp, TASK_ESP(%esi)   # current_task->esp = esp
+    movl %esp, (%eax, %esi)   # current_task->esp = esp
 resume:
     movl 36(%esp), %esi  # next_task
-    movl TASK_ESP(%esi), %esp   # next_task->esp = esp
+    movl (%eax, %esi), %esp   # next_task->esp = esp
     popl %edi
     popl %esi
     popl %ebp
@@ -43,4 +45,5 @@ resume:
 .section .data
 .global	task_esp
 task_esp:
-    .long 0x12345678
+    # task_struct->esp offset
+    .long 0x0
