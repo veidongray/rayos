@@ -8,29 +8,17 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "libc/string.h"
+#include "libc/stdlib.h"
 
 extern uint32_t _mboot_info[];
 extern uint32_t _mboot_magic[];
 extern uint32_t host_total_mem;
 
-void second_init(void *arg)
-{
-    arg = arg;
-    char strbuf[32];
-    memset(strbuf, 'a', 31);
-    strbuf[31] = '\0';
-    cga_printf("Running %s, %d\n", strbuf, strlen(strbuf));
-}
-
 void kernel_init(void *arg)
 {
     arg = arg;
     while (1) {
-        cga_printf("kernel_init ...\n");
-        kthread_create(second_init, 0, "second000_init");
-        kthread_create(second_init, 0, "second111_init");
-        kthread_create(second_init, 0, "second222_init");
-        for (int i = 0; i < 0xffffff; i++);
+        // cga_printf("kernel_init ... %X\n", get_physaddr(0xC0010000));
         asm volatile ("hlt\r\n");
     }
 }
@@ -54,8 +42,8 @@ void start_kernel(void)
     }
     gdt_init();
     idt_init();
-    page_init();
     cga_init();
+    page_init();
     kheap_init();
 
     // Never return

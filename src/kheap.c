@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include "print.h"
+#include "paging.h"
 #include "kheap.h"
 #include "multiboot2.h"
 #include "libc/stdlib.h"
@@ -9,7 +10,9 @@ static struct heap_block *kheap_pool = NULL;
 
 void kheap_init(void)
 {
-    kheap_pool = (struct heap_block *)kcreate_heap_pool(kheap_pool_start, 0x400000);
+    kheap_pool = (struct heap_block *)kcreate_heap_pool((uint32_t *)kheap_top, 0x400000);
+    kheap_top += 0x401000;
+    cga_printf("kheap_top %X\n", kheap_top);
     if (kheap_pool == NULL)
     {
         cga_printf("Host desn't have enough memory space...\n");
