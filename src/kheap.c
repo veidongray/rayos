@@ -10,9 +10,10 @@ static struct heap_block *kheap_pool = NULL;
 
 void kheap_init(void)
 {
-    kheap_pool = (struct heap_block *)kcreate_heap_pool((uint32_t *)kheap_top, 0x400000);
-    kheap_top += 0x401000;
-    cga_printf("kheap_top %X\n", kheap_top);
+    kheap_pool = (struct heap_block *)kcreate_heap_pool((uint32_t *)kheap_top, KHEAP_SIZE);
+    // 在这里之后不再使用kheap_top直接分配空间
+    // 而是使用kmalloc和kfree在分配到的kheap_pool中进行内存管理
+    kheap_top += KHEAP_SIZE + 0x1000;
     if (kheap_pool == NULL)
     {
         cga_printf("Host desn't have enough memory space...\n");

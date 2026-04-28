@@ -18,7 +18,7 @@ void kernel_init(void *arg)
 {
     arg = arg;
     while (1) {
-        // cga_printf("kernel_init ... %X\n", get_physaddr(0xC0010000));
+        cga_printf("kernel_init ... %s\n", current->name);
         asm volatile ("hlt\r\n");
     }
 }

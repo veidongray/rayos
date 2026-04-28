@@ -10,10 +10,10 @@ mkiso: build
 	grub-mkrescue -o rayos.iso iso/
 
 qemu: mkiso
-	qemu-system-i386 -m 128M -no-reboot -d int,guest_errors -cdrom rayos.iso
+	qemu-system-i386 -m 128M -no-reboot -d int,guest_errors,mmu -D qemu.log -cdrom rayos.iso
 
 qemu-dbg: mkiso
-	qemu-system-i386 -m 128M -S -s -no-reboot -d int,guest_errors -cdrom rayos.iso
+	qemu-system-i386 -m 128M -S -s -no-reboot -d int,guest_errors,mmu -D qemu.log -cdrom rayos.iso
 
 clean:
-	$(RM) *.iso vmrayos iso/boot/vmrayos src/*.o src/libc/*.o
+	$(RM) *.iso vmrayos iso/boot/vmrayos src/*.o src/libc/*.o *.log

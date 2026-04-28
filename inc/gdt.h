@@ -2,6 +2,10 @@
 #define GDT_H
 
 #include <stdint.h>
+#define KCODE_SELECTOR (0x08UL | 0x0UL)
+#define KDATA_SELECTOR (0x10UL | 0x0UL)
+#define UCODE_SELECTOR (0x18UL | 0x3UL)
+#define UDATA_SELECTOR (0x20UL | 0x3UL)
 
 struct gdt_entry {
     uint16_t limit;

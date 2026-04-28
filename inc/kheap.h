@@ -5,6 +5,8 @@
 
 #define KHEAP_ALLOC 0x0
 
+#define KHEAP_SIZE 0x400000
+
 struct heap_block
 {
     uint32_t *start;

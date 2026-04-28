@@ -1,7 +1,40 @@
 #include "gdt.h"
 #include "print.h"
+#include "libc/string.h"
 
-static struct gdt_entry descriptors[5] __attribute__((aligned(4096)));
+struct tss_entry {
+    uint32_t prev_tss;
+    uint32_t esp0;
+    uint32_t ss0;
+    uint32_t esp1;
+    uint32_t ss1;
+    uint32_t esp2;
+    uint32_t ss2;
+    uint32_t cr3;
+    uint32_t eip;
+    uint32_t eflags;
+    uint32_t eax;
+    uint32_t ecx;
+    uint32_t edx;
+    uint32_t ebx;
+    uint32_t esp;
+    uint32_t ebp;
+    uint32_t esi;
+    uint32_t edi;
+    uint32_t es;
+    uint32_t cs;
+    uint32_t ss;
+    uint32_t ds;
+    uint32_t fs;
+    uint32_t gs;
+    uint32_t ldt;
+    uint16_t trap;
+    uint16_t iomap_base;
+} __attribute__((packed));
+
+static struct tss_entry tss;
+
+static struct gdt_entry descriptors[6] __attribute__((aligned(4096)));
 static struct gdtr gdtr __attribute__((aligned(4096)));
 
 int create_gdt_entry(struct gdt_entry *entry, uint32_t base,
@@ -31,8 +64,15 @@ int gdt_init(void)
     create_gdt_entry(&desc[0], 0, 0, 0, 0);
     create_gdt_entry(&desc[1], 0, 0xFFFFF, 0x9A, 0xCF);  // Kernel mode code segment
     create_gdt_entry(&desc[2], 0, 0xFFFFF, 0x93, 0xCF);  // Kernel mode data segment
-    load_gdt(desc, sizeof(struct gdt_entry) * 3);
+    create_gdt_entry(&desc[3], 0, 0xFFFFF, 0xFA, 0xCF);  // User mode code segment
+    create_gdt_entry(&desc[4], 0, 0xFFFFF, 0xF3, 0xCF);  // User mode data segment
+    create_gdt_entry(&desc[5], (uint32_t)&tss, sizeof(tss) - 1, 0x89, 0x00);
+    load_gdt(desc, sizeof(struct gdt_entry) * 6);
+    memset(&tss, 0, sizeof(tss));
+    tss.ss0 = KDATA_SELECTOR;
+    tss.esp0 = 0;
 	extern void gdt_flush(struct gdtr *gdtr);
     gdt_flush(&gdtr);
+    asm volatile ("ltr %%ax" :: "a"(0x2B));
     return 0;
 }

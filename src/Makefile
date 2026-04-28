@@ -11,7 +11,7 @@ OBJS =  head.o          \
         paging.o        \
         paging_asm.o    \
         kheap.o         \
-        switch_task.o   \
+        switch.o        \
         task.o
 
 CFLAGS = -m32                               \
