@@ -14,12 +14,6 @@ void kheap_init(void)
     // 在这里之后不再使用kheap_top直接分配空间
     // 而是使用kmalloc和kfree在分配到的kheap_pool中进行内存管理
     kheap_top += KHEAP_SIZE + 0x1000;
-    if (kheap_pool == NULL)
-    {
-        cga_printf("Host desn't have enough memory space...\n");
-        while (1)
-            asm volatile("hlt\r\n");
-    }
 }
 
 void *kmalloc(uint32_t size, uint32_t flag)
@@ -84,6 +78,7 @@ void kfree(void *ptr)
 
 void *kcreate_heap_pool(uint32_t *start, uint32_t size)
 {
+    // heap_pool也只是一个heap block
     struct heap_block *heap_pool;
 
     if ((uint32_t)start + size > host_total_mem + _virt_offset[0])

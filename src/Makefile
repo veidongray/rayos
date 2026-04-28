@@ -14,7 +14,7 @@ OBJS =  head.o          \
         switch.o        \
         task.o
 
-CFLAGS = -m32                               \
+CFLAGS = -m32 -fno-pic                      \
     -ffreestanding                          \
     -fno-builtin                            \
     -fno-stack-protector                    \

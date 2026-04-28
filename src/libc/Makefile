@@ -1,6 +1,6 @@
 OBJS =  string.o
 
-CFLAGS = -m32                               \
+CFLAGS = -m32 -fno-pic                      \
     -ffreestanding                          \
     -fno-builtin                            \
     -fno-stack-protector                    \
@@ -11,7 +11,7 @@ CFLAGS = -m32                               \
     -fno-asynchronous-unwind-tables         \
     -std=gnu99                              \
     -I $(INCDIR)
-
+    
 %.o: %.S
 	$(CC) $(CFLAGS) -c $< -o $@
 

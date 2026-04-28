@@ -3,13 +3,17 @@
 
 #include <stdint.h>
 
-extern uint32_t kheap_top;
-
 struct page {
     uint32_t *base;
     int32_t kref;
     uint32_t flags;
 } __attribute__((packed));
+
+extern uint32_t kheap_top;
+extern struct page *page_list;
+
+extern void load_page_directory(uint32_t *page_directory);
+extern void enable_paging();
 
 int page_init(void);
 void *get_physaddr(void *virtualaddr);
