@@ -11,7 +11,7 @@ struct page {
 
 extern uint32_t kheap_top;
 extern struct page *page_list;
-
+extern uint32_t kpage_directory[1024] __attribute__((aligned(4096)));
 extern void load_page_directory(uint32_t *page_directory);
 extern void enable_paging();
 

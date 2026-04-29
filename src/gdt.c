@@ -1,4 +1,5 @@
 #include "gdt.h"
+#include "kheap.h"
 #include "print.h"
 #include "libc/string.h"
 
@@ -68,11 +69,25 @@ int gdt_init(void)
     create_gdt_entry(&desc[4], 0, 0xFFFFF, 0xF3, 0xCF);  // User mode data segment
     create_gdt_entry(&desc[5], (uint32_t)&tss, sizeof(tss) - 1, 0x89, 0x00);
     load_gdt(desc, sizeof(struct gdt_entry) * 6);
-    memset(&tss, 0, sizeof(tss));
-    tss.ss0 = KDATA_SELECTOR;
-    tss.esp0 = 0;
 	extern void gdt_flush(struct gdtr *gdtr);
     gdt_flush(&gdtr);
-    asm volatile ("ltr %%ax" :: "a"(0x2B));
+    memset(&tss, 0, sizeof(tss));
+    tss.ss0 = KDATA_SELECTOR;
+    tss.esp0 = (uint32_t)kmalloc(8192, KHEAP_ALLOC);
+    asm volatile ("ltr %%ax" :: "a"(TSS_SELECTOR));
     return 0;
+}
+
+uint32_t get_current_esp(void)
+{
+    uint32_t esp;
+    asm volatile ("mov %%esp, %0" : "=r"(esp));
+    return esp;
+}
+
+void update_tss_esp0(uint32_t esp0)
+{
+    tss.esp0 = esp0;
+    // 重新加载 TR 寄存器以使更改生效
+    asm volatile ("ltr %%ax" :: "a"(TSS_SELECTOR));
 }

@@ -141,15 +141,15 @@ void map_page(void *physaddr, void *virtualaddr, unsigned int flags)
         struct page *t;
         t = alloc_page();
         t->kref = 1;
-        pd[pdindex] = (uint32_t)t->base | 0x3;
+        pd[pdindex] = (uint32_t)t->base | (flags & 0xFFFUL) | 0x01UL;
     }
 
     unsigned long *pt = ((unsigned long *)0xFFC00000UL) + (0x400UL * pdindex);
     // Here you need to check whether the PT entry is present.
     // When it is, then there is already a mapping present. What do you do now?
     // 如果虚拟地址已经有映射则直接返回
-    if ((pt[ptindex] & 0x1UL))
-        return;
+    // if ((pt[ptindex] & 0x1UL))
+    //     return;
 
     physaddr = (void *)((uint32_t)physaddr & 0xfffff000UL);
     page_list[(uint32_t)physaddr / 4096].flags = PAGE_USED;
