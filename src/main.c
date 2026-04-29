@@ -29,6 +29,7 @@ void user_init(void)
 struct task_struct *utask_create(void *(task_func)(void *), void *arg, char *name)
 {
     uint32_t i;
+    struct task_struct *task = (struct task_struct *)kmalloc(sizeof(struct task_struct), KHEAP_ALLOC);
 
     // map vga address area for user task
     map_page((uint32_t *)0xb8000, (uint32_t *)0xb8000, 0x7);
@@ -56,27 +57,49 @@ struct task_struct *utask_create(void *(task_func)(void *), void *arg, char *nam
     new_pd[512] = (uint32_t)get_physaddr(new_pt) | 0x7;
 
     // copy task code/data
-    // only copy 4K for test
+    // user_ptr is user task start address
     uint32_t *user_ptr = 0x80000000;
-    map_page(new_pt[0], user_ptr, 0x7);
+    for (i = 0; i < 1024; i++) {
+        map_page(new_pt[i], (uint32_t *)((uint32_t)user_ptr + (i * 0x1000)), 0x7);
+    }
     memcpy(user_ptr, user_init, 4096);
-    uint32_t *stack = user_ptr + 0x400;
+    uint32_t *stack = (uint32_t *)((uint32_t)user_ptr + 0x400000);
     uint32_t *stack_top = stack;
     *(--stack_top) = UDATA_SELECTOR;
     *(--stack_top) = stack;
     *(--stack_top) = 0x2;
     *(--stack_top) = UCODE_SELECTOR;
     *(--stack_top) = user_ptr;
+    *(--stack_top) = 0x0; // eax
+    *(--stack_top) = 0x0; // ecx
+    *(--stack_top) = 0x0; // edx
+    *(--stack_top) = 0x0; // ebx
+    *(--stack_top) = 0x0; // ebp
+    *(--stack_top) = 0x0; // esi
+    *(--stack_top) = 0x0; // edi
+
+    task->esp = stack_top;
+    task->stack = stack;
+    task->task_status = TASK_READY;
+    strcpy(task->name, "USER");
 
     load_page_directory((uint32_t *)get_physaddr(new_pd));
 
     asm volatile(
         "cli\r\n"
         "movl %0, %%esp\n\r" // 将 stack_top 加载到 esp
+        "popl %%edi\r\n"
+        "popl %%esi\r\n"
+        "popl %%ebp\r\n"
+        "popl %%ebx\r\n"
+        "popl %%edx\r\n"
+        "popl %%ecx\r\n"
+        "popl %%eax\r\n"
         "iret\n\r"           // 执行中断返回
         :
         : "r"(stack_top)
         : "memory");
+    return task;
 }
 
 void kernel_init(void *arg)

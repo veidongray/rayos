@@ -64,9 +64,9 @@ int gdt_init(void)
     struct gdt_entry *desc = descriptors;
     create_gdt_entry(&desc[0], 0, 0, 0, 0);
     create_gdt_entry(&desc[1], 0, 0xFFFFF, 0x9A, 0xCF);  // Kernel mode code segment
-    create_gdt_entry(&desc[2], 0, 0xFFFFF, 0x93, 0xCF);  // Kernel mode data segment
+    create_gdt_entry(&desc[2], 0, 0xFFFFF, 0x92, 0xCF);  // Kernel mode data segment
     create_gdt_entry(&desc[3], 0, 0xFFFFF, 0xFA, 0xCF);  // User mode code segment
-    create_gdt_entry(&desc[4], 0, 0xFFFFF, 0xF3, 0xCF);  // User mode data segment
+    create_gdt_entry(&desc[4], 0, 0xFFFFF, 0xF2, 0xCF);  // User mode data segment
     create_gdt_entry(&desc[5], (uint32_t)&tss, sizeof(tss) - 1, 0x89, 0x00);
     load_gdt(desc, sizeof(struct gdt_entry) * 6);
 	extern void gdt_flush(struct gdtr *gdtr);
