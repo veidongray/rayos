@@ -2,6 +2,8 @@
 #include "kheap.h"
 #include "idt.h"
 #include <stddef.h>
+#include "paging.h"
+#include "libc/string.h"
 
 struct task_list *current_tasklist = 0;
 struct task_struct *current;
@@ -38,10 +40,8 @@ struct task_struct *kthread_create(void (*thread_func)(void *), void *arg, char 
     extern uint32_t task_esp;
     task_esp = offsetof(struct task_struct, esp);
 
-    for (i = 0; i < 2048; i++)
-        stack[i] = 0;
-
     // make task stack
+    memset(stack, 0x0, sizeof(uint32_t) * 2048);
     stack_step = &stack[2048];
     *(--stack_step) = (uint32_t)arg;
     *(--stack_step) = (uint32_t)thread_exit; // setup return address to thread_exit
@@ -57,8 +57,13 @@ struct task_struct *kthread_create(void (*thread_func)(void *), void *arg, char 
     kthread->esp = (uint32_t)stack_step;
     kthread->stack = stack;
     kthread->task_status = TASK_READY;
-    for (i = 0; i < 32; i++)
-        kthread->name[i] = name[i];
+    strcpy(kthread->name, "KERN");
+    asm volatile (
+        "movl %%cr3, %0"
+        : "=r"(kthread->page_dir)
+        :
+        : "memory"
+    );
 
     struct task_list *rl = (struct task_list *)kmalloc(sizeof(struct task_list), KHEAP_ALLOC);
     rl->task = kthread;

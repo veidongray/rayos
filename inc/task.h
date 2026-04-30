@@ -13,6 +13,7 @@ struct task_struct
     uint32_t *stack;
     uint32_t task_status;
     char name[32];
+    uint32_t page_dir;
 };
 
 struct task_list

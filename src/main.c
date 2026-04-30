@@ -59,7 +59,8 @@ struct task_struct *utask_create(void *(task_func)(void *), void *arg, char *nam
     // copy task code/data
     // user_ptr is user task start address
     uint32_t *user_ptr = 0x80000000;
-    for (i = 0; i < 1024; i++) {
+    for (i = 0; i < 1024; i++)
+    {
         map_page(new_pt[i], (uint32_t *)((uint32_t)user_ptr + (i * 0x1000)), 0x7);
     }
     memcpy(user_ptr, user_init, 4096);
@@ -82,8 +83,21 @@ struct task_struct *utask_create(void *(task_func)(void *), void *arg, char *nam
     task->stack = stack;
     task->task_status = TASK_READY;
     strcpy(task->name, "USER");
+    task->page_dir = (uint32_t)get_physaddr(new_pd);
 
-    load_page_directory((uint32_t *)get_physaddr(new_pd));
+    disable_irq();
+    struct task_list *rl = (struct task_list *)kmalloc(sizeof(struct task_list), KHEAP_ALLOC);
+    rl->task = task;
+    rl->next = rl;
+    rl->prev = rl;
+
+    // add new task to tasklist
+    rl->next = current_tasklist->next;
+    rl->prev = current_tasklist;
+    rl->next->prev = rl;
+    current_tasklist->next = rl;
+
+    load_page_directory(task->page_dir);
 
     asm volatile(
         "cli\r\n"
@@ -95,10 +109,11 @@ struct task_struct *utask_create(void *(task_func)(void *), void *arg, char *nam
         "popl %%edx\r\n"
         "popl %%ecx\r\n"
         "popl %%eax\r\n"
-        "iret\n\r"           // 执行中断返回
+        "iret\n\r" // 执行中断返回
         :
         : "r"(stack_top)
         : "memory");
+    enable_irq();
     return task;
 }
 
@@ -106,10 +121,10 @@ void kernel_init(void *arg)
 {
     arg = arg;
 
-    utask_create(NULL, NULL, NULL);
+    // utask_create(NULL, NULL, NULL);
+    cga_printf("kernel_init ... %s\n", current->name);
     while (1)
     {
-        cga_printf("kernel_init ... %s\n", current->name);
         asm volatile("hlt\r\n");
     }
 }
