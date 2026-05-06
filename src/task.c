@@ -4,8 +4,9 @@
 #include <stddef.h>
 #include "paging.h"
 #include "libc/string.h"
+#include "libc/stdlib.h"
 
-struct task_list *current_tasklist = 0;
+struct task_list *current_tasklist = NULL;
 struct task_struct *current;
 
 static void thread_exit(void)
@@ -58,12 +59,11 @@ struct task_struct *kthread_create(void (*thread_func)(void *), void *arg, char 
     kthread->stack = stack;
     kthread->task_status = TASK_READY;
     strcpy(kthread->name, "KERN");
-    asm volatile (
+    asm volatile(
         "movl %%cr3, %0"
         : "=r"(kthread->page_dir)
         :
-        : "memory"
-    );
+        : "memory");
 
     struct task_list *rl = (struct task_list *)kmalloc(sizeof(struct task_list), KHEAP_ALLOC);
     rl->task = kthread;
@@ -71,7 +71,7 @@ struct task_struct *kthread_create(void (*thread_func)(void *), void *arg, char 
     rl->prev = rl;
 
     disable_irq();
-    if (current_tasklist == 0)
+    if (current_tasklist == NULL)
     {
         // means first thread
         current_tasklist = rl;
@@ -94,7 +94,7 @@ struct task_struct *kthread_create(void (*thread_func)(void *), void *arg, char 
 void scheduler(void)
 {
     disable_irq();
-    if (current_tasklist != 0)
+    if (current_tasklist != NULL)
     {
         struct task_struct *old_task, *new_task;
         old_task = current_tasklist->task;
@@ -103,6 +103,7 @@ void scheduler(void)
         current = new_task;
         old_task->task_status = TASK_READY;
         new_task->task_status = TASK_RUNNING;
+        // load_page_directory(current->page_dir);
         context_switch(old_task, new_task);
     }
     enable_irq();

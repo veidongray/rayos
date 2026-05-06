@@ -15,3 +15,17 @@ isr_pic_timer:
 isr_page_fault:
     call page_fault_handler
     iret
+
+.global isr_double_fault
+isr_double_fault:
+    call double_fault_handler
+    iret
+
+.global isr_gp_fault
+isr_gp_fault:
+    cli
+    pushl (%esp)        # Pass error_code to C function
+    call gp_fault_handler
+    addl $4, %esp
+    sti
+    iret
