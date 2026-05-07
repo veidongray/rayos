@@ -15,142 +15,8 @@ extern uint32_t _mboot_info[];
 extern uint32_t _mboot_magic[];
 extern uint32_t host_total_mem;
 
-
-
-void user_init1(void)
+void user_init(void)
 {
-    *(volatile uint8_t *)0xb8008 = 'U';
-    *(volatile uint8_t *)0xb800a = 'S';
-    *(volatile uint8_t *)0xb800c = 'E';
-    *(volatile uint8_t *)0xb800e = 'R';
-    while (1)
-    {
-    }
-}
-
-struct task_struct *utask_create(void *(task_func)(void *), void *arg, char *name)
-{
-    uint32_t i;
-    struct task_struct *task = (struct task_struct *)kmalloc(sizeof(struct task_struct), KHEAP_ALLOC);
-
-    // map vga address area for user task
-    map_page((uint32_t *)0xb8000, (uint32_t *)0xb8000, 0x7);
-    // make new pd
-    uint32_t *new_pd = 0x40000000;
-    map_page(alloc_page()->base, new_pd, 0x7);
-    // copy vga map
-    new_pd[0] = kpage_directory[0];
-    for (i = 768; i < 1024; i++)
-    {
-        // copy kernel map
-        new_pd[i] = kpage_directory[i];
-    }
-    new_pd[1023] = (uint32_t)get_physaddr(new_pd) | 0x7;
-
-    // make new pt
-    uint32_t *new_pt = 0x40001000;
-    map_page(alloc_page()->base, new_pt, 0x7);
-    for (i = 0; i < 1024; i++)
-    {
-        // alloc 4096 pages
-        new_pt[i] = (uint32_t)alloc_page()->base | 0x7;
-    }
-    // from 0x80000000
-    new_pd[512] = (uint32_t)get_physaddr(new_pt) | 0x7;
-
-    // copy task code/data
-    // user_ptr is user task start address
-    uint32_t *user_ptr = 0x80000000;
-    for (i = 0; i < 1024; i++)
-    {
-        map_page(new_pt[i], (uint32_t *)((uint32_t)user_ptr + (i * 0x1000)), 0x7);
-    }
-    memcpy(user_ptr, task_func, 4096);
-    uint32_t *stack = (uint32_t *)((uint32_t)user_ptr + 0x400000);
-    uint32_t *stack_top = stack;
-    *(--stack_top) = UDATA_SELECTOR;
-    *(--stack_top) = stack;
-    *(--stack_top) = 0x202;
-    *(--stack_top) = UCODE_SELECTOR;
-    *(--stack_top) = user_ptr;
-    *(--stack_top) = 0x0; // eax
-    *(--stack_top) = 0x0; // ecx
-    *(--stack_top) = 0x0; // edx
-    *(--stack_top) = 0x0; // ebx
-    *(--stack_top) = 0x0; // ebp
-    *(--stack_top) = 0x0; // esi
-    *(--stack_top) = 0x0; // edi
-
-    task->esp = stack_top;
-    task->stack = stack;
-    task->task_status = TASK_READY;
-    strcpy(task->name, "USER");
-    task->page_dir = (uint32_t)get_physaddr(new_pd);
-
-    disable_irq();
-    struct task_list *rl = (struct task_list *)kmalloc(sizeof(struct task_list), KHEAP_ALLOC);
-    rl->task = task;
-    rl->next = rl;
-    rl->prev = rl;
-
-    if (current_tasklist == NULL)
-    {
-        // means first thread
-        current_tasklist = rl;
-        current = current_tasklist->task;
-        current->task_status = TASK_RUNNING;
-
-        load_page_directory(task->page_dir);
-        asm volatile(
-            "cli\r\n"
-            "movl %0, %%esp\n\r" // 将 stack_top 加载到 esp
-            "popl %%edi\r\n"
-            "popl %%esi\r\n"
-            "popl %%ebp\r\n"
-            "popl %%ebx\r\n"
-            "popl %%edx\r\n"
-            "popl %%ecx\r\n"
-            "popl %%eax\r\n"
-            "iret\n\r" // 执行中断返回
-            :
-            : "r"(stack_top)
-            : "memory");
-    }
-    else
-    {
-        // add new task to tasklist
-        rl->next = current_tasklist->next;
-        rl->prev = current_tasklist;
-        rl->next->prev = rl;
-        current_tasklist->next = rl;
-        load_page_directory(task->page_dir);
-        asm volatile(
-            "cli\r\n"
-            "movl %0, %%esp\n\r" // 将 stack_top 加载到 esp
-            "popl %%edi\r\n"
-            "popl %%esi\r\n"
-            "popl %%ebp\r\n"
-            "popl %%ebx\r\n"
-            "popl %%edx\r\n"
-            "popl %%ecx\r\n"
-            "popl %%eax\r\n"
-            "iret\n\r" // 执行中断返回
-            :
-            : "r"(stack_top)
-            : "memory");
-    }
-    enable_irq();
-
-    return task;
-}
-
-void user_init0(void)
-{
-    *(volatile uint8_t *)0xb8000 = 'U';
-    *(volatile uint8_t *)0xb8002 = 'S';
-    *(volatile uint8_t *)0xb8004 = 'E';
-    *(volatile uint8_t *)0xb8006 = 'R';
-    utask_create(user_init0, NULL, NULL);
     while (1)
     {
     }
@@ -160,10 +26,10 @@ void kernel_init(void *arg)
 {
     arg = arg;
 
-    // utask_create(NULL, NULL, NULL);
-    cga_printf("kernel_init ... %s\n", current->name);
+    utask_create(user_init, NULL, "USER");
     while (1)
     {
+        cga_printf("kernel_init ... %s\n", current->name);
         asm volatile("hlt\r\n");
     }
 }
@@ -192,10 +58,13 @@ void start_kernel(void)
     cga_init();
     page_init();
     kheap_init();
+    // setup task_struct esp offset
+    // task_esp from switch_task.S
+    extern uint32_t task_esp;
+    task_esp = offsetof(struct task_struct, esp);
 
     // Never return
-    // kthread_create(kernel_init, 0, "kernel_init");
-    utask_create(user_init0, NULL, NULL);
+    kthread_create(kernel_init, 0, "kernel_init");
     while (1)
         asm volatile("hlt\r\n");
 }

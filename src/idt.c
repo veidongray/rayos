@@ -78,7 +78,7 @@ void page_fault_handler(uint32_t error_code)
     uint32_t faulting_address;
     asm volatile("mov %%cr2, %0" : "=r"(faulting_address)); // Get the faulting address from CR2
 
-    cga_printf("Page Fault! Error code: %x, Faulting address: %x\n", error_code, faulting_address);
+    cga_printf("Page Fault! Error code: 0x%x, Faulting address: 0x%x\n", error_code, faulting_address);
     while (1)
         asm volatile("cli\r\nhlt\r\n");
 }
@@ -92,6 +92,6 @@ void double_fault_handler(void)
 
 void gp_fault_handler(uint32_t error_code)
 {
-    cga_printf("GENERAL PROTECTION FAULT! Error code: %x\n", error_code);
+    cga_printf("GENERAL PROTECTION FAULT! Error code: 0x%x\n", error_code);
     while (1) asm volatile("cli; hlt");
 }

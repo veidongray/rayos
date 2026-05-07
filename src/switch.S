@@ -42,8 +42,28 @@ resume:
     sti
     retl
 
+.global	switch_to_user
+.type switch_to_user, @function
+switch_to_user:
+    movl task_esp, %eax # task_struct->esp offset
+    movl 4(%esp), %edi  # task_struct pointer
+    movl (%eax, %edi), %esp
+    popl %edi
+    popl %esi
+    popl %ebp
+    popl %ebx
+    popl %edx
+    popl %ecx
+    popl %eax
+    iret
+
 .section .data
 .global	task_esp
 task_esp:
     # task_struct->esp offset
+    .long 0x0
+
+.global	task_tss_esp0
+task_tss_esp0:
+    # task_struct->tss_esp0 offset
     .long 0x0
