@@ -167,3 +167,12 @@ void flush_tlb(void)
         "mov %cr3, %eax\r\n"
         "mov %eax, %cr3\r\n");
 }
+
+void get_cr3(uint32_t *cr3)
+{
+    asm volatile(
+        "movl %%cr3, %0"
+        : "=r"(*cr3)
+        :
+        : "memory");
+}

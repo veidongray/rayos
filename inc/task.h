@@ -2,6 +2,7 @@
 #define TASK_H
 
 #include <stdint.h>
+#include "list.h"
 
 #define TASK_RUNNING 0x0
 #define TASK_READY 0x1
@@ -20,23 +21,17 @@ struct task_struct
     uint32_t task_scheduled;
     uint32_t tss_ss0;
     uint32_t tss_esp0;
+    struct list_head list;
 };
 
-struct task_list
-{
-    struct task_struct *task;
-    struct task_list *prev;
-    struct task_list *next;
-};
-
-extern struct task_list *current_tasklist;
 extern struct task_struct *current;
-extern void first_task(struct task_struct *);
+extern void switch_to(struct task_struct *);
 extern void context_switch(struct task_struct *, struct task_struct *);
 extern void switch_to_user(struct task_struct *);
 
 struct task_struct *kthread_create(void (*thread_func)(void *), void *arg, char *name);
 struct task_struct *utask_create(void *(task_func)(void *), void *arg, char *name);
 void scheduler(void);
+void task_init(void);
 
 #endif // TASK_H

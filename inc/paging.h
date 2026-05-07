@@ -21,5 +21,6 @@ void flush_tlb(void);
 void map_page(void *physaddr, void *virtualaddr, unsigned int flags);
 struct page *alloc_page(void);
 void free_page(struct page *page);
+void get_cr3(uint32_t *cr3);
 
 #endif // PAGING_H

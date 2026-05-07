@@ -19,6 +19,8 @@ void user_init(void)
 {
     while (1)
     {
+        cga_printf("%s\n", current->name);
+        asm volatile("hlt\r\n");
     }
 }
 
@@ -26,10 +28,13 @@ void kernel_init(void *arg)
 {
     arg = arg;
 
-    utask_create(user_init, NULL, "USER");
+    ktask_create(user_init, 0, "user_init000");
+    ktask_create(user_init, 0, "user_init111");
+    ktask_create(user_init, 0, "user_init222");
+    ktask_create(user_init, 0, "user_init333");
     while (1)
     {
-        cga_printf("kernel_init ... %s\n", current->name);
+        cga_printf("%s\n", current->name);
         asm volatile("hlt\r\n");
     }
 }
@@ -58,13 +63,10 @@ void start_kernel(void)
     cga_init();
     page_init();
     kheap_init();
-    // setup task_struct esp offset
-    // task_esp from switch_task.S
-    extern uint32_t task_esp;
-    task_esp = offsetof(struct task_struct, esp);
+    task_init();
 
     // Never return
-    kthread_create(kernel_init, 0, "kernel_init");
+    ktask_create(kernel_init, 0, "kernel_init");
     while (1)
         asm volatile("hlt\r\n");
 }

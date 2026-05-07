@@ -1,4 +1,4 @@
-OBJS =  string.o
+OBJS =  list.o
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@

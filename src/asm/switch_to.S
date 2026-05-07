@@ -1,8 +1,8 @@
-.equ TASK_ESP, 0
 .section .note.GNU-stack,"",@progbits
 .section .text
-.global first_task
-first_task:
+.global switch_to
+.type switch_to, @function
+switch_to:
     movl task_esp, %eax # task_struct->esp offset
     movl 4(%esp), %edi  # task_struct pointer
     movl (%eax, %edi), %esp
@@ -61,9 +61,4 @@ switch_to_user:
 .global	task_esp
 task_esp:
     # task_struct->esp offset
-    .long 0x0
-
-.global	task_tss_esp0
-task_tss_esp0:
-    # task_struct->tss_esp0 offset
     .long 0x0
