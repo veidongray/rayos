@@ -42,7 +42,7 @@ int page_init(void)
 
     // Calculate the total number of pages needed for the host memory
     // 计算所有可用内存的页数和页表数
-    total_pages = host_total_mem / 4096;
+    total_pages = get_total_mem() / 4096;
     total_tables = total_pages / 1024;
 
     // Map all memory up to the total memory size, including the kernel itself

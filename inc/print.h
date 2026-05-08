@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-int cga_init(void);
+int tty_init(void);
 char *itoa(int value, char *str, int base);
 char *uitoa(uint32_t value, char *str, int base);
 int cga_putc(const char ch);

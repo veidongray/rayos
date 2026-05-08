@@ -1,8 +1,13 @@
 #include "print.h"
+#include "idt.h"
 #include <stdint.h>
 
 static uint8_t *cgaptr = (uint8_t *)0xC00B8000;
-static uint8_t **get_cgaptr(void) { return &cgaptr; }
+
+static uint8_t **get_cgaptr(void)
+{
+    return &cgaptr;
+}
 
 int cga_shift(uint8_t **ptr)
 {
@@ -111,8 +116,7 @@ int cga_putc(const char ch)
 {
     // if not to disable interrupts,
     // the output may be garbled when an interrupt occurs during writing to CGA memory
-    
-    asm volatile ("cli\r\n");
+    disable_irq();
     uint8_t **cga = get_cgaptr();
     if (ch >= 32)
     {
@@ -125,7 +129,7 @@ int cga_putc(const char ch)
         *cga += 160 - ((*cga - (uint8_t *)0xC00B8000) % 160);
         cga_shift(cga);
     }
-    asm volatile ("sti\r\n");
+    enable_irq();
     return ch;
 }
 
@@ -235,16 +239,14 @@ int cga_printf(const char *format, ...)
     return count;
 }
 
-int cga_init(void)
+int tty_init(void)
 {
     uint8_t **cga = get_cgaptr();
     uint32_t i;
     for (i = 0; i < 4000; ++i)
     {
         cga_putc(' ');
-        cga_putc(0x07); // Light grey on black
     }
     *cga = (uint8_t *)0xC00B8000;
-    // cga_info("CGA text mode initialized.\n");
     return 0;
 }

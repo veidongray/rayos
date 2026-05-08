@@ -1,22 +1,26 @@
 #include "mm.h"
+#include "paging.h"
 #include "multiboot2.h"
 #include "panic.h"
 #include "libc/stdlib.h"
 
-#define KMEM_POOL_LEN (4 * 1024 * 1024)
-#define EARLY_MEM_POOL_LEN (2 * 1024 * 1024)
+#define KMEM_POOL_LEN (16 * 1024 * 1024)
+#define EARLY_MEM_POOL_LEN (4 * 1024 * 1024)
+
 static uint8_t *early_free_ptr = NULL;
 static uint8_t *kfree_ptr = NULL;
 static uint8_t early_mem_pool[EARLY_MEM_POOL_LEN] __attribute__((aligned(4096)));
-static uint8_t kmem_pool[KMEM_POOL_LEN] __attribute__((aligned(4096)));
 LIST_HEAD(mm_list);
+extern uint32_t _kernel_virt_end_aligned[];
+extern uint32_t _mboot_info[];
+extern uint32_t _mboot_magic[];
 
 void early_mm_init(void)
 {
-    extern uint32_t _mboot_info[];
-    extern uint32_t _mboot_magic[];
     if (_mboot_magic[0] == 0x36d76289)
+    {
         parse_multiboot2_mmap((uint32_t *)_mboot_info[0]);
+    }
     else
     {
         // If we don't have a valid multiboot magic number, we can't trust the bootloader and should halt
@@ -27,7 +31,15 @@ void early_mm_init(void)
 
 void mm_init(void)
 {
-    kfree_ptr = kmem_pool;
+    uint32_t i;
+    struct page *pg;
+
+    kfree_ptr = (uint8_t *)_kernel_virt_end_aligned;
+    for (i = 0; i < KMEM_POOL_LEN; i += 0x1000)
+    {
+        pg = alloc_page();
+        map_page(pg->base, (uint32_t *)((uint32_t)kfree_ptr + i), 0x3);
+    }
 }
 
 void *early_malloc(size_t len)

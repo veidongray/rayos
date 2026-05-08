@@ -80,7 +80,7 @@ void start_kernel(void)
     // step 2.
     gdt_init();
     idt_init();
-    cga_init();
+    tty_init();
     page_init();
     mm_init();
     task_init();
