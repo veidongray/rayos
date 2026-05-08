@@ -1,54 +1,118 @@
 #include "task.h"
 #include "kheap.h"
 #include "idt.h"
+#include <stddef.h>
+#include "paging.h"
+#include "print.h"
+#include "gdt.h"
+#include "libc/string.h"
+#include "panic.h"
+#include "libc/stdlib.h"
 
-struct task_list *current_runlist = 0;
-struct task_struct *current;
+INIT_TASK_CURRENT(current);
+LIST_HEAD(task_list);
 
-struct task_struct *kthread_create(void (*thread_func)(void *), void *arg, char *name)
+void task_init(void)
 {
-    uint32_t i;
-    struct task_struct *kthread = kmalloc(sizeof(struct task_struct));
-    uint32_t *stack = (uint32_t *)kmalloc(sizeof(uint32_t) * 2048);
+    // setup task_struct esp offset
+    // task_esp from switch_task.S
+    task_esp = offsetof(struct task_struct, esp);
+}
 
-    for (i = 0; i < 2048; i++)
-        stack[i] = 0;
-
-    stack = &stack[2048];
-    *(--stack) = (uint32_t)arg;
-    *(--stack) = (uint32_t)thread_func;
-    *(--stack) = 0x0; // eax
-    *(--stack) = 0x0; // ecx
-    *(--stack) = 0x0; // edx
-    *(--stack) = 0x0; // ebx
-    *(--stack) = 0x0; // ebp
-    *(--stack) = 0x0; // esi
-    *(--stack) = 0x0; // edi
-
-    kthread->esp = (uint32_t)stack;
-    for (i = 0; i < 32; i++)
-        kthread->name[i] = name[i];
-
-    struct task_list *rl = (struct task_list *)kmalloc(sizeof(struct task_list));
-    rl->task = kthread;
-    rl->next = rl;
-    rl->prev = rl;
-
+static void task_exit(void)
+{
     disable_irq();
-    if (current_runlist == 0)
+    current->task_status = TASK_DEAD;
+    scheduler();
+    enable_irq();
+}
+
+struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *name)
+{
+    struct task_struct *ktask = kmalloc(sizeof(struct task_struct), KHEAP_ALLOC);
+    uint32_t *stack = (uint32_t *)kmalloc(8192, KHEAP_ALLOC);
+    uint32_t *stack_top;
+
+    // make task stack
+    memset(stack, 0x0, 8192);
+    stack_top = (uint32_t *)((uint32_t)stack + 8192);
+    *(--stack_top) = (uint32_t)arg;
+    *(--stack_top) = (uint32_t)task_exit; // setup return address to thread_exit
+    *(--stack_top) = (uint32_t)task_func;
+    *(--stack_top) = 0x0; // eax
+    *(--stack_top) = 0x0; // ecx
+    *(--stack_top) = 0x0; // edx
+    *(--stack_top) = 0x0; // ebx
+    *(--stack_top) = 0x0; // ebp
+    *(--stack_top) = 0x0; // esi
+    *(--stack_top) = 0x0; // edi
+
+    ktask->esp = (uint32_t)stack_top;
+    ktask->stack = stack;
+    ktask->task_status = TASK_READY;
+    strcpy(ktask->name, name);
+    get_cr3(&ktask->page_dir);
+    ktask->task_level = TASK_KERN;
+    ktask->tss_esp0 = (uint32_t)kmalloc(8192, KHEAP_ALLOC) + 8192;
+    // insert to head
+    list_add(&ktask->list, &task_list);
+
+    if (current == NULL)
     {
-        // means first thread
-        current_runlist = rl;
-        switch_to_task(current_runlist->task);
+        // means first ktask
+        current = ktask;
+        current->task_status = TASK_RUNNING;
+        switch_to(current);
     }
-    else
+    return ktask;
+}
+
+void scheduler(void)
+{
+    struct task_struct *cur, *next;
+    disable_irq();
+    if (current != NULL)
     {
-        // add new task to runlist
-        rl->next = current_runlist->next;
-        rl->prev = current_runlist;
-        rl->next->prev = rl;
-        current_runlist->next = rl;
+        switch (current->task_status)
+        {
+        case TASK_RUNNING:
+            list_del(&current->list);
+            list_add_tail(&current->list, &task_list);
+            next = container_of(task_list.next, struct task_struct, list);
+
+            cur = current;
+            current = next;
+            // update task status
+            cur->task_status = TASK_READY;
+            next->task_status = TASK_RUNNING;
+
+            update_tss_esp0(next->tss_esp0);
+            load_page_directory((uint32_t *)next->page_dir);
+            context_switch(cur, next);
+            break;
+
+        case TASK_DEAD:
+            list_del(&current->list);
+            next = container_of(task_list.next, struct task_struct, list);
+
+            cur = current;
+            current = next;
+            // update task status
+            next->task_status = TASK_RUNNING;
+
+            kfree(current->stack);
+            kfree((uint32_t *)current->tss_esp0);
+            kfree(current);
+
+            update_tss_esp0(next->tss_esp0);
+            load_page_directory((uint32_t *)next->page_dir);
+            context_switch(cur, next);
+            break;
+
+        default:
+            // Do nothing
+            break;
+        }
     }
     enable_irq();
-    return kthread;
 }

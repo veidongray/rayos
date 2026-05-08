@@ -2,40 +2,53 @@
 #include "pic_8259.h"
 #include "print.h"
 #include "task.h"
+#include "paging.h"
+#include "gdt.h"
 
 static struct idt_entry idt[256] __attribute__((aligned(4096)));
-void set_idt_entry(uint8_t vector, void* isr, uint8_t flags) {
-    struct idt_entry* descriptor = &idt[vector];
+void set_idt_entry(uint8_t vector, void *isr, uint8_t flags)
+{
+    struct idt_entry *descriptor = &idt[vector];
 
-    descriptor->isr_low        = (uint32_t)isr & 0xFFFF;
-    descriptor->kernel_cs      = 0x08; // this value can be whatever offset your kernel code selector is in your GDT
-    descriptor->attributes     = flags;
-    descriptor->isr_high       = (uint32_t)isr >> 16;
-    descriptor->reserved       = 0;
+    descriptor->isr_low = (uint32_t)isr & 0xFFFF;
+    descriptor->kernel_cs = KCODE_SELECTOR; // this value can be whatever offset your kernel code selector is in your GDT
+    descriptor->attributes = flags;
+    descriptor->isr_high = (uint32_t)isr >> 16;
+    descriptor->reserved = 0;
 }
 
-void load_idt(struct idt_entry* idt, uint16_t size) {
+void load_idt(struct idt_entry *idt, uint16_t size)
+{
     struct idtr idtr;
     idtr.limit = size - 1;
     idtr.base = (uint32_t)idt;
 
-    asm volatile ("lidt %0" : : "m"(idtr));
+    asm volatile("lidt %0" : : "m"(idtr));
 }
+
+extern void default_isr(void);
+extern void isr_pic_timer(void);
+extern void isr_page_fault(void);
+extern void isr_double_fault(void);
+extern void isr_gp_fault(void);
 
 int idt_init(void)
 {
     uint32_t i;
 
-    extern void default_isr(void);
     for (i = 0; i < 256; ++i)
         set_idt_entry(i, default_isr, 0);
 
     // Set up the PIC timer interrupt (IRQ0).
-    extern void isr_pic_timer(void);
     set_idt_entry(IRQ0_VECTOR, isr_pic_timer, 0x8E); // Present, ring 0, 32-bit interrupt gate
+
     // Set up the page fault handler (interrupt vector 14).
-    extern void isr_page_fault(void);
     set_idt_entry(14, isr_page_fault, 0x8E);
+
+    // Set up the double fault handler (interrupt vector 8).
+    set_idt_entry(8, isr_double_fault, 0x8E);
+
+    set_idt_entry(13, isr_gp_fault, 0x8E);
 
     load_idt(idt, sizeof(idt));
     pic_remap(0x20, 0x28);
@@ -46,33 +59,39 @@ int idt_init(void)
 
 void enable_irq(void)
 {
-    asm volatile ("sti");
+    asm volatile("sti");
 }
 
 void disable_irq(void)
 {
-    asm volatile ("cli");
+    asm volatile("cli");
 }
 
 void timer_interrupt_handler(void)
 {
     pic_sendEOI(0); // Send End of Interrupt (EOI) signal to PIC
-    if (current_runlist != 0)
-    {
-        struct task_struct *old_task, *new_task;
-        old_task = current_runlist->task;
-        new_task = current_runlist->next->task;
-        current_runlist = current_runlist->next;
-        current = new_task;
-        context_switch(old_task, new_task);
-    }
+    scheduler();
 }
 
 void page_fault_handler(uint32_t error_code)
 {
     uint32_t faulting_address;
-    asm volatile ("mov %%cr2, %0" : "=r" (faulting_address)); // Get the faulting address from CR2
+    asm volatile("mov %%cr2, %0" : "=r"(faulting_address)); // Get the faulting address from CR2
 
-    cga_printf("Page Fault! Error code: %x, Faulting address: %x\n", error_code, faulting_address);
-    while (1) asm volatile("cli\r\nhlt\r\n");
+    cga_printf("Page Fault! Error code: 0x%x, Faulting address: 0x%x\n", error_code, faulting_address);
+    while (1)
+        asm volatile("cli\r\nhlt\r\n");
+}
+
+void double_fault_handler(void)
+{
+    cga_printf("DOUBLE FAULT! System halted.\n");
+    while (1)
+        asm volatile("cli; hlt");
+}
+
+void gp_fault_handler(uint32_t error_code)
+{
+    cga_printf("GENERAL PROTECTION FAULT! Error code: 0x%x\n", error_code);
+    while (1) asm volatile("cli; hlt");
 }

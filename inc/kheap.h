@@ -3,7 +3,12 @@
 
 #include <stdint.h>
 
-struct heap_block {
+#define KHEAP_ALLOC 0x0
+
+#define KHEAP_SIZE 0x400000
+
+struct heap_block
+{
     uint32_t *start;
     uint32_t *end;
     uint32_t size;
@@ -11,7 +16,8 @@ struct heap_block {
 } __attribute__((packed));
 
 void kheap_init(void);
-void *kmalloc(uint32_t size);
+void *kmalloc(uint32_t size, uint32_t flag);
 void kfree(void *ptr);
+void *kcreate_heap_pool(uint32_t *start, uint32_t size);
 
 #endif // KHEAP_H
