@@ -30,12 +30,12 @@ static void task_exit(void)
 struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *name)
 {
     struct task_struct *ktask = kmalloc(sizeof(struct task_struct));
-    uint32_t *stack = (uint32_t *)kmalloc(8192);
+    uint32_t *stack = (uint32_t *)kmalloc(KTASK_STACK_LEN);
     uint32_t *stack_top;
 
     // make task stack
-    memset(stack, 0x0, 8192);
-    stack_top = (uint32_t *)((uint32_t)stack + 8192);
+    memset(stack, 0x0, KTASK_STACK_LEN);
+    stack_top = (uint32_t *)((uint32_t)stack + KTASK_STACK_LEN);
     *(--stack_top) = (uint32_t)arg;
     *(--stack_top) = (uint32_t)task_exit; // setup return address to thread_exit
     *(--stack_top) = (uint32_t)task_func;
@@ -49,12 +49,11 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
 
     ktask->esp = (uint32_t)stack_top;
     ktask->stack = stack;
+    ktask->tss_esp0 = 0;
     ktask->task_status = TASK_READY;
+    ktask->task_level = TASK_KERN;
     strcpy(ktask->name, name);
     get_cr3(&ktask->page_dir);
-    ktask->task_level = TASK_KERN;
-    ktask->tss_esp0 = (uint32_t)kmalloc(8192) + 8192;
-    // insert to head
     list_add(&ktask->list, &task_list);
 
     if (current == NULL)
