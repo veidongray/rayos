@@ -3,7 +3,6 @@
 #include "gdt.h"
 #include "idt.h"
 #include "paging.h"
-#include "kheap.h"
 #include "task.h"
 #include "pic_8259.h"
 #include <stdint.h>
@@ -11,10 +10,7 @@
 #include "libc/string.h"
 #include "libc/stdlib.h"
 #include "panic.h"
-
-extern uint32_t _mboot_info[];
-extern uint32_t _mboot_magic[];
-extern uint32_t host_total_mem;
+#include "mm.h"
 
 void user_init000(void *arg)
 {
@@ -77,24 +73,16 @@ void kernel_init(void *arg)
 
 void start_kernel(void)
 {
-    if (_mboot_magic[0] == 0x36d76289)
-        parse_multiboot2_mmap((uint32_t *)_mboot_info[0]);
-    else
-    {
-        // If we don't have a valid multiboot magic number, we can't trust the bootloader and should halt
-        PANIC("Lost Bootloader...\n");
-    }
+    // step 1.
+    early_page_init();
+    early_mm_init();
 
-    // Check if we have at least 8MB of memory, otherwise we can't do much
-    if (host_total_mem < 0x800000)
-    {
-        PANIC("Not enough memory detected: %u bytes\n", host_total_mem);
-    }
+    // step 2.
     gdt_init();
     idt_init();
     cga_init();
     page_init();
-    kheap_init();
+    mm_init();
     task_init();
 
     // Never return

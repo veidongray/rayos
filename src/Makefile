@@ -6,8 +6,8 @@ OBJS =  main.o          \
         pic_8259.o      \
         io.o            \
         paging.o        \
-        kheap.o         \
-        task.o
+        task.o          \
+        mm.o
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@

@@ -1,5 +1,4 @@
 #include "task.h"
-#include "kheap.h"
 #include "idt.h"
 #include <stddef.h>
 #include "paging.h"
@@ -8,6 +7,7 @@
 #include "libc/string.h"
 #include "panic.h"
 #include "libc/stdlib.h"
+#include "mm.h"
 
 INIT_TASK_CURRENT(current);
 LIST_HEAD(task_list);
@@ -29,8 +29,8 @@ static void task_exit(void)
 
 struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *name)
 {
-    struct task_struct *ktask = kmalloc(sizeof(struct task_struct), KHEAP_ALLOC);
-    uint32_t *stack = (uint32_t *)kmalloc(8192, KHEAP_ALLOC);
+    struct task_struct *ktask = kmalloc(sizeof(struct task_struct));
+    uint32_t *stack = (uint32_t *)kmalloc(8192);
     uint32_t *stack_top;
 
     // make task stack
@@ -53,7 +53,7 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     strcpy(ktask->name, name);
     get_cr3(&ktask->page_dir);
     ktask->task_level = TASK_KERN;
-    ktask->tss_esp0 = (uint32_t)kmalloc(8192, KHEAP_ALLOC) + 8192;
+    ktask->tss_esp0 = (uint32_t)kmalloc(8192) + 8192;
     // insert to head
     list_add(&ktask->list, &task_list);
 

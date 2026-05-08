@@ -2,108 +2,103 @@
 #include "multiboot2.h"
 #include "paging.h"
 #include "print.h"
-#include "kheap.h"
 #include "libc/stdlib.h"
+#include "mm.h"
+#include "panic.h"
+#include "idt.h"
 
 extern uint32_t _virt_offset[];
-extern uint32_t _kernel_base[];
-extern uint32_t _kernel_virt_start[];
-extern uint32_t _kernel_phys_start[];
-extern uint32_t _kernel_virt_end[];
-extern uint32_t _kernel_phys_end[];
-extern uint32_t _kernel_virt_end_aligned[];
 extern uint32_t _kernel_phys_end_aligned[];
-extern uint32_t host_total_mem;
+static uint32_t total_pages;
+static uint32_t total_tables;
+static uint32_t early_tables[4096] __attribute__((aligned(4096)));
+static uint32_t kpage_directory[1024] __attribute__((aligned(4096)));
+static uint32_t *kpage_tables = NULL;
+static struct page *pages = NULL;
 
-uint32_t kpage_directory[1024] __attribute__((aligned(4096)));
-static uint32_t *kpage_tables;
+void early_page_init(void)
+{
+    uint32_t i;
+    uint32_t cr3, *cr3ptr;
+    get_cr3(&cr3);
 
-#define PAGE_USED (1UL << 0)
-#define PAGE_UNUSED (0xfffffffeUL)
+    for (i = 0; i < 4096; i++)
+    {
+        early_tables[i] = ((i * 0x1000UL)) | 0x3UL;
+    }
 
-// page空闲列表
-struct page *page_list;
-uint32_t kheap_top = 0;
+    // early map 16MB
+    cr3ptr = (uint32_t *)(cr3 + (uint32_t)_virt_offset);
+    cr3ptr[768] = ((uint32_t)(early_tables + 0) - (uint32_t)_virt_offset) | 0x3UL;
+    cr3ptr[769] = ((uint32_t)(early_tables + 1024) - (uint32_t)_virt_offset) | 0x3UL;
+    cr3ptr[770] = ((uint32_t)(early_tables + 2048) - (uint32_t)_virt_offset) | 0x3UL;
+    cr3ptr[771] = ((uint32_t)(early_tables + 3072) - (uint32_t)_virt_offset) | 0x3UL;
+}
 
 int page_init(void)
 {
     uint32_t i;
+    struct page *t;
 
     // Calculate the total number of pages needed for the host memory
     // 计算所有可用内存的页数和页表数
-    uint32_t ktotal_pages =
-        (host_total_mem / 0x1000) + ((host_total_mem % 0x1000) ? 1 : 0); // Round up to nearest page
-    uint32_t ktotal_page_tables =
-        (ktotal_pages / 0x400) + ((ktotal_pages % 0x400) ? 1 : 0); // Each page table can map 1024 pages
-
-    // 计算内核大小从0xc0000000开始
-    // 并且加上尾部的page tables大小
-    uint32_t kernel_size =
-        ((uint32_t)_kernel_virt_end_aligned - (uint32_t)_virt_offset) + ((uint32_t)ktotal_page_tables * 0x1000);
-    kernel_size += ((kernel_size % 4096) != 0) ? (4096 - (kernel_size % 4096)) : 0; // 对齐4K
+    total_pages = host_total_mem / 4096;
+    total_tables = total_pages / 1024;
 
     // Map all memory up to the total memory size, including the kernel itself
     // 映射所有的系统可用内存空间
     // 从0xC0000000映射到0x00000000开始
-    kpage_tables = (uint32_t *)((uint32_t)_kernel_virt_end_aligned);
-    for (i = 0; i < ktotal_pages; i++)
-        kpage_tables[i] = (i * 0x1000) | 0x3; // Present + Read/Write
-    for (i = 0; i < ktotal_page_tables; i++)
-        kpage_directory[i + 0x300] =
-            (uint32_t)((uint32_t)kpage_tables - (uint32_t)_virt_offset + (i * 0x1000)) | 0x3;     // Present + Read/Write
-    kpage_directory[1023] = (uint32_t)((uint32_t)kpage_directory - (uint32_t)_virt_offset) | 0x3; // Map the last page to itself for recursive paging
+    kpage_tables = (uint32_t *)early_malloc(total_pages * sizeof(uint32_t));
+    for (i = 0; i < total_pages; i++)
+    {
+        kpage_tables[i] = (i * 0x1000UL) | 0x3UL;
+    }
+    for (i = 0; i < total_tables; i++)
+    {
+        kpage_directory[i + 768] = ((uint32_t)kpage_tables - (uint32_t)_virt_offset + (i * 0x1000UL)) | 0x3UL;
+    }
+    kpage_directory[1023] = ((uint32_t)kpage_directory - (uint32_t)_virt_offset) | 0x3UL;
     load_page_directory((uint32_t *)((uint32_t)kpage_directory - (uint32_t)_virt_offset));
     enable_paging();
 
-    // 设置page列表，使用全局数组记录每个page
-    // 目的是方便后续alloc_page分配页以及page的管理
-    kheap_top = (uint32_t)_virt_offset + kernel_size;
-    page_list = (struct page *)kheap_top;
-    for (i = 0; i < ktotal_pages; i++)
+    pages = (struct page *)early_malloc(sizeof(struct page) * total_pages);
+    for (i = 0; i < total_pages; i++)
     {
-        page_list[i].base = (uint32_t *)(i * 0x1000);
-        page_list[i].flags = PAGE_UNUSED;
-        page_list[i].kref = 0;
+        pages[i].base = (uint32_t *)(i * 0x1000);
+        pages[i].kref = 0;
     }
-
-    // kheap_top增加page列表的空间
-    // kheap_top向上(高地址)增长
-    kheap_top += (sizeof(struct page) * ktotal_pages);
-    kheap_top += (((sizeof(struct page) * ktotal_pages) % 4096) != 0) ? (4096 - ((sizeof(struct page) * ktotal_pages) % 4096)) : 0; // 对齐4K
-    // 将内核已覆盖的内存页的标志改为已使用
-    for (i = 0; i < (kheap_top + KHEAP_SIZE - (uint32_t)_virt_offset) / 0x1000; i++)
+    for (t = pages; (uint32_t)t->base < (uint32_t)_kernel_phys_end_aligned; t++)
     {
-        page_list[i].flags &= PAGE_USED;
-        page_list[i].kref = 1;
+        t->kref++;
     }
     return 0;
 }
 
 struct page *alloc_page(void)
 {
+    uint32_t i;
     struct page *fp = NULL;
     // 遍历page列表寻找空闲页
-    for (fp = page_list; (uint32_t)fp->base < (uint32_t)_virt_offset + host_total_mem; fp++)
+    disable_irq();
+    for (fp = pages, i = 0; i < total_pages; fp++)
     {
-        if (fp->flags == PAGE_UNUSED)
+        if (!fp->kref)
         {
-            fp->flags = PAGE_USED;
-            fp->kref = 0;
-            return fp;
+            fp->kref++;
+            goto done;
         }
     }
-    return NULL;
+
+done:
+    enable_irq();
+    return fp;
 }
 
-void free_page(struct page *page)
+void free_page(struct page *ptr)
 {
-    if (page->kref <= 0)
-    {
-        page->flags = PAGE_UNUSED;
-        page->kref = 0;
-    }
-    else
-        page->kref--;
+    disable_irq();
+    ptr->kref = 0;
+    enable_irq();
 }
 
 void *get_physaddr(void *virtualaddr)
@@ -124,10 +119,11 @@ void *get_physaddr(void *virtualaddr)
     return (void *)((pt[ptindex] & ~0xFFFUL) + ((unsigned long)virtualaddr & 0xFFFUL));
 }
 
-void map_page(void *physaddr, void *virtualaddr, unsigned int flags)
+int map_page(void *physaddr, void *virtualaddr, unsigned int flags)
 {
-    // Make sure that both addresses are page-aligned.
+    struct page *t;
 
+    // Make sure that both addresses are page-aligned.
     unsigned long pdindex = (unsigned long)virtualaddr >> 22UL;
     unsigned long ptindex = (unsigned long)virtualaddr >> 12UL & 0x03FFUL;
 
@@ -138,9 +134,7 @@ void map_page(void *physaddr, void *virtualaddr, unsigned int flags)
     // 如果对应页表不存在则分配一个页作为页表空间
     if ((pd[pdindex] & 0x1) == 0)
     {
-        struct page *t;
         t = alloc_page();
-        t->kref = 1;
         pd[pdindex] = (uint32_t)t->base | (flags & 0xFFFUL) | 0x01UL;
     }
 
@@ -148,17 +142,17 @@ void map_page(void *physaddr, void *virtualaddr, unsigned int flags)
     // Here you need to check whether the PT entry is present.
     // When it is, then there is already a mapping present. What do you do now?
     // 如果虚拟地址已经有映射则直接返回
-    // if ((pt[ptindex] & 0x1UL))
-    //     return;
+    if ((pt[ptindex] & 0x1UL))
+        return -1;
 
     physaddr = (void *)((uint32_t)physaddr & 0xfffff000UL);
-    page_list[(uint32_t)physaddr / 4096].flags = PAGE_USED;
-    page_list[(uint32_t)physaddr / 4096].kref++;
+    pages[(uint32_t)physaddr / 4096].kref++;
     pt[ptindex] = ((unsigned long)physaddr) | (flags & 0xFFFUL) | 0x01UL; // Present
 
     // Now you need to flush the entry in the TLB
     // or you might not notice the change.
     flush_tlb();
+    return 0;
 }
 
 void flush_tlb(void)

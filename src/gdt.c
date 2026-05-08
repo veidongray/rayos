@@ -1,5 +1,4 @@
 #include "gdt.h"
-#include "kheap.h"
 #include "print.h"
 #include "libc/string.h"
 
