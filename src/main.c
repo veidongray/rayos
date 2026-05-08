@@ -10,17 +10,53 @@
 #include <stddef.h>
 #include "libc/string.h"
 #include "libc/stdlib.h"
+#include "panic.h"
 
 extern uint32_t _mboot_info[];
 extern uint32_t _mboot_magic[];
 extern uint32_t host_total_mem;
 
-void user_init(void)
+void user_init000(void *arg)
 {
+    arg = arg;
     while (1)
     {
         cga_printf("%s\n", current->name);
-        asm volatile("hlt\r\n");
+        panic_halt();
+        return;
+    }
+}
+
+void user_init111(void *arg)
+{
+    arg = arg;
+    while (1)
+    {
+        cga_printf("%s\n", current->name);
+        panic_halt();
+        return;
+    }
+}
+
+void user_init222(void *arg)
+{
+    arg = arg;
+    while (1)
+    {
+        cga_printf("%s\n", current->name);
+        panic_halt();
+        return;
+    }
+}
+
+void user_init333(void *arg)
+{
+    arg = arg;
+    while (1)
+    {
+        cga_printf("%s\n", current->name);
+        panic_halt();
+        return;
     }
 }
 
@@ -28,14 +64,14 @@ void kernel_init(void *arg)
 {
     arg = arg;
 
-    ktask_create(user_init, 0, "user_init000");
-    ktask_create(user_init, 0, "user_init111");
-    ktask_create(user_init, 0, "user_init222");
-    ktask_create(user_init, 0, "user_init333");
+    ktask_create(user_init000, 0, "user_init000");
+    ktask_create(user_init111, 0, "user_init111");
+    ktask_create(user_init222, 0, "user_init222");
+    ktask_create(user_init333, 0, "user_init333");
     while (1)
     {
         cga_printf("%s\n", current->name);
-        asm volatile("hlt\r\n");
+        panic_halt();
     }
 }
 
@@ -46,17 +82,13 @@ void start_kernel(void)
     else
     {
         // If we don't have a valid multiboot magic number, we can't trust the bootloader and should halt
-        cga_printf("Lost Bootloader...\n");
-        while (1)
-            asm volatile("hlt\r\n");
+        PANIC("Lost Bootloader...\n");
     }
 
     // Check if we have at least 8MB of memory, otherwise we can't do much
     if (host_total_mem < 0x800000)
     {
-        cga_printf("Not enough memory detected: %u bytes\n", host_total_mem);
-        while (1)
-            asm volatile("hlt\r\n");
+        PANIC("Not enough memory detected: %u bytes\n", host_total_mem);
     }
     gdt_init();
     idt_init();
@@ -67,6 +99,5 @@ void start_kernel(void)
 
     // Never return
     ktask_create(kernel_init, 0, "kernel_init");
-    while (1)
-        asm volatile("hlt\r\n");
+    PANIC("PANIC");
 }

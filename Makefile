@@ -23,15 +23,15 @@ build:
 	$(MAKE) -C src/tools built-in.o
 	$(LD) -m elf_i386 -T linker.ld -o vmrayos $(BUILT-IN)
 
-mkiso: build
+iso: build
 	cp vmrayos iso/boot/
 	grub-mkrescue -o rayos.iso iso/
 
-qemu: mkiso
+qemu: iso
 	qemu-system-i386 -m 128M -no-reboot -d int,guest_errors,mmu -D qemu.log -cdrom rayos.iso
 
-qemu-dbg: mkiso
+qemu-dbg: iso
 	qemu-system-i386 -m 128M -S -s -no-reboot -d int,guest_errors,mmu -D qemu.log -cdrom rayos.iso
 
 clean:
-	$(RM) *.iso vmrayos iso/boot/vmrayos src/*.o src/libc/*.o src/asm/*.o *.log
+	$(RM) *.iso vmrayos iso/boot/vmrayos src/*.o src/libc/*.o src/asm/*.o src/tools/*.o *.log

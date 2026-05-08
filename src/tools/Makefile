@@ -1,4 +1,4 @@
-OBJS =  list.o
+OBJS =  list.o panic.o
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
