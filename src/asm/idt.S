@@ -31,6 +31,20 @@ isr_gp_fault:
 .global isr_syscall
 isr_syscall:
     pushl %eax
+    pushl %ecx
+    pushl %edx
+    pushl %ebx
+    pushl %ebp
+    pushl %esi
+    pushl %edi
+    pushl %eax
     call syscall_handler
+    popl %eax
+    popl %edi
+    popl %esi
+    popl %ebp
+    popl %ebx
+    popl %edx
+    popl %ecx
     popl %eax
     iret

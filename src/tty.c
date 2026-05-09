@@ -1,9 +1,10 @@
 #include "tty.h"
 #include "idt.h"
 #include <stdint.h>
+#include "libc/string.h"
 
 static uint8_t *cgaptr = (uint8_t *)0xC00B8000;
-
+static uint8_t cga_buffer[4000];
 static uint8_t **get_cgaptr(void)
 {
     return &cgaptr;
@@ -12,22 +13,22 @@ static uint8_t **get_cgaptr(void)
 int cga_shift(uint8_t **ptr)
 {
     int i;
-    uint8_t buffer[4000];
+    memset(cga_buffer, 0, 4000);
     if (*ptr >= (uint8_t *)(0xC00B8000 + 4000))
     {
         *ptr = (uint8_t *)0xC00B8000 + 4000 - 160;
         for (i = 0; i < 4000 - 160; ++i)
         {
-            buffer[i] = ((uint8_t *)0xC00B8000)[i + 160];
+            cga_buffer[i] = ((uint8_t *)0xC00B8000)[i + 160];
         }
         for (i = 4000 - 160; i < 4000; i += 2)
         {
-            buffer[i] = ' ';
-            buffer[i + 1] = 0x07; // Light grey on black
+            cga_buffer[i] = ' ';
+            cga_buffer[i + 1] = 0x07; // Light grey on black
         }
         for (i = 0; i < 4000; ++i)
         {
-            ((uint8_t *)0xC00B8000)[i] = buffer[i];
+            ((uint8_t *)0xC00B8000)[i] = cga_buffer[i];
         }
     }
     return 0;
@@ -143,7 +144,7 @@ int cga_printf(const char *format, ...)
 {
     const char *p = format;
     char *args = (char *)(&format + 1);
-    char buffer[32];
+    char str_buffer[32];
     int count = 0;
 
     while (*p)
@@ -183,8 +184,8 @@ int cga_printf(const char *format, ...)
         {
             int val = *(int *)args;
             args += sizeof(int);
-            itoa(val, buffer, 10);
-            int len = cga_puts(buffer);
+            itoa(val, str_buffer, 10);
+            int len = cga_puts(str_buffer);
             count += len;
             break;
         }
@@ -192,8 +193,8 @@ int cga_printf(const char *format, ...)
         {
             unsigned int val = *(unsigned int *)args;
             args += sizeof(unsigned int);
-            uitoa(val, buffer, 10);
-            int len = cga_puts(buffer);
+            uitoa(val, str_buffer, 10);
+            int len = cga_puts(str_buffer);
             count += len;
             break;
         }
@@ -202,16 +203,16 @@ int cga_printf(const char *format, ...)
         {
             unsigned int val = *(unsigned int *)args;
             args += sizeof(unsigned int);
-            uitoa(val, buffer, 16);
+            uitoa(val, str_buffer, 16);
             if (*p == 'X')
             {
-                for (int i = 0; buffer[i]; i++)
+                for (int i = 0; str_buffer[i]; i++)
                 {
-                    if (buffer[i] >= 'a' && buffer[i] <= 'f')
-                        buffer[i] = buffer[i] - 'a' + 'A';
+                    if (str_buffer[i] >= 'a' && str_buffer[i] <= 'f')
+                        str_buffer[i] = str_buffer[i] - 'a' + 'A';
                 }
             }
-            int len = cga_puts(buffer);
+            int len = cga_puts(str_buffer);
             count += len;
             break;
         }

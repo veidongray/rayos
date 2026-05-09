@@ -40,6 +40,7 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
     copy_kernel_pagedir(user_pagedir);
 
     // make user page table
+    // total 4MB space from 0x40000000 to 0x40400000
     user_table = (uint32_t *)kmalloc_aligned(1024 * sizeof(uint32_t));
     memset(user_table, 0, 1024 * sizeof(uint32_t));
     for (i = 0; i < 1024; i++)
@@ -51,16 +52,22 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
     user_pagedir[256] = ((uint32_t)get_physaddr((uint32_t *)user_table) & (~0xfffUL)) | 0x7UL;
 
     // copy task
+    // task code/data place in first 3MB
     task_code = (uint32_t *)0x40000000;
-    if (map_page(user_table[0], task_code, 0x7) < 0)
+    for (i = 0; i < 1024; i++)
     {
-        PANIC("ERROR map\n");
+        // map 4MB space
+        if (map_page(user_table[i], (uint32_t)task_code + (i * 0x1000), 0x7) < 0)
+        {
+            PANIC("ERROR map\n");
+        }
     }
-    memcpy(task_code, (uint8_t *)task_func, 2048);
+    memcpy(task_code, (uint8_t *)task_func, 16 * 1024);
 
     // make user stack
-    stack = (uint32_t *)((uint32_t)task_code + 0x1000);
-    stack_top = stack;
+    // task stack space place in last 1MB
+    stack = (uint32_t *)((uint32_t)task_code + 0x300000);
+    stack_top = (uint32_t)stack + 0x100000;
     *(--stack_top) = UDATA_SELECTOR;
     *(--stack_top) = (uint32_t)stack;
     *(--stack_top) = 0x202;
@@ -94,9 +101,9 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     struct task_struct *ktask;
 
     // make task stack
-    stack = (uint32_t *)kmalloc_aligned(KTASK_STACK_LEN);
-    memset(stack, 0x0, KTASK_STACK_LEN);
-    stack_top = (uint32_t *)((uint32_t)stack + KTASK_STACK_LEN);
+    stack = (uint32_t *)kmalloc_aligned(TASK_STACK_LEN);
+    memset(stack, 0x0, TASK_STACK_LEN);
+    stack_top = (uint32_t *)((uint32_t)stack + TASK_STACK_LEN);
     *(--stack_top) = (uint32_t)arg;
     *(--stack_top) = (uint32_t)task_exit; // setup return address to thread_exit
     *(--stack_top) = (uint32_t)task_func;

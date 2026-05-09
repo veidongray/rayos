@@ -14,7 +14,7 @@
 #define TASK_KERN 0x0
 #define TASK_USER 0x1
 
-#define KTASK_STACK_LEN (8192)
+#define TASK_STACK_LEN (128 * 1024)
 
 struct task_struct
 {

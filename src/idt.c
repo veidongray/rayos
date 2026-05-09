@@ -104,7 +104,8 @@ void gp_fault_handler(uint32_t error_code)
     PANIC("GENERAL PROTECTION FAULT! Error code: 0x%x\n", error_code);
 }
 
+
 void syscall_handler(uint32_t syscall_number)
 {
-    printk("syscall number %u\n", syscall_number);
+    printk("syscall number 0x%u\n", syscall_number);
 }
