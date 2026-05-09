@@ -57,7 +57,7 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
     for (i = 0; i < 1024; i++)
     {
         // map 4MB space
-        if (map_page(user_table[i], (uint32_t)task_code + (i * 0x1000), 0x7) < 0)
+        if (map_page((uint32_t *)user_table[i], (uint32_t *)((uint32_t)task_code + (i * 0x1000)), 0x7) < 0)
         {
             PANIC("ERROR map\n");
         }
@@ -67,15 +67,15 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
     // make user stack
     // task stack space place in last 1MB
     stack = (uint32_t *)((uint32_t)task_code + 0x300000);
-    stack_top = (uint32_t)stack + 0x100000;
+    stack_top = (uint32_t *)((uint32_t)stack + 0x100000);
     *(--stack_top) = (uint32_t)arg;
     *(--stack_top) = (uint32_t)task_exit;
     *(--stack_top) = UDATA_SELECTOR;
     *(--stack_top) = (uint32_t)stack + 0x100000 - (2 * sizeof(uint32_t));
     *(--stack_top) = 0x202;
     *(--stack_top) = UCODE_SELECTOR;
-    *(--stack_top) = task_code;
-    *(--stack_top) = switch_to_user;
+    *(--stack_top) = (uint32_t)task_code;
+    *(--stack_top) = (uint32_t)switch_to_user;
     *(--stack_top) = 0x0; // eax
     *(--stack_top) = 0x0; // ecx
     *(--stack_top) = 0x0; // edx

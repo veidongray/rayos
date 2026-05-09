@@ -12,6 +12,8 @@
 #include "panic.h"
 #include "mm.h"
 #include "printk.h"
+#include "syscall.h"
+#include "libc/stdio.h"
 
 void user_init000(void *arg)
 {
@@ -34,15 +36,17 @@ void user_init111(void *arg)
 void user_func(void *arg)
 {
     arg = arg;
+    uint32_t retval;
+    uint32_t arg_list[6];
+    arg_list[0] = SYSCALL_WRITE;
+    arg_list[1] = STDOUT;
+    arg_list[2] = (uint32_t)"user\n";
+    arg_list[3] = 0x5;
+    arg_list[4] = 0x0;
+    arg_list[5] = 0x0;
     while (1)
     {
-        asm volatile(
-            "pushl %%eax\r\n"
-            "movl %0, %%eax\r\n"
-            "int $0x80\r\n"
-            "popl %%eax\r\n"
-            :
-            : "r"(arg));
+        syscall(arg_list, retval);
     }
 }
 

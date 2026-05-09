@@ -7,7 +7,8 @@ OBJS =  main.o          \
         io.o            \
         paging.o        \
         task.o          \
-        mm.o
+        mm.o            \
+        syscall.o
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@

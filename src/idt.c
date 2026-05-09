@@ -5,6 +5,7 @@
 #include "paging.h"
 #include "gdt.h"
 #include "panic.h"
+#include <stddef.h>
 
 static struct idt_entry idt[256] __attribute__((aligned(4096)));
 void set_idt_entry(uint8_t vector, void *isr, uint8_t flags)
@@ -102,9 +103,4 @@ void double_fault_handler(void)
 void gp_fault_handler(uint32_t error_code)
 {
     PANIC("GENERAL PROTECTION FAULT! Error code: 0x%x\n", error_code);
-}
-
-void syscall_handler(uint32_t syscall_number)
-{
-    printk("syscall number 0x%s\n", syscall_number);
 }

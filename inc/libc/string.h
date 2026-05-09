@@ -1,7 +1,7 @@
 #ifndef STRING_H
 #define STRING_H
 
-int strlen(char *str);
+int strlen(const char *str);
 void *memset(void *str, int c, int n);
 int strcmp(const char *s1, const char *s2);
 char *strcpy(char *dest, const char *src);
