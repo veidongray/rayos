@@ -37,22 +37,24 @@ void user_func(void *arg)
     while (1)
     {
         asm volatile(
-            "pushl %eax\r\n"
-            "movl $0x100, %eax\r\n"
+            "pushl %%eax\r\n"
+            "movl %0, %%eax\r\n"
             "int $0x80\r\n"
-            "popl %eax\r\n");
+            "popl %%eax\r\n"
+            :
+            : "r"(arg));
     }
 }
 
 void kernel_init(void *arg)
 {
-    uint32_t i;
+    char *str = "user";
     arg = arg;
 
     ktask_create(user_init000, 0, "user_init000");
     ktask_create(user_init111, 0, "user_init111");
-    utask_create(user_func, 0, "user_func000");
-    utask_create(user_func, 0, "user_func111");
+    utask_create(user_func, str, "user_func000");
+    utask_create(user_func, str, "user_func111");
     while (1)
     {
         printk("%s, total_tasks %u\n", current->name, total_tasks());

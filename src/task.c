@@ -68,8 +68,10 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
     // task stack space place in last 1MB
     stack = (uint32_t *)((uint32_t)task_code + 0x300000);
     stack_top = (uint32_t)stack + 0x100000;
+    *(--stack_top) = (uint32_t)arg;
+    *(--stack_top) = (uint32_t)task_exit;
     *(--stack_top) = UDATA_SELECTOR;
-    *(--stack_top) = (uint32_t)stack;
+    *(--stack_top) = (uint32_t)stack + 0x100000 - (2 * sizeof(uint32_t));
     *(--stack_top) = 0x202;
     *(--stack_top) = UCODE_SELECTOR;
     *(--stack_top) = task_code;
@@ -81,6 +83,10 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
     *(--stack_top) = 0x0; // ebp
     *(--stack_top) = 0x0; // esi
     *(--stack_top) = 0x0; // edi
+    *(--stack_top) = UDATA_SELECTOR; // ds
+    *(--stack_top) = UDATA_SELECTOR; // es
+    *(--stack_top) = UDATA_SELECTOR; // fs
+    *(--stack_top) = UDATA_SELECTOR; // gs
 
     task = (struct task_struct *)kmalloc_aligned(sizeof(struct task_struct));
     task->esp = (uint32_t)stack_top;
@@ -114,6 +120,10 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     *(--stack_top) = 0x0; // ebp
     *(--stack_top) = 0x0; // esi
     *(--stack_top) = 0x0; // edi
+    *(--stack_top) = KDATA_SELECTOR; // ds
+    *(--stack_top) = KDATA_SELECTOR; // es
+    *(--stack_top) = KDATA_SELECTOR; // fs
+    *(--stack_top) = KDATA_SELECTOR; // gs
 
     ktask = (struct task_struct *)kmalloc_aligned(sizeof(struct task_struct));
     ktask->esp = (uint32_t)stack_top;

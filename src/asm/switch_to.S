@@ -6,6 +6,10 @@ switch_to:
     movl task_esp, %eax # task_struct->esp offset
     movl 4(%esp), %edi  # task_struct pointer
     movl (%eax, %edi), %esp
+    pop %gs
+    pop %fs
+    pop %es
+    pop %ds
     popl %edi
     popl %esi
     popl %ebp
@@ -26,11 +30,20 @@ context_switch:
     pushl %ebp
     pushl %esi
     pushl %edi
+    push %ds
+    push %es
+    push %fs
+    push %gs
     movl task_esp, %eax # task_struct->esp offset
-    movl 32(%esp), %esi   # current_task
+    movl 48(%esp), %esi   # current_task
     movl %esp, (%eax, %esi)   # current_task->esp = esp
-    movl 36(%esp), %esi  # next_task
+resume:
+    movl 52(%esp), %esi  # next_task
     movl (%eax, %esi), %esp   # next_task->esp = esp
+    pop %gs
+    pop %fs
+    pop %es
+    pop %ds
     popl %edi
     popl %esi
     popl %ebp
