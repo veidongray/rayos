@@ -52,10 +52,13 @@ void *early_malloc(size_t len)
 
 void *kmalloc(size_t len)
 {
-    struct mm_area *m = (struct mm_area *)kfree_ptr;
-    void *ptr = (void *)((size_t)kfree_ptr + sizeof(struct mm_area));
+    struct mm_area *m;
+    void *ptr;
 
+    ptr = (void *)kfree_ptr;
     len = ((len % 4) == 0) ? len : (len - (len % 4) + 4);
+    // place it after data
+    m = (struct mm_area *)((size_t)kfree_ptr + len);
 
     kfree_ptr = (uint8_t *)((size_t)kfree_ptr + len + sizeof(struct mm_area));
     m->start = (uint32_t)ptr;
@@ -63,6 +66,16 @@ void *kmalloc(size_t len)
     m->size = m->end - m->start;
     list_add_tail(&m->list, &mm_list);
     return ptr;
+}
+
+void *kmalloc_aligned(size_t len)
+{
+    if ((uint32_t)kfree_ptr % 4096) {
+        // aligned 4K
+        kfree_ptr = (uint8_t *)((uint32_t)kfree_ptr - ((uint32_t)kfree_ptr % 4096) + 4096);
+    }
+
+    return kmalloc(len);
 }
 
 void kfree(void *ptr)

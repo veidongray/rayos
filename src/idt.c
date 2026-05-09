@@ -12,7 +12,7 @@ void set_idt_entry(uint8_t vector, void *isr, uint8_t flags)
     struct idt_entry *descriptor = &idt[vector];
 
     descriptor->isr_low = (uint32_t)isr & 0xFFFF;
-    descriptor->kernel_cs = KCODE_SELECTOR; // this value can be whatever offset your kernel code selector is in your GDT
+    descriptor->kernel_cs = KCODE_SELECTOR;
     descriptor->attributes = flags;
     descriptor->isr_high = (uint32_t)isr >> 16;
     descriptor->reserved = 0;
@@ -32,6 +32,7 @@ extern void isr_pic_timer(void);
 extern void isr_page_fault(void);
 extern void isr_double_fault(void);
 extern void isr_gp_fault(void);
+extern void syscall_handler(uint32_t);
 
 int idt_init(void)
 {
@@ -51,6 +52,10 @@ int idt_init(void)
 
     // Set up the GP fault handler (interrupt vector 13).
     set_idt_entry(13, isr_gp_fault, 0x8E);
+
+    // Set up the system call handler (interrupt vector 128).
+    // DPL=3
+    set_idt_entry(128, syscall_handler, 0xEE);
 
     load_idt(idt, sizeof(idt));
     pic_remap(0x20, 0x28);
@@ -90,4 +95,9 @@ void double_fault_handler(void)
 void gp_fault_handler(uint32_t error_code)
 {
     PANIC("GENERAL PROTECTION FAULT! Error code: 0x%x\n", error_code);
+}
+
+void syscall_handler(uint32_t syscall_number)
+{
+    cga_printf("syscall number %u\n", syscall_number);
 }

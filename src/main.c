@@ -18,8 +18,6 @@ void user_init000(void *arg)
     while (1)
     {
         cga_printf("%s\n", current->name);
-        panic_halt();
-        return;
     }
 }
 
@@ -29,45 +27,28 @@ void user_init111(void *arg)
     while (1)
     {
         cga_printf("%s\n", current->name);
-        panic_halt();
-        return;
     }
 }
 
-void user_init222(void *arg)
+void user_func(void *arg)
 {
     arg = arg;
     while (1)
-    {
-        cga_printf("%s\n", current->name);
-        panic_halt();
-        return;
-    }
-}
-
-void user_init333(void *arg)
-{
-    arg = arg;
-    while (1)
-    {
-        cga_printf("%s\n", current->name);
-        panic_halt();
-        return;
-    }
+        ;
 }
 
 void kernel_init(void *arg)
 {
+    uint32_t i;
     arg = arg;
 
     ktask_create(user_init000, 0, "user_init000");
     ktask_create(user_init111, 0, "user_init111");
-    ktask_create(user_init222, 0, "user_init222");
-    ktask_create(user_init333, 0, "user_init333");
+    utask_create(user_func, 0, "user_func");
+    utask_create(user_func, 0, "user_func");
     while (1)
     {
-        cga_printf("%s\n", current->name);
-        panic_halt();
+        cga_printf("%s, total_tasks %u\n", current->name, total_tasks());
     }
 }
 

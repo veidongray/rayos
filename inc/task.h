@@ -33,10 +33,12 @@ extern uint32_t task_esp;
 extern INIT_TASK_CURRENT(current);
 extern void switch_to(struct task_struct *);
 extern void context_switch(struct task_struct *, struct task_struct *);
-extern void switch_to_user(struct task_struct *, struct task_struct *);
+extern void switch_to_user(void);
 
+struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *name);
 struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *name);
 void scheduler(void);
 void task_init(void);
+size_t total_tasks(void);
 
 #endif // TASK_H

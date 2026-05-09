@@ -20,5 +20,6 @@ void get_cr3(uint32_t *cr3);
 void early_page_init(void);
 void *get_physaddr(void *virtualaddr);
 void flush_tlb(void);
+void copy_kernel_pagedir(uint32_t *pd);
 
 #endif // PAGING_H

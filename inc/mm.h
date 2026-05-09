@@ -15,6 +15,7 @@ struct mm_area
 
 void *early_malloc(size_t len);
 void *kmalloc(size_t len);
+void *kmalloc_aligned(size_t len);
 void kfree(void *ptr);
 void early_mm_init(void);
 void mm_init(void);

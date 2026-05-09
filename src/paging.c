@@ -141,9 +141,6 @@ int map_page(void *physaddr, void *virtualaddr, unsigned int flags)
     unsigned long *pt = ((unsigned long *)0xFFC00000UL) + (0x400UL * pdindex);
     // Here you need to check whether the PT entry is present.
     // When it is, then there is already a mapping present. What do you do now?
-    // 如果虚拟地址已经有映射则直接返回
-    if ((pt[ptindex] & 0x1UL))
-        return -1;
 
     physaddr = (void *)((uint32_t)physaddr & 0xfffff000UL);
     pages[(uint32_t)physaddr / 4096].kref++;
@@ -169,4 +166,14 @@ void get_cr3(uint32_t *cr3)
         : "=r"(*cr3)
         :
         : "memory");
+}
+
+void copy_kernel_pagedir(uint32_t *pd)
+{
+    uint32_t i;
+
+    for (i = 768; i < 1024; i++)
+    {
+        pd[i] = kpage_directory[i];
+    }
 }
