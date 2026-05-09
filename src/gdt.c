@@ -1,5 +1,5 @@
 #include "gdt.h"
-#include "print.h"
+#include "tty.h"
 #include "libc/string.h"
 
 static struct tss_entry tss;

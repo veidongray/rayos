@@ -1,4 +1,4 @@
-#include "print.h"
+#include "tty.h"
 #include "idt.h"
 #include <stdint.h>
 
@@ -114,9 +114,6 @@ char *uitoa(uint32_t value, char *str, int base)
 
 int cga_putc(const char ch)
 {
-    // if not to disable interrupts,
-    // the output may be garbled when an interrupt occurs during writing to CGA memory
-    disable_irq();
     uint8_t **cga = get_cgaptr();
     if (ch >= 32)
     {
@@ -129,7 +126,6 @@ int cga_putc(const char ch)
         *cga += 160 - ((*cga - (uint8_t *)0xC00B8000) % 160);
         cga_shift(cga);
     }
-    enable_irq();
     return ch;
 }
 

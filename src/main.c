@@ -1,5 +1,5 @@
 #include "multiboot2.h"
-#include "print.h"
+#include "tty.h"
 #include "gdt.h"
 #include "idt.h"
 #include "paging.h"
@@ -11,13 +11,14 @@
 #include "libc/stdlib.h"
 #include "panic.h"
 #include "mm.h"
+#include "printk.h"
 
 void user_init000(void *arg)
 {
     arg = arg;
     while (1)
     {
-        cga_printf("%s\n", current->name);
+        printk("%s\n", current->name);
     }
 }
 
@@ -26,15 +27,20 @@ void user_init111(void *arg)
     arg = arg;
     while (1)
     {
-        cga_printf("%s\n", current->name);
+        printk("%s\n", current->name);
     }
 }
 
 void user_func(void *arg)
 {
     arg = arg;
-    while (1)
-        ;
+    asm volatile(
+        "pushl %eax\r\n"
+        "movl $0x100, %eax\r\n"
+        // "int $0x80\r\n"
+        "popl %eax\r\n"
+    );
+    while (1);
 }
 
 void kernel_init(void *arg)
@@ -48,7 +54,7 @@ void kernel_init(void *arg)
     utask_create(user_func, 0, "user_func");
     while (1)
     {
-        cga_printf("%s, total_tasks %u\n", current->name, total_tasks());
+        printk("%s, total_tasks %u\n", current->name, total_tasks());
     }
 }
 

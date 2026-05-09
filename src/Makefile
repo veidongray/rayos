@@ -1,5 +1,5 @@
 OBJS =  main.o          \
-        print.o         \
+        tty.o         \
         multiboot2.o    \
         gdt.o           \
         idt.o           \

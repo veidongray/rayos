@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include "multiboot2.h"
 #include "paging.h"
-#include "print.h"
+#include "tty.h"
 #include "libc/stdlib.h"
 #include "mm.h"
 #include "panic.h"

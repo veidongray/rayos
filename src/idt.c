@@ -1,6 +1,6 @@
 #include "idt.h"
 #include "pic_8259.h"
-#include "print.h"
+#include "tty.h"
 #include "task.h"
 #include "paging.h"
 #include "gdt.h"
@@ -32,7 +32,7 @@ extern void isr_pic_timer(void);
 extern void isr_page_fault(void);
 extern void isr_double_fault(void);
 extern void isr_gp_fault(void);
-extern void syscall_handler(uint32_t);
+extern void isr_syscall(uint32_t);
 
 int idt_init(void)
 {
@@ -55,7 +55,7 @@ int idt_init(void)
 
     // Set up the system call handler (interrupt vector 128).
     // DPL=3
-    set_idt_entry(128, syscall_handler, 0xEE);
+    set_idt_entry(128, isr_syscall, 0xEE);
 
     load_idt(idt, sizeof(idt));
     pic_remap(0x20, 0x28);
@@ -72,6 +72,13 @@ void enable_irq(void)
 void disable_irq(void)
 {
     asm volatile("cli");
+}
+
+int is_interrupts_enabled(void)
+{
+    unsigned long flags;
+    asm volatile("pushf; pop %0" : "=rm"(flags));
+    return !!(flags & (1UL << 9));
 }
 
 void timer_interrupt_handler(void)
@@ -99,5 +106,5 @@ void gp_fault_handler(uint32_t error_code)
 
 void syscall_handler(uint32_t syscall_number)
 {
-    cga_printf("syscall number %u\n", syscall_number);
+    printk("syscall number %u\n", syscall_number);
 }

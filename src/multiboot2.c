@@ -1,5 +1,5 @@
 #include "multiboot2.h"
-#include "print.h"
+#include "tty.h"
 
 static uint32_t total_mem = 0;
 

@@ -2,7 +2,7 @@
 #include "idt.h"
 #include <stddef.h>
 #include "paging.h"
-#include "print.h"
+#include "tty.h"
 #include "gdt.h"
 #include "libc/string.h"
 #include "panic.h"
