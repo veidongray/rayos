@@ -24,6 +24,7 @@ void mm_init(void)
     struct page *pg;
 
     kfree_ptr = (uint8_t *)_kernel_virt_end_aligned;
+    // alloc kmalloc cache
     for (i = 0; i < KMEM_POOL_LEN; i += 0x1000)
     {
         pg = alloc_page();
@@ -51,8 +52,7 @@ void *kmalloc(size_t len)
 
     kfree_ptr = (uint8_t *)((size_t)kfree_ptr + len + sizeof(struct mm_area));
     m->start = (uint32_t)ptr;
-    m->end = (uint32_t)ptr + len;
-    m->size = m->end - m->start;
+    m->size = len;
     list_add_tail(&m->list, &mm_list);
     return ptr;
 }

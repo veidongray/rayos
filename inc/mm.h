@@ -8,7 +8,6 @@
 struct mm_area
 {
     uint32_t start;
-    uint32_t end;
     size_t size;
     struct list_head list;
 };
