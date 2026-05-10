@@ -7,6 +7,8 @@
 #include "panic.h"
 #include "idt.h"
 
+#define EARLY_PAGES ((16 * 1024 * 1024) / 4096)
+
 extern uint32_t _virt_offset[];
 extern uint32_t _kernel_phys_end_aligned[];
 static uint32_t total_pages;
@@ -14,7 +16,9 @@ static uint32_t total_tables;
 static uint32_t early_tables[4096] __attribute__((aligned(4096)));
 static uint32_t kpage_directory[1024] __attribute__((aligned(4096)));
 static uint32_t *kpage_tables = NULL;
-static struct page *pages = NULL;
+static struct page *early_pages = NULL;
+LIST_HEAD(free_page_list);
+LIST_HEAD(used_page_list);
 
 void early_page_init(void)
 {
@@ -38,15 +42,12 @@ void early_page_init(void)
 int page_init(void)
 {
     uint32_t i;
-    struct page *t;
 
-    // Calculate the total number of pages needed for the host memory
-    // 计算所有可用内存的页数和页表数
-    total_pages = get_total_mem() / 4096;
+    // 计算1G以内可用内存的页数和页表数
+    total_pages = (get_total_mem() / 4096) > 0x40000 ? 0x40000 : (get_total_mem() / 4096);
     total_tables = total_pages / 1024;
 
-    // Map all memory up to the total memory size, including the kernel itself
-    // 映射所有的系统可用内存空间
+    // 映射1G以内的系统可用内存空间
     // 从0xC0000000映射到0x00000000开始
     kpage_tables = (uint32_t *)early_malloc(total_pages * sizeof(uint32_t));
     for (i = 0; i < total_pages; i++)
@@ -61,44 +62,42 @@ int page_init(void)
     load_page_directory((uint32_t *)((uint32_t)kpage_directory - (uint32_t)_virt_offset));
     enable_paging();
 
-    pages = (struct page *)early_malloc(sizeof(struct page) * total_pages);
-    for (i = 0; i < total_pages; i++)
+    // create 16MB's page
+    early_pages = (struct page *)early_malloc(sizeof(struct page) * EARLY_PAGES);
+    for (i = 0; i < EARLY_PAGES; i++)
     {
-        pages[i].base = (uint32_t *)(i * 0x1000);
-        pages[i].kref = 0;
+        early_pages[i].base = (uint32_t *)(i * 0x1000);
+        if ((uint32_t)early_pages[i].base < (uint32_t)_kernel_phys_end_aligned)
+        {
+            early_pages[i].kref = 1;
+            list_add_tail(&early_pages[i].list, &used_page_list);
+        }
+        else
+        {
+            early_pages[i].kref = 0;
+            list_add_tail(&early_pages[i].list, &free_page_list);
+        }
     }
-    for (t = pages; (uint32_t)t->base < (uint32_t)_kernel_phys_end_aligned; t++)
-    {
-        t->kref++;
-    }
+
     return 0;
 }
 
 struct page *alloc_page(void)
 {
-    uint32_t i;
     struct page *fp = NULL;
-    // 遍历page列表寻找空闲页
-    disable_irq();
-    for (fp = pages, i = 0; i < total_pages; fp++)
-    {
-        if (!fp->kref)
-        {
-            fp->kref++;
-            goto done;
-        }
-    }
 
-done:
-    enable_irq();
+    fp = container_of(free_page_list.next, struct page, list);
+    fp->kref++;
+    list_del(&fp->list);
+    list_add_tail(&fp->list, &used_page_list);
     return fp;
 }
 
-void free_page(struct page *ptr)
+void free_page(struct page *fp)
 {
-    disable_irq();
-    ptr->kref = 0;
-    enable_irq();
+    fp->kref = 0;
+    list_del(&fp->list);
+    list_add_tail(&fp->list, &free_page_list);
 }
 
 void *get_physaddr(void *virtualaddr)
@@ -143,7 +142,7 @@ int map_page(void *physaddr, void *virtualaddr, unsigned int flags)
     // When it is, then there is already a mapping present. What do you do now?
 
     physaddr = (void *)((uint32_t)physaddr & 0xfffff000UL);
-    pages[(uint32_t)physaddr / 4096].kref++;
+    early_pages[(uint32_t)physaddr / 4096].kref++;
     pt[ptindex] = ((unsigned long)physaddr) | (flags & 0xFFFUL) | 0x01UL; // Present
 
     // Now you need to flush the entry in the TLB

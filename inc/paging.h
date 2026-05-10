@@ -1,12 +1,14 @@
 #ifndef PAGING_H
 #define PAGING_H
 
+#include "list.h"
 #include <stdint.h>
 
 struct page {
     int kref;
     uint32_t *base;
-} __attribute__((packed));
+    struct list_head list;
+};
 
 extern struct page *page_list;
 extern void load_page_directory(uint32_t *page_directory);

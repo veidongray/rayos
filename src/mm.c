@@ -4,7 +4,7 @@
 #include "panic.h"
 #include "libc/stdlib.h"
 
-#define KMEM_POOL_LEN (16 * 1024 * 1024)
+#define KMEM_POOL_LEN (1 * 1024 * 1024)
 #define EARLY_MEM_POOL_LEN (4 * 1024 * 1024)
 
 static uint8_t *early_free_ptr = NULL;
