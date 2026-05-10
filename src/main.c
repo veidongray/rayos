@@ -69,6 +69,7 @@ void start_kernel(void)
 {
     // step 1.
     early_page_init();
+    total_memory_init();
     early_mm_init();
 
     // step 2.

@@ -12,20 +12,9 @@ static uint8_t *kfree_ptr = NULL;
 static uint8_t early_mem_pool[EARLY_MEM_POOL_LEN] __attribute__((aligned(4096)));
 LIST_HEAD(mm_list);
 extern uint32_t _kernel_virt_end_aligned[];
-extern uint32_t _mboot_info[];
-extern uint32_t _mboot_magic[];
 
 void early_mm_init(void)
 {
-    if (_mboot_magic[0] == 0x36d76289)
-    {
-        parse_multiboot2_mmap((uint32_t *)_mboot_info[0]);
-    }
-    else
-    {
-        // If we don't have a valid multiboot magic number, we can't trust the bootloader and should halt
-        PANIC("Lost Bootloader...\n");
-    }
     early_free_ptr = early_mem_pool;
 }
 
