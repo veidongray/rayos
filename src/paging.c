@@ -12,12 +12,10 @@
 extern uint32_t _virt_offset[];
 extern uint32_t _kernel_phys_end_aligned[];
 extern uint32_t _kernel_virt_end_aligned[];
-static uint32_t total_pages;
-static uint32_t total_tables;
 static uint32_t early_tables[4096] __attribute__((aligned(4096)));
 static uint32_t kpage_directory[1024] __attribute__((aligned(4096)));
 static uint32_t *kpage_tables = NULL;
-static struct page *early_pages = NULL;
+static struct page *global_page_list = NULL;
 LIST_HEAD(free_page_list);
 LIST_HEAD(used_page_list);
 
@@ -43,20 +41,25 @@ void early_page_init(void)
 int page_init(void)
 {
     uint32_t i;
-    uint32_t pages_end;
+    uint32_t pages_list_end;
+    uint32_t global_pages;
+    uint32_t ktotal_pages;
+    uint32_t ktotal_tables;
 
+    global_pages = get_total_mem() / 4096;
     // 计算1G以内可用内存的页数和页表数
-    total_pages = (get_total_mem() / 4096) > 0x40000 ? 0x40000 : (get_total_mem() / 4096);
-    total_tables = total_pages / 1024;
+    // 这个只包括内核高地址最高1G的页数
+    ktotal_pages = (get_total_mem() / 4096) > 0x40000 ? 0x40000 : (get_total_mem() / 4096);
+    ktotal_tables = ktotal_pages / 1024;
 
     // 映射1G以内的系统可用内存空间
     // 从0xC0000000映射到0x00000000开始
-    kpage_tables = (uint32_t *)early_malloc(total_pages * sizeof(uint32_t));
-    for (i = 0; i < total_pages; i++)
+    kpage_tables = (uint32_t *)early_malloc(ktotal_pages * sizeof(uint32_t));
+    for (i = 0; i < ktotal_pages; i++)
     {
         kpage_tables[i] = (i * 0x1000UL) | 0x3UL;
     }
-    for (i = 0; i < total_tables; i++)
+    for (i = 0; i < ktotal_tables; i++)
     {
         kpage_directory[i + 768] = ((uint32_t)kpage_tables - (uint32_t)_virt_offset + (i * 0x1000UL)) | 0x3UL;
     }
@@ -65,29 +68,33 @@ int page_init(void)
     enable_paging();
 
     // create free page list
-    early_pages = (struct page *)_kernel_virt_end_aligned;
-    pages_end = (uint32_t)_kernel_phys_end_aligned + (total_pages * sizeof(struct page));
-    for (i = 0; i < total_pages; i++)
+    // 记录所有可用内存page
+    global_page_list = (struct page *)_kernel_virt_end_aligned;
+    pages_list_end = (uint32_t)_kernel_phys_end_aligned + (global_pages * sizeof(struct page));
+    for (i = 0; i < global_pages; i++)
     {
-        early_pages[i].base = (uint32_t *)(i * 0x1000);
-        if ((uint32_t)early_pages[i].base < pages_end)
+        global_page_list[i].base = (uint32_t *)(i * 0x1000);
+        if ((uint32_t)global_page_list[i].base < pages_list_end)
         {
-            early_pages[i].kref = 1;
-            list_add_tail(&early_pages[i].list, &used_page_list);
+            // 标记已经被使用的地址
+            global_page_list[i].kref = 1;
+            list_add_tail(&global_page_list[i].list, &used_page_list);
         }
         else
         {
-            early_pages[i].kref = 0;
-            list_add_tail(&early_pages[i].list, &free_page_list);
+            global_page_list[i].kref = 0;
+            list_add_tail(&global_page_list[i].list, &free_page_list);
         }
     }
-
+    
     return 0;
 }
 
 struct page *alloc_page(void)
 {
-    struct page *fp = NULL;
+    struct page *fp;
+
+    if (list_empty(&free_page_list)) return NULL;
 
     fp = container_of(free_page_list.next, struct page, list);
     fp->kref++;
@@ -111,12 +118,12 @@ void *get_physaddr(void *virtualaddr)
     unsigned long *pd = (unsigned long *)0xFFFFF000UL;
     // Here you need to check whether the PD entry is present.
     if ((pd[pdindex] & 0x1) == 0)
-        return NULL;
+        return (void *)-1;
 
     unsigned long *pt = ((unsigned long *)0xFFC00000UL) + (0x400UL * pdindex);
     // Here you need to check whether the PT entry is present.
     if ((pt[ptindex] & 0x1) == 0)
-        return NULL;
+        return (void *)-1;
 
     return (void *)((pt[ptindex] & ~0xFFFUL) + ((unsigned long)virtualaddr & 0xFFFUL));
 }
@@ -145,7 +152,7 @@ int map_page(void *physaddr, void *virtualaddr, unsigned int flags)
     // When it is, then there is already a mapping present. What do you do now?
 
     physaddr = (void *)((uint32_t)physaddr & 0xfffff000UL);
-    early_pages[(uint32_t)physaddr / 4096].kref++;
+    global_page_list[(uint32_t)physaddr / 4096].kref++;
     pt[ptindex] = ((unsigned long)physaddr) | (flags & 0xFFFUL) | 0x01UL; // Present
 
     // Now you need to flush the entry in the TLB

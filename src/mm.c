@@ -3,11 +3,12 @@
 #include "multiboot2.h"
 #include "panic.h"
 #include "libc/stdlib.h"
+#include "list.h"
 
 #define EARLY_MEM_POOL_LEN (2 * 1024 * 1024)
 
 static uint8_t *early_free_ptr = NULL;
-static uint8_t *kfree_ptr = NULL;
+static uint8_t *kmalloc_ptr = NULL;
 static uint8_t early_mem_pool[EARLY_MEM_POOL_LEN] __attribute__((aligned(4096)));
 LIST_HEAD(mm_list);
 extern uint32_t _kernel_virt_end_aligned[];
@@ -19,18 +20,21 @@ void early_mm_init(void)
 
 void mm_init(void)
 {
-    uint32_t i, free_pages;
+    uint32_t i, global_pages;
+    uint8_t *kp;
     struct page *pg;
 
-    free_pages = (get_total_mem() / 4096) > 0x40000 ? 0x40000 : (get_total_mem() / 4096);
-    kfree_ptr = (uint8_t *)(_kernel_virt_end_aligned + (free_pages * sizeof(struct page)));
-    free_pages -= ((uint32_t)kfree_ptr - 0xc0000000) / 4096;
-    
+    // kmalloc的起始地址在page list后面
+    global_pages = (get_total_mem() / 4096);
+    kmalloc_ptr = (uint8_t *)(_kernel_virt_end_aligned + (global_pages * sizeof(struct page)));
+    kp = kmalloc_ptr;
+
     // alloc kmalloc cache
-    for (i = 0; i < free_pages; i += 0x1000)
+    for (i = 0; (uint32_t)kp <= 0xfffff000; i++, kp += 0x1000)
     {
         pg = alloc_page();
-        map_page(pg->base, (uint32_t *)((uint32_t)kfree_ptr + i), 0x3);
+        if (pg == NULL)
+            break;
     }
 }
 
@@ -47,12 +51,12 @@ void *kmalloc(size_t len)
     struct mm_area *m;
     void *ptr;
 
-    ptr = (void *)kfree_ptr;
+    ptr = (void *)kmalloc_ptr;
     len = ((len % 4) == 0) ? len : (len - (len % 4) + 4);
     // place it after data
-    m = (struct mm_area *)((size_t)kfree_ptr + len);
+    m = (struct mm_area *)((size_t)kmalloc_ptr + len);
 
-    kfree_ptr = (uint8_t *)((size_t)kfree_ptr + len + sizeof(struct mm_area));
+    kmalloc_ptr = (uint8_t *)((size_t)kmalloc_ptr + len + sizeof(struct mm_area));
     m->start = (uint32_t)ptr;
     m->size = len;
     list_add_tail(&m->list, &mm_list);
@@ -61,9 +65,10 @@ void *kmalloc(size_t len)
 
 void *kmalloc_aligned(size_t len)
 {
-    if ((uint32_t)kfree_ptr % 4096) {
+    if ((uint32_t)kmalloc_ptr % 4096)
+    {
         // aligned 4K
-        kfree_ptr = (uint8_t *)((uint32_t)kfree_ptr - ((uint32_t)kfree_ptr % 4096) + 4096);
+        kmalloc_ptr = (uint8_t *)((uint32_t)kmalloc_ptr - ((uint32_t)kmalloc_ptr % 4096) + 4096);
     }
 
     return kmalloc(len);
