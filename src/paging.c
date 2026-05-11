@@ -6,6 +6,7 @@
 #include "mm.h"
 #include "panic.h"
 #include "idt.h"
+#include "aligned.h"
 
 #define EARLY_PAGES ((16 * 1024 * 1024) / 4096)
 
@@ -70,7 +71,7 @@ int page_init(void)
     // create free page list
     // 记录所有可用内存page
     global_page_list = (struct page *)_kernel_virt_end_aligned;
-    pages_list_end = (uint32_t)_kernel_phys_end_aligned + (global_pages * sizeof(struct page));
+    pages_list_end = ALIGN_4K((uint32_t)_kernel_phys_end_aligned + (global_pages * sizeof(struct page)));
     for (i = 0; i < global_pages; i++)
     {
         global_page_list[i].base = (uint32_t *)(i * 0x1000);
@@ -86,7 +87,7 @@ int page_init(void)
             list_add_tail(&global_page_list[i].list, &free_page_list);
         }
     }
-    
+
     return 0;
 }
 
@@ -94,7 +95,8 @@ struct page *alloc_page(void)
 {
     struct page *fp;
 
-    if (list_empty(&free_page_list)) return NULL;
+    if (list_empty(&free_page_list))
+        return NULL;
 
     fp = container_of(free_page_list.next, struct page, list);
     fp->kref++;
@@ -152,7 +154,6 @@ int map_page(void *physaddr, void *virtualaddr, unsigned int flags)
     // When it is, then there is already a mapping present. What do you do now?
 
     physaddr = (void *)((uint32_t)physaddr & 0xfffff000UL);
-    global_page_list[(uint32_t)physaddr / 4096].kref++;
     pt[ptindex] = ((unsigned long)physaddr) | (flags & 0xFFFUL) | 0x01UL; // Present
 
     // Now you need to flush the entry in the TLB

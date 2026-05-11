@@ -4,6 +4,7 @@
 #include "panic.h"
 #include "libc/stdlib.h"
 #include "list.h"
+#include "aligned.h"
 
 #define EARLY_MEM_POOL_LEN (2 * 1024 * 1024)
 
@@ -30,7 +31,7 @@ void mm_init(void)
     kp = kmalloc_ptr;
 
     // alloc kmalloc cache
-    for (i = 0; (uint32_t)kp <= 0xfffff000; i++, kp += 0x1000)
+    for (i = 0; (uint32_t)kp < 0xfffff000; i++, kp = (uint8_t *)((uint32_t)kp + 0x1000))
     {
         pg = alloc_page();
         if (pg == NULL)
@@ -41,7 +42,7 @@ void mm_init(void)
 void *early_malloc(size_t len)
 {
     void *ptr = (void *)early_free_ptr;
-    len = ((len % 4) == 0) ? len : (len - (len % 4) + 4);
+    len = ALIGN_4B(len);
     early_free_ptr = (uint8_t *)((size_t)early_free_ptr + len);
     return ptr;
 }
@@ -52,7 +53,7 @@ void *kmalloc(size_t len)
     void *ptr;
 
     ptr = (void *)kmalloc_ptr;
-    len = ((len % 4) == 0) ? len : (len - (len % 4) + 4);
+    len = ALIGN_4B(len);
     // place it after data
     m = (struct mm_area *)((size_t)kmalloc_ptr + len);
 
