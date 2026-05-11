@@ -11,6 +11,7 @@
 
 extern uint32_t _virt_offset[];
 extern uint32_t _kernel_phys_end_aligned[];
+extern uint32_t _kernel_virt_end_aligned[];
 static uint32_t total_pages;
 static uint32_t total_tables;
 static uint32_t early_tables[4096] __attribute__((aligned(4096)));
@@ -42,6 +43,7 @@ void early_page_init(void)
 int page_init(void)
 {
     uint32_t i;
+    uint32_t pages_end;
 
     // 计算1G以内可用内存的页数和页表数
     total_pages = (get_total_mem() / 4096) > 0x40000 ? 0x40000 : (get_total_mem() / 4096);
@@ -62,12 +64,13 @@ int page_init(void)
     load_page_directory((uint32_t *)((uint32_t)kpage_directory - (uint32_t)_virt_offset));
     enable_paging();
 
-    // create 16MB's page
-    early_pages = (struct page *)early_malloc(sizeof(struct page) * EARLY_PAGES);
-    for (i = 0; i < EARLY_PAGES; i++)
+    // create free page list
+    early_pages = (struct page *)_kernel_virt_end_aligned;
+    pages_end = (uint32_t)_kernel_phys_end_aligned + (total_pages * sizeof(struct page));
+    for (i = 0; i < total_pages; i++)
     {
         early_pages[i].base = (uint32_t *)(i * 0x1000);
-        if ((uint32_t)early_pages[i].base < (uint32_t)_kernel_phys_end_aligned)
+        if ((uint32_t)early_pages[i].base < pages_end)
         {
             early_pages[i].kref = 1;
             list_add_tail(&early_pages[i].list, &used_page_list);
