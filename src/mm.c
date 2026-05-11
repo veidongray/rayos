@@ -21,17 +21,16 @@ void early_mm_init(void)
 
 void mm_init(void)
 {
-    uint32_t i, global_pages;
-    uint8_t *kp;
+    uint32_t i, global_pages, avail_page;
     struct page *pg;
 
     // kmalloc的起始地址在page list后面
     global_pages = (get_total_mem() / 4096);
     kmalloc_ptr = (uint8_t *)(_kernel_virt_end_aligned + (global_pages * sizeof(struct page)));
-    kp = kmalloc_ptr;
+    avail_page = global_pages / 8;
 
     // alloc kmalloc cache
-    for (i = 0; (uint32_t)kp < 0xfffff000; i++, kp = (uint8_t *)((uint32_t)kp + 0x1000))
+    for (i = 0; i < avail_page; i++)
     {
         pg = alloc_page();
         if (pg == NULL)
@@ -66,12 +65,7 @@ void *kmalloc(size_t len)
 
 void *kmalloc_aligned(size_t len)
 {
-    if ((uint32_t)kmalloc_ptr % 4096)
-    {
-        // aligned 4K
-        kmalloc_ptr = (uint8_t *)((uint32_t)kmalloc_ptr - ((uint32_t)kmalloc_ptr % 4096) + 4096);
-    }
-
+    kmalloc_ptr = (uint8_t *)ALIGN_4K((uint32_t)kmalloc_ptr);
     return kmalloc(len);
 }
 

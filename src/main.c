@@ -20,7 +20,7 @@ void user_init000(void *arg)
     arg = arg;
     while (1)
     {
-        printk("%s\n", current->name);
+        // printk("%s\n", current->name);
     }
 }
 
@@ -29,7 +29,7 @@ void user_init111(void *arg)
     arg = arg;
     while (1)
     {
-        printk("%s\n", current->name);
+        // printk("%s\n", current->name);
     }
 }
 

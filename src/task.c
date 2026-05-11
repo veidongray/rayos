@@ -8,6 +8,7 @@
 #include "panic.h"
 #include "libc/stdlib.h"
 #include "mm.h"
+#include "aligned.h"
 
 INIT_TASK_CURRENT(current);
 LIST_HEAD(task_list);

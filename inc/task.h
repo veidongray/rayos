@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "list.h"
+#include "aligned.h"
 
 // task status
 #define TASK_RUNNING 0x0
@@ -15,6 +16,7 @@
 #define TASK_USER 0x1
 
 #define TASK_STACK_LEN (128 * 1024)
+#define TASK_CODE_BEGIN 0x40000000
 
 struct task_struct
 {
@@ -27,7 +29,7 @@ struct task_struct
     uint32_t tss_esp0;
     struct list_head list;
 };
-#define INIT_TASK_CURRENT(cur) struct task_struct *(cur)
+#define INIT_TASK_CURRENT(cur) ALIGN_ATTR struct task_struct *(cur)
 
 extern uint32_t task_esp;
 extern INIT_TASK_CURRENT(current);
