@@ -1,15 +1,14 @@
 #include "gdt.h"
-#include "kheap.h"
-#include "print.h"
+#include "tty.h"
 #include "libc/string.h"
 
-struct tss_entry tss;
-
+static struct tss_entry tss;
 static struct gdt_entry descriptors[6] __attribute__((aligned(4096)));
 static struct gdtr gdtr __attribute__((aligned(4096)));
 
 int create_gdt_entry(struct gdt_entry *entry, uint32_t base,
-    uint32_t limit, uint8_t access, uint8_t granularity) {
+                     uint32_t limit, uint8_t access, uint8_t granularity)
+{
     entry->base_low = base & 0xFFFF;
     entry->base_mid = (base >> 16) & 0xFF;
     entry->base_high = (base >> 24) & 0xFF;
@@ -20,12 +19,13 @@ int create_gdt_entry(struct gdt_entry *entry, uint32_t base,
     return 0;
 }
 
-int load_gdt(struct gdt_entry *gdt, uint16_t size) {
+int load_gdt(struct gdt_entry *gdt, uint16_t size)
+{
     struct gdtr *g = &gdtr;
     g->limit = size - 1;
     g->base = (uint32_t)gdt;
 
-    asm volatile ("lgdt %0" : : "m"(g));
+    asm volatile("lgdt %0" : : "m"(g));
     return 0;
 }
 
@@ -33,14 +33,13 @@ int gdt_init(void)
 {
     struct gdt_entry *desc = descriptors;
     create_gdt_entry(&desc[0], 0, 0, 0, 0);
-    create_gdt_entry(&desc[1], 0, 0xFFFFF, 0x9A, 0xCF);  // Kernel code
-    create_gdt_entry(&desc[2], 0, 0xFFFFF, 0x92, 0xCF);  // Kernel data
-    create_gdt_entry(&desc[3], 0, 0xFFFFF, 0xFA, 0xCF);  // User code
-    create_gdt_entry(&desc[4], 0, 0xFFFFF, 0xF2, 0xCF);  // User data
+    create_gdt_entry(&desc[1], 0, 0xFFFFF, 0x9A, 0xCF); // Kernel code
+    create_gdt_entry(&desc[2], 0, 0xFFFFF, 0x92, 0xCF); // Kernel data
+    create_gdt_entry(&desc[3], 0, 0xFFFFF, 0xFA, 0xCF); // User code
+    create_gdt_entry(&desc[4], 0, 0xFFFFF, 0xF2, 0xCF); // User data
     create_gdt_entry(&desc[5], (uint32_t)&tss, sizeof(tss) - 1, 0x89, 0x00);
 
     load_gdt(desc, sizeof(struct gdt_entry) * 6);
-    extern void gdt_flush(struct gdtr *gdtr);
     gdt_flush(&gdtr);
 
     tss.prev_tss = 0;
@@ -72,14 +71,14 @@ int gdt_init(void)
     // 关键：设置 iomap_base > limit，表示无 I/O 权限位图
     tss.iomap_base = sizeof(tss); // e.g., 104 if TSS is 104 bytes
 
-    asm volatile ("ltr %%ax" :: "a"(TSS_SELECTOR));
+    asm volatile("ltr %%ax" ::"a"(TSS_SELECTOR));
     return 0;
 }
 
 uint32_t get_current_esp(void)
 {
     uint32_t esp;
-    asm volatile ("mov %%esp, %0" : "=r"(esp));
+    asm volatile("mov %%esp, %0" : "=r"(esp));
     return esp;
 }
 

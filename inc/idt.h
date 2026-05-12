@@ -21,5 +21,6 @@ void load_idt(struct idt_entry* idt, uint16_t size);
 int idt_init(void);
 void enable_irq(void);
 void disable_irq(void);
+int is_interrupts_enabled(void);
 
 #endif // IRQ_H

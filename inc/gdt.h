@@ -8,7 +8,8 @@
 #define UDATA_SELECTOR (0x20UL | 0x3UL)
 #define TSS_SELECTOR (0x28UL | 0x0UL)
 
-struct gdt_entry {
+struct gdt_entry
+{
     uint16_t limit;
     uint16_t base_low;
     uint8_t base_mid;
@@ -17,12 +18,14 @@ struct gdt_entry {
     uint8_t base_high;
 } __attribute__((packed));
 
-struct gdtr {
+struct gdtr
+{
     uint16_t limit;
     uint32_t base;
 } __attribute__((packed));
 
-struct tss_entry {
+struct tss_entry
+{
     uint32_t prev_tss;
     uint32_t esp0;
     uint32_t ss0;
@@ -53,11 +56,13 @@ struct tss_entry {
 } __attribute__((packed));
 
 int create_gdt_entry(struct gdt_entry *entry, uint32_t base,
-    uint32_t limit, uint8_t access, uint8_t granularity);
+                     uint32_t limit, uint8_t access, uint8_t granularity);
 int load_gdt(struct gdt_entry *gdt, uint16_t size);
 struct gdtr *get_gdtr(void);
 int gdt_init(void);
 void update_tss_esp0(uint32_t esp0);
 uint32_t get_current_esp(void);
+
+extern void gdt_flush(struct gdtr *gdtr);
 
 #endif // GDT_H

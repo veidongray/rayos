@@ -1,6 +1,6 @@
 #include "libc/string.h"
 
-int strlen(char *str)
+int strlen(const char *str)
 {
     char *ptr = (char *)str;
     int len = 0;

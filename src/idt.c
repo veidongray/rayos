@@ -1,9 +1,11 @@
 #include "idt.h"
 #include "pic_8259.h"
-#include "print.h"
+#include "tty.h"
 #include "task.h"
 #include "paging.h"
 #include "gdt.h"
+#include "panic.h"
+#include <stddef.h>
 
 static struct idt_entry idt[256] __attribute__((aligned(4096)));
 void set_idt_entry(uint8_t vector, void *isr, uint8_t flags)
@@ -11,7 +13,7 @@ void set_idt_entry(uint8_t vector, void *isr, uint8_t flags)
     struct idt_entry *descriptor = &idt[vector];
 
     descriptor->isr_low = (uint32_t)isr & 0xFFFF;
-    descriptor->kernel_cs = KCODE_SELECTOR; // this value can be whatever offset your kernel code selector is in your GDT
+    descriptor->kernel_cs = KCODE_SELECTOR;
     descriptor->attributes = flags;
     descriptor->isr_high = (uint32_t)isr >> 16;
     descriptor->reserved = 0;
@@ -31,6 +33,7 @@ extern void isr_pic_timer(void);
 extern void isr_page_fault(void);
 extern void isr_double_fault(void);
 extern void isr_gp_fault(void);
+extern void isr_syscall(uint32_t);
 
 int idt_init(void)
 {
@@ -48,7 +51,12 @@ int idt_init(void)
     // Set up the double fault handler (interrupt vector 8).
     set_idt_entry(8, isr_double_fault, 0x8E);
 
+    // Set up the GP fault handler (interrupt vector 13).
     set_idt_entry(13, isr_gp_fault, 0x8E);
+
+    // Set up the system call handler (interrupt vector 128).
+    // DPL=3
+    set_idt_entry(128, isr_syscall, 0xEE);
 
     load_idt(idt, sizeof(idt));
     pic_remap(0x20, 0x28);
@@ -67,6 +75,13 @@ void disable_irq(void)
     asm volatile("cli");
 }
 
+int is_interrupts_enabled(void)
+{
+    unsigned long flags;
+    asm volatile("pushf; pop %0" : "=rm"(flags));
+    return !!(flags & (1UL << 9));
+}
+
 void timer_interrupt_handler(void)
 {
     pic_sendEOI(0); // Send End of Interrupt (EOI) signal to PIC
@@ -77,21 +92,15 @@ void page_fault_handler(uint32_t error_code)
 {
     uint32_t faulting_address;
     asm volatile("mov %%cr2, %0" : "=r"(faulting_address)); // Get the faulting address from CR2
-
-    cga_printf("Page Fault! Error code: 0x%x, Faulting address: 0x%x\n", error_code, faulting_address);
-    while (1)
-        asm volatile("cli\r\nhlt\r\n");
+    PANIC("Page Fault! Error code: 0x%x, Faulting address: 0x%x\n", error_code, faulting_address);
 }
 
 void double_fault_handler(void)
 {
-    cga_printf("DOUBLE FAULT! System halted.\n");
-    while (1)
-        asm volatile("cli; hlt");
+    PANIC("DOUBLE FAULT! System halted.\n");
 }
 
 void gp_fault_handler(uint32_t error_code)
 {
-    cga_printf("GENERAL PROTECTION FAULT! Error code: 0x%x\n", error_code);
-    while (1) asm volatile("cli; hlt");
+    PANIC("GENERAL PROTECTION FAULT! Error code: 0x%x\n", error_code);
 }

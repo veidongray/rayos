@@ -23,9 +23,14 @@ isr_double_fault:
 
 .global isr_gp_fault
 isr_gp_fault:
-    cli
     pushl (%esp)        # Pass error_code to C function
     call gp_fault_handler
     addl $4, %esp
-    sti
+    iret
+
+.global isr_syscall
+isr_syscall:
+    pushl %eax
+    call syscall_handler
+    addl $0x4, %esp
     iret
