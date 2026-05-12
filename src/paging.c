@@ -33,10 +33,10 @@ void early_page_init(void)
 
     // early map 16MB
     cr3ptr = (uint32_t *)(cr3 + (uint32_t)_virt_offset);
-    cr3ptr[768] = ((uint32_t)(early_tables + 0) - (uint32_t)_virt_offset) | 0x3UL;
-    cr3ptr[769] = ((uint32_t)(early_tables + 1024) - (uint32_t)_virt_offset) | 0x3UL;
-    cr3ptr[770] = ((uint32_t)(early_tables + 2048) - (uint32_t)_virt_offset) | 0x3UL;
-    cr3ptr[771] = ((uint32_t)(early_tables + 3072) - (uint32_t)_virt_offset) | 0x3UL;
+    for (i = 0; i < 4; i++)
+    {
+        cr3ptr[768 + i] = ((uint32_t)(early_tables + (i * 1024)) - (uint32_t)_virt_offset) | 0x3UL;
+    }
 }
 
 int page_init(void)
@@ -50,7 +50,7 @@ int page_init(void)
     global_pages = get_total_mem() / 4096;
     // 计算1G以内可用内存的页数和页表数
     // 这个只包括内核高地址最高1G的页数
-    ktotal_pages = (get_total_mem() / 4096) > 0x40000 ? 0x40000 : (get_total_mem() / 4096);
+    ktotal_pages = global_pages > 0x40000 ? 0x40000 : global_pages;
     ktotal_tables = ktotal_pages / 1024;
 
     // 映射1G以内的系统可用内存空间
