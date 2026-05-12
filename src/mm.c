@@ -11,8 +11,9 @@
 static uint8_t *early_free_ptr = NULL;
 static uint8_t *kmalloc_ptr = NULL;
 static uint8_t early_mem_pool[EARLY_MEM_POOL_LEN] __attribute__((aligned(4096)));
-LIST_HEAD(mm_list);
 extern uint32_t _kernel_virt_end_aligned[];
+LIST_HEAD(mm_list);
+LIST_HEAD(mm_free_list);
 
 void early_mm_init(void)
 {
@@ -23,10 +24,13 @@ void mm_init(void)
 {
     uint32_t i, global_pages, avail_page;
     struct page *pg;
+    struct mm_area *first_mm;
+
+    first_mm = (struct mm_area *)early_malloc(sizeof(struct mm_area));
 
     // kmalloc的起始地址在page list后面
     global_pages = (get_total_mem() / 4096);
-    kmalloc_ptr = (uint8_t *)(_kernel_virt_end_aligned + (global_pages * sizeof(struct page)));
+    kmalloc_ptr = (uint8_t *)ALIGN_4K((uint32_t)(_kernel_virt_end_aligned + (global_pages * sizeof(struct page))));
     avail_page = global_pages / 8;
 
     // alloc kmalloc cache
@@ -36,12 +40,15 @@ void mm_init(void)
         if (pg == NULL)
             break;
     }
+    first_mm->start = (uint32_t)kmalloc_ptr;
+    first_mm->size = i * 0x1000;
+    list_add_tail(&first_mm->list, &mm_free_list);
 }
 
 void *early_malloc(size_t len)
 {
     void *ptr = (void *)early_free_ptr;
-    len = ALIGN_4B(len);
+    len = ALIGN_4K(len);
     early_free_ptr = (uint8_t *)((size_t)early_free_ptr + len);
     return ptr;
 }
