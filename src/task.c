@@ -51,19 +51,16 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
 
     // user task start at 0x40000000
     user_pagedir[256] = ((uint32_t)get_physaddr((uint32_t *)user_table) & (~0xfffUL)) | 0x7UL;
+    user_pagedir[1023] = (uint32_t)get_physaddr(user_pagedir) | 0x7UL;
 
     // copy task
     // task code/data place in first 3MB
-    task_code = (uint32_t *)0x40000000;
-    for (i = 0; i < 1024; i++)
+    task_code = (uint32_t *)TASK_CODE_BEGIN;
+    if (map_page_range((uint32_t *)user_table[0], (uint32_t *)task_code, 0x7, 1024) < 0)
     {
-        // map 4MB space
-        if (map_page((uint32_t *)user_table[i], (uint32_t *)((uint32_t)task_code + (i * 0x1000)), 0x7) < 0)
-        {
-            PANIC("ERROR map\n");
-        }
+        PANIC("MAP RANGE error\n");
     }
-    memcpy(task_code, (uint8_t *)task_func, 16 * 1024);
+    memcpy(task_code, (uint8_t *)task_func, 3 * 1024 * 1024);
 
     // make user stack
     // task stack space place in last 1MB
@@ -77,17 +74,23 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
     *(--stack_top) = UCODE_SELECTOR;
     *(--stack_top) = (uint32_t)task_code;
     *(--stack_top) = (uint32_t)switch_to_user;
-    *(--stack_top) = 0x0; // eax
-    *(--stack_top) = 0x0; // ecx
-    *(--stack_top) = 0x0; // edx
-    *(--stack_top) = 0x0; // ebx
-    *(--stack_top) = 0x0; // ebp
-    *(--stack_top) = 0x0; // esi
-    *(--stack_top) = 0x0; // edi
+    *(--stack_top) = 0x0;            // eax
+    *(--stack_top) = 0x0;            // ecx
+    *(--stack_top) = 0x0;            // edx
+    *(--stack_top) = 0x0;            // ebx
+    *(--stack_top) = 0x0;            // ebp
+    *(--stack_top) = 0x0;            // esi
+    *(--stack_top) = 0x0;            // edi
     *(--stack_top) = UDATA_SELECTOR; // ds
     *(--stack_top) = UDATA_SELECTOR; // es
     *(--stack_top) = UDATA_SELECTOR; // fs
     *(--stack_top) = UDATA_SELECTOR; // gs
+
+    // unmap task space
+    if (unmap_page_range(task_code, 1024) < 0)
+    {
+        PANIC("UNMAP RANGE error\n");
+    }
 
     task = (struct task_struct *)kmalloc_aligned(sizeof(struct task_struct));
     task->esp = (uint32_t)stack_top;
@@ -114,13 +117,13 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     *(--stack_top) = (uint32_t)arg;
     *(--stack_top) = (uint32_t)task_exit; // setup return address to thread_exit
     *(--stack_top) = (uint32_t)task_func;
-    *(--stack_top) = 0x0; // eax
-    *(--stack_top) = 0x0; // ecx
-    *(--stack_top) = 0x0; // edx
-    *(--stack_top) = 0x0; // ebx
-    *(--stack_top) = 0x0; // ebp
-    *(--stack_top) = 0x0; // esi
-    *(--stack_top) = 0x0; // edi
+    *(--stack_top) = 0x0;            // eax
+    *(--stack_top) = 0x0;            // ecx
+    *(--stack_top) = 0x0;            // edx
+    *(--stack_top) = 0x0;            // ebx
+    *(--stack_top) = 0x0;            // ebp
+    *(--stack_top) = 0x0;            // esi
+    *(--stack_top) = 0x0;            // edi
     *(--stack_top) = KDATA_SELECTOR; // ds
     *(--stack_top) = KDATA_SELECTOR; // es
     *(--stack_top) = KDATA_SELECTOR; // fs

@@ -7,6 +7,7 @@
 #include "panic.h"
 #include "idt.h"
 #include "aligned.h"
+#include <stddef.h>
 
 #define EARLY_PAGES ((16 * 1024 * 1024) / 4096)
 
@@ -17,6 +18,7 @@ static uint32_t early_tables[4096] __attribute__((aligned(4096)));
 static uint32_t kpage_directory[1024] __attribute__((aligned(4096)));
 static uint32_t *kpage_tables = NULL;
 static struct page *global_page_list = NULL;
+uint32_t kheap_begin;
 LIST_HEAD(free_page_list);
 LIST_HEAD(used_page_list);
 
@@ -55,7 +57,7 @@ int page_init(void)
 
     // 映射1G以内的系统可用内存空间
     // 从0xC0000000映射到0x00000000开始
-    kpage_tables = (uint32_t *)early_malloc(ktotal_pages * sizeof(uint32_t));
+    kpage_tables = (uint32_t *)_kernel_virt_end_aligned;
     for (i = 0; i < ktotal_pages; i++)
     {
         kpage_tables[i] = (i * 0x1000UL) | 0x3UL;
@@ -70,8 +72,9 @@ int page_init(void)
 
     // create free page list
     // 记录所有可用内存page
-    global_page_list = (struct page *)_kernel_virt_end_aligned;
-    pages_list_end = ALIGN_4K((uint32_t)_kernel_phys_end_aligned + (global_pages * sizeof(struct page)));
+    global_page_list = (struct page *)ALIGN_4K((uint32_t)((uint32_t)_kernel_virt_end_aligned + (ktotal_pages * sizeof(uint32_t))));
+    pages_list_end = ALIGN_4K((uint32_t)global_page_list + (global_pages * sizeof(struct page)) - (uint32_t)_virt_offset);
+    kheap_begin = pages_list_end + (uint32_t)_virt_offset;
     for (i = 0; i < global_pages; i++)
     {
         global_page_list[i].base = (uint32_t *)(i * 0x1000);
@@ -143,7 +146,7 @@ int map_page(void *physaddr, void *virtualaddr, unsigned int flags)
     // When it is not present, you need to create a new empty PT and
     // adjust the PDE accordingly.
     // 如果对应页表不存在则分配一个页作为页表空间
-    if ((pd[pdindex] & 0x1) == 0)
+    if ((pd[pdindex] & 0x1UL) == 0)
     {
         t = alloc_page();
         pd[pdindex] = (uint32_t)t->base | (flags & 0xFFFUL) | 0x01UL;
@@ -152,6 +155,8 @@ int map_page(void *physaddr, void *virtualaddr, unsigned int flags)
     unsigned long *pt = ((unsigned long *)0xFFC00000UL) + (0x400UL * pdindex);
     // Here you need to check whether the PT entry is present.
     // When it is, then there is already a mapping present. What do you do now?
+    if (pt[ptindex] & 0x1UL)
+        return -1;
 
     physaddr = (void *)((uint32_t)physaddr & 0xfffff000UL);
     pt[ptindex] = ((unsigned long)physaddr) | (flags & 0xFFFUL) | 0x01UL; // Present
@@ -162,11 +167,61 @@ int map_page(void *physaddr, void *virtualaddr, unsigned int flags)
     return 0;
 }
 
-void flush_tlb(void)
+int unmap_page(void *virtualaddr)
 {
-    asm volatile(
-        "mov %cr3, %eax\r\n"
-        "mov %eax, %cr3\r\n");
+    // Make sure that both addresses are page-aligned.
+    unsigned long pdindex = (unsigned long)virtualaddr >> 22UL;
+    unsigned long ptindex = (unsigned long)virtualaddr >> 12UL & 0x03FFUL;
+
+    unsigned long *pd = (unsigned long *)0xFFFFF000UL;
+    unsigned long *pt = ((unsigned long *)0xFFC00000UL) + (0x400UL * pdindex);
+    // Here you need to check whether the PD entry is present.
+    // When it is not present, you need to create a new empty PT and
+    // adjust the PDE accordingly.
+    // 如果对应页表不存在则分配一个页作为页表空间
+    if ((pd[pdindex] & 0x1UL) && (pt[ptindex] & 0x1UL))
+    {
+        pt[ptindex] &= ~0x1UL;
+    }
+    else
+    {
+        return -1;
+    }
+
+    // Now you need to flush the entry in the TLB
+    // or you might not notice the change.
+    flush_tlb();
+    return 0;
+}
+
+int map_page_range(void *physaddr, void *virtualaddr, unsigned int flags, size_t len)
+{
+    int ret;
+    uint32_t i;
+
+    for (i = 0; i < len; i++)
+    {
+        ret = map_page((uint32_t *)((uint32_t)physaddr + (i * 0x1000)), (uint32_t *)((uint32_t)virtualaddr + (i * 0x1000)), flags);
+        if (ret < 0)
+            return ret;
+    }
+    ret = 0;
+    return ret;
+}
+
+int unmap_page_range(void *virtualaddr, size_t len)
+{
+    int ret;
+    uint32_t i;
+
+    for (i = 0; i < len; i++)
+    {
+        ret = unmap_page((uint32_t *)((uint32_t)virtualaddr + (i * 0x1000)));
+        if (ret < 0)
+            return ret;
+    }
+    ret = 0;
+    return ret;
 }
 
 void get_cr3(uint32_t *cr3)

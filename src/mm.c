@@ -6,11 +6,11 @@
 #include "list.h"
 #include "aligned.h"
 
-#define EARLY_MEM_POOL_LEN (2 * 1024 * 1024)
+#define EARLY_MEM_POOL_LEN (128 * 1024)
 
+ALIGN_ATTR(4096)
+static uint8_t early_mem_pool[EARLY_MEM_POOL_LEN];
 static uint8_t *early_free_ptr = NULL;
-static uint8_t *kmalloc_ptr = NULL;
-static uint8_t early_mem_pool[EARLY_MEM_POOL_LEN] __attribute__((aligned(4096)));
 extern uint32_t _kernel_virt_end_aligned[];
 LIST_HEAD(mm_list);
 LIST_HEAD(mm_free_list);
@@ -22,7 +22,9 @@ void early_mm_init(void)
 
 void mm_init(void)
 {
-    uint32_t i, global_pages, avail_page;
+    uint32_t i;
+    uint32_t global_pages;
+    uint32_t avail_page;
     struct page *pg;
     struct mm_area *first_mm;
 
@@ -30,62 +32,89 @@ void mm_init(void)
 
     // kmalloc的起始地址在page list后面
     global_pages = (get_total_mem() / 4096);
-    kmalloc_ptr = (uint8_t *)ALIGN_4K((uint32_t)(_kernel_virt_end_aligned + (global_pages * sizeof(struct page))));
     avail_page = global_pages / 8;
 
     // alloc kmalloc cache
+    // max 512MB
     for (i = 0; i < avail_page; i++)
     {
         pg = alloc_page();
         if (pg == NULL)
-            break;
+        {
+            PANIC("MM error\n");
+        }
     }
-    first_mm->start = (uint32_t)kmalloc_ptr;
+    // uint32_t kheap_begin from paging.c
+    first_mm->start = kheap_begin;
     first_mm->size = i * 0x1000;
     list_add_tail(&first_mm->list, &mm_free_list);
 }
 
 void *early_malloc(size_t len)
 {
-    void *ptr = (void *)early_free_ptr;
+    void *start = (void *)early_free_ptr;
     len = ALIGN_4K(len);
     early_free_ptr = (uint8_t *)((size_t)early_free_ptr + len);
-    return ptr;
+    return start;
 }
 
 void *kmalloc(size_t len)
 {
+    struct list_head *pos;
     struct mm_area *m;
-    void *ptr;
+    void *start;
 
-    ptr = (void *)kmalloc_ptr;
     len = ALIGN_4B(len);
-    // place it after data
-    m = (struct mm_area *)((size_t)kmalloc_ptr + len);
+    list_for_each(pos, &mm_free_list)
+    {
+        m = container_of(pos, struct mm_area, list);
+        if (m->size >= (len + sizeof(struct mm_area)))
+        {
+            break;
+        }
+    }
+    start = (void *)m->start;
+    m->start = m->start + len + sizeof(struct mm_area);
+    m->size -= len + sizeof(struct mm_area);
 
-    kmalloc_ptr = (uint8_t *)((size_t)kmalloc_ptr + len + sizeof(struct mm_area));
-    m->start = (uint32_t)ptr;
+    // place it after data
+    // setup new mm_area struct
+    m = (struct mm_area *)((size_t)start + len);
+    m->start = (uint32_t)start;
     m->size = len;
     list_add_tail(&m->list, &mm_list);
-    return ptr;
+    return start;
 }
 
 void *kmalloc_aligned(size_t len)
 {
-    kmalloc_ptr = (uint8_t *)ALIGN_4K((uint32_t)kmalloc_ptr);
+    struct mm_area *m;
+    struct list_head *pos;
+
+    len = ALIGN_4K(len);
+    list_for_each(pos, &mm_free_list)
+    {
+        m = container_of(pos, struct mm_area, list);
+        if (m->size >= (len + sizeof(struct mm_area)))
+        {
+            break;
+        }
+    }
+    m->start = ALIGN_4K(m->start);
     return kmalloc(len);
 }
 
-void kfree(void *ptr)
+void kfree(void *start)
 {
     struct list_head *pos;
     struct mm_area *m;
     list_for_each(pos, &mm_list)
     {
         m = container_of(pos, struct mm_area, list);
-        if (m->start == (uint32_t)ptr)
+        if (m->start == (uint32_t)start)
         {
             list_del(&m->list);
+            list_add(&m->list, &mm_free_list);
             break;
         }
     }
