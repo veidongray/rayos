@@ -5,6 +5,7 @@
 #include "libc/stdlib.h"
 #include "list.h"
 #include "aligned.h"
+#include "spinlock.h"
 
 #define EARLY_MEM_POOL_LEN (128 * 1024)
 
@@ -14,10 +15,14 @@ static uint8_t *early_free_ptr = NULL;
 extern uint32_t _kernel_virt_end_aligned[];
 LIST_HEAD(mm_list);
 LIST_HEAD(mm_free_list);
+SPINLOCK_INIT(mm_list_lock);
+SPINLOCK_INIT(mm_free_list_lock);
 
 void early_mm_init(void)
 {
     early_free_ptr = early_mem_pool;
+    spinlock_init(&mm_list_lock);
+    spinlock_init(&mm_free_list_lock);
 }
 
 void mm_init(void)
@@ -47,7 +52,9 @@ void mm_init(void)
     // uint32_t kheap_begin from paging.c
     first_mm->start = kheap_begin;
     first_mm->size = i * 0x1000;
+    spinlock_lock(&mm_free_list_lock);
     list_add_tail(&first_mm->list, &mm_free_list);
+    spinlock_unlock(&mm_free_list_lock);
 }
 
 void *early_malloc(size_t len)
@@ -65,6 +72,7 @@ void *kmalloc(size_t len)
     void *start;
 
     len = ALIGN_4B(len);
+    spinlock_lock(&mm_free_list_lock);
     list_for_each(pos, &mm_free_list)
     {
         m = container_of(pos, struct mm_area, list);
@@ -73,6 +81,8 @@ void *kmalloc(size_t len)
             break;
         }
     }
+    spinlock_unlock(&mm_free_list_lock);
+
     start = (void *)m->start;
     m->start = m->start + len + sizeof(struct mm_area);
     m->size -= len + sizeof(struct mm_area);
@@ -82,7 +92,9 @@ void *kmalloc(size_t len)
     m = (struct mm_area *)((size_t)start + len);
     m->start = (uint32_t)start;
     m->size = len;
+    spinlock_lock(&mm_list_lock);
     list_add_tail(&m->list, &mm_list);
+    spinlock_unlock(&mm_list_lock);
     return start;
 }
 
@@ -92,6 +104,7 @@ void *kmalloc_aligned(size_t len)
     struct list_head *pos;
 
     len = ALIGN_4K(len);
+    spinlock_lock(&mm_free_list_lock);
     list_for_each(pos, &mm_free_list)
     {
         m = container_of(pos, struct mm_area, list);
@@ -101,6 +114,7 @@ void *kmalloc_aligned(size_t len)
         }
     }
     m->start = ALIGN_4K(m->start);
+    spinlock_unlock(&mm_free_list_lock);
     return kmalloc(len);
 }
 
@@ -108,14 +122,19 @@ void kfree(void *start)
 {
     struct list_head *pos;
     struct mm_area *m;
+
+    spinlock_lock(&mm_list_lock);
     list_for_each(pos, &mm_list)
     {
         m = container_of(pos, struct mm_area, list);
         if (m->start == (uint32_t)start)
         {
             list_del(&m->list);
+            spinlock_lock(&mm_free_list_lock);
             list_add(&m->list, &mm_free_list);
+            spinlock_unlock(&mm_free_list_lock);
             break;
         }
     }
+    spinlock_unlock(&mm_list_lock);
 }

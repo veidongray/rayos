@@ -5,7 +5,7 @@
 
 typedef volatile int32_t spinlock_t;
 
-#define SPINLOCK_INIT(name) spinlock_t name
+#define SPINLOCK_INIT(name) spinlock_t name = 0
 
 void spinlock_init(spinlock_t *lock);
 void spinlock_lock(spinlock_t *lock);

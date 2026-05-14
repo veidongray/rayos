@@ -9,23 +9,25 @@
 #include "libc/stdlib.h"
 #include "mm.h"
 #include "aligned.h"
+#include "spinlock.h"
+#include "list.h"
 
 INIT_TASK_CURRENT(current);
 LIST_HEAD(task_list);
+SPINLOCK_INIT(task_list_lock);
 
 void task_init(void)
 {
     // setup task_struct esp offset
     // task_esp from switch_task.S
     task_esp = offsetof(struct task_struct, esp);
+    spinlock_init(&task_list_lock);
 }
 
 static void task_exit(void)
 {
-    disable_irq();
     current->task_status = TASK_DEAD;
     scheduler();
-    enable_irq();
 }
 
 struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *name)
@@ -35,7 +37,6 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
     uint32_t *user_pagedir, *user_table;
     struct task_struct *task;
 
-    disable_irq();
     // copy kernel page dir
     user_pagedir = (uint32_t *)kmalloc_aligned(1024 * sizeof(uint32_t));
     memset(user_pagedir, 0, 1024 * sizeof(uint32_t));
@@ -101,8 +102,9 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
     task->task_level = TASK_USER;
     task->page_dir = (uint32_t)get_physaddr(user_pagedir);
     strcpy(task->name, name);
+    spinlock_lock(&task_list_lock);
     list_add(&task->list, &task_list);
-    enable_irq();
+    spinlock_unlock(&task_list_lock);
     return task;
 }
 
@@ -111,8 +113,7 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     uint32_t *stack;
     uint32_t *stack_top;
     struct task_struct *ktask;
-
-    disable_irq();
+    
     // make task stack
     stack = (uint32_t *)kmalloc_aligned(TASK_STACK_LEN);
     memset(stack, 0x0, TASK_STACK_LEN);
@@ -140,7 +141,10 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     ktask->task_level = TASK_KERN;
     strcpy(ktask->name, name);
     get_cr3(&ktask->page_dir);
+    
+    spinlock_lock(&task_list_lock);
     list_add(&ktask->list, &task_list);
+    spinlock_unlock(&task_list_lock);
 
     if (current == NULL)
     {
@@ -149,7 +153,6 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
         current->task_status = TASK_RUNNING;
         switch_to(current);
     }
-    enable_irq();
     return ktask;
 }
 
@@ -157,17 +160,19 @@ size_t total_tasks(void)
 {
     uint32_t count = 0;
     struct list_head *pos;
+    spinlock_lock(&task_list_lock);
     list_for_each(pos, &task_list)
     {
         count++;
     }
+    spinlock_unlock(&task_list_lock);
     return count;
 }
 
 void scheduler(void)
 {
     struct task_struct *cur, *next;
-    disable_irq();
+    
     if (current != NULL)
     {
         switch (current->task_status)
@@ -211,5 +216,4 @@ void scheduler(void)
             break;
         }
     }
-    enable_irq();
 }

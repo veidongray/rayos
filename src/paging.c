@@ -7,6 +7,7 @@
 #include "panic.h"
 #include "idt.h"
 #include "aligned.h"
+#include "spinlock.h"
 #include <stddef.h>
 
 #define EARLY_PAGES ((16 * 1024 * 1024) / 4096)
@@ -21,6 +22,8 @@ static struct page *global_page_list = NULL;
 uint32_t kheap_begin;
 LIST_HEAD(free_page_list);
 LIST_HEAD(used_page_list);
+SPINLOCK_INIT(free_page_list_lock);
+SPINLOCK_INIT(used_page_list_lock);
 
 void early_page_init(void)
 {
@@ -39,6 +42,8 @@ void early_page_init(void)
     {
         cr3ptr[768 + i] = ((uint32_t)(early_tables + (i * 1024)) - (uint32_t)_virt_offset) | 0x3UL;
     }
+    spinlock_init(&free_page_list_lock);
+    spinlock_init(&used_page_list_lock);
 }
 
 int page_init(void)
@@ -96,10 +101,15 @@ struct page *alloc_page(void)
 {
     struct page *fp;
 
+    spinlock_lock(&free_page_list_lock);
     if (list_empty(&free_page_list))
+    {
+        spinlock_unlock(&free_page_list_lock);
         return NULL;
-
+    }
     fp = container_of(free_page_list.next, struct page, list);
+    spinlock_unlock(&free_page_list_lock);
+    
     list_del(&fp->list);
     list_add_tail(&fp->list, &used_page_list);
     return fp;
