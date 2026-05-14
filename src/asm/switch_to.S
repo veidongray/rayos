@@ -3,61 +3,61 @@
 .global switch_to
 .type switch_to, @function
 switch_to:
-    movl task_esp, %eax # task_struct->esp offset
-    movl 4(%esp), %edi  # task_struct pointer
-    movl (%eax, %edi), %esp
+    mov task_esp, %eax # task_struct->esp offset
+    mov 4(%esp), %edi  # task_struct pointer
+    mov (%eax, %edi), %esp
     pop %gs
     pop %fs
     pop %es
     pop %ds
-    popl %edi
-    popl %esi
-    popl %ebp
-    popl %ebx
-    popl %edx
-    popl %ecx
-    popl %eax
+    pop %edi
+    pop %esi
+    pop %ebp
+    pop %ebx
+    pop %edx
+    pop %ecx
+    pop %eax
     sti
-    retl
+    ret
 
 .global context_switch
 .type context_switch, @function
 context_switch:
-    pushl %eax
-    pushl %ecx
-    pushl %edx
-    pushl %ebx
-    pushl %ebp
-    pushl %esi
-    pushl %edi
+    push %eax
+    push %ecx
+    push %edx
+    push %ebx
+    push %ebp
+    push %esi
+    push %edi
     push %ds
     push %es
     push %fs
     push %gs
-    movl task_esp, %eax # task_struct->esp offset
-    movl 48(%esp), %esi   # current_task
-    movl %esp, (%eax, %esi)   # current_task->esp = esp
+    mov task_esp, %eax # task_struct->esp offset
+    mov 48(%esp), %esi   # current_task
+    mov %esp, (%eax, %esi)   # current_task->esp = esp
 resume:
-    movl 52(%esp), %esi  # next_task
-    movl (%eax, %esi), %esp   # next_task->esp = esp
+    mov 52(%esp), %esi  # next_task
+    mov (%eax, %esi), %esp   # next_task->esp = esp
     pop %gs
     pop %fs
     pop %es
     pop %ds
-    popl %edi
-    popl %esi
-    popl %ebp
-    popl %ebx
-    popl %edx
-    popl %ecx
-    popl %eax
+    pop %edi
+    pop %esi
+    pop %ebp
+    pop %ebx
+    pop %edx
+    pop %ecx
+    pop %eax
     sti
-    retl
+    ret
 
 .global	switch_to_user
 .type switch_to_user, @function
 switch_to_user:
-    iretl
+    iret
 
 .section .data
 .global	task_esp

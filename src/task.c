@@ -9,23 +9,25 @@
 #include "libc/stdlib.h"
 #include "mm.h"
 #include "aligned.h"
+#include "spinlock.h"
+#include "list.h"
 
 INIT_TASK_CURRENT(current);
 LIST_HEAD(task_list);
+SPINLOCK_INIT(task_list_lock);
 
 void task_init(void)
 {
     // setup task_struct esp offset
     // task_esp from switch_task.S
     task_esp = offsetof(struct task_struct, esp);
+    spinlock_init(&task_list_lock);
 }
 
 static void task_exit(void)
 {
-    disable_irq();
     current->task_status = TASK_DEAD;
     scheduler();
-    enable_irq();
 }
 
 struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *name)
@@ -51,19 +53,16 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
 
     // user task start at 0x40000000
     user_pagedir[256] = ((uint32_t)get_physaddr((uint32_t *)user_table) & (~0xfffUL)) | 0x7UL;
+    user_pagedir[1023] = (uint32_t)get_physaddr(user_pagedir) | 0x7UL;
 
     // copy task
     // task code/data place in first 3MB
-    task_code = (uint32_t *)0x40000000;
-    for (i = 0; i < 1024; i++)
+    task_code = (uint32_t *)TASK_CODE_BEGIN;
+    if (map_page_range((uint32_t *)user_table[0], (uint32_t *)task_code, 0x7, 1024) < 0)
     {
-        // map 4MB space
-        if (map_page((uint32_t *)user_table[i], (uint32_t *)((uint32_t)task_code + (i * 0x1000)), 0x7) < 0)
-        {
-            PANIC("ERROR map\n");
-        }
+        PANIC("MAP RANGE error\n");
     }
-    memcpy(task_code, (uint8_t *)task_func, 16 * 1024);
+    memcpy(task_code, (uint8_t *)task_func, 3 * 1024 * 1024);
 
     // make user stack
     // task stack space place in last 1MB
@@ -77,17 +76,23 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
     *(--stack_top) = UCODE_SELECTOR;
     *(--stack_top) = (uint32_t)task_code;
     *(--stack_top) = (uint32_t)switch_to_user;
-    *(--stack_top) = 0x0; // eax
-    *(--stack_top) = 0x0; // ecx
-    *(--stack_top) = 0x0; // edx
-    *(--stack_top) = 0x0; // ebx
-    *(--stack_top) = 0x0; // ebp
-    *(--stack_top) = 0x0; // esi
-    *(--stack_top) = 0x0; // edi
+    *(--stack_top) = 0x0;            // eax
+    *(--stack_top) = 0x0;            // ecx
+    *(--stack_top) = 0x0;            // edx
+    *(--stack_top) = 0x0;            // ebx
+    *(--stack_top) = 0x0;            // ebp
+    *(--stack_top) = 0x0;            // esi
+    *(--stack_top) = 0x0;            // edi
     *(--stack_top) = UDATA_SELECTOR; // ds
     *(--stack_top) = UDATA_SELECTOR; // es
     *(--stack_top) = UDATA_SELECTOR; // fs
     *(--stack_top) = UDATA_SELECTOR; // gs
+
+    // unmap task space
+    if (unmap_page_range(task_code, 1024) < 0)
+    {
+        PANIC("UNMAP RANGE error\n");
+    }
 
     task = (struct task_struct *)kmalloc_aligned(sizeof(struct task_struct));
     task->esp = (uint32_t)stack_top;
@@ -97,7 +102,9 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
     task->task_level = TASK_USER;
     task->page_dir = (uint32_t)get_physaddr(user_pagedir);
     strcpy(task->name, name);
+    spinlock_lock(&task_list_lock);
     list_add(&task->list, &task_list);
+    spinlock_unlock(&task_list_lock);
     return task;
 }
 
@@ -106,7 +113,7 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     uint32_t *stack;
     uint32_t *stack_top;
     struct task_struct *ktask;
-
+    
     // make task stack
     stack = (uint32_t *)kmalloc_aligned(TASK_STACK_LEN);
     memset(stack, 0x0, TASK_STACK_LEN);
@@ -114,13 +121,13 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     *(--stack_top) = (uint32_t)arg;
     *(--stack_top) = (uint32_t)task_exit; // setup return address to thread_exit
     *(--stack_top) = (uint32_t)task_func;
-    *(--stack_top) = 0x0; // eax
-    *(--stack_top) = 0x0; // ecx
-    *(--stack_top) = 0x0; // edx
-    *(--stack_top) = 0x0; // ebx
-    *(--stack_top) = 0x0; // ebp
-    *(--stack_top) = 0x0; // esi
-    *(--stack_top) = 0x0; // edi
+    *(--stack_top) = 0x0;            // eax
+    *(--stack_top) = 0x0;            // ecx
+    *(--stack_top) = 0x0;            // edx
+    *(--stack_top) = 0x0;            // ebx
+    *(--stack_top) = 0x0;            // ebp
+    *(--stack_top) = 0x0;            // esi
+    *(--stack_top) = 0x0;            // edi
     *(--stack_top) = KDATA_SELECTOR; // ds
     *(--stack_top) = KDATA_SELECTOR; // es
     *(--stack_top) = KDATA_SELECTOR; // fs
@@ -134,7 +141,10 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     ktask->task_level = TASK_KERN;
     strcpy(ktask->name, name);
     get_cr3(&ktask->page_dir);
+    
+    spinlock_lock(&task_list_lock);
     list_add(&ktask->list, &task_list);
+    spinlock_unlock(&task_list_lock);
 
     if (current == NULL)
     {
@@ -150,17 +160,19 @@ size_t total_tasks(void)
 {
     uint32_t count = 0;
     struct list_head *pos;
+    spinlock_lock(&task_list_lock);
     list_for_each(pos, &task_list)
     {
         count++;
     }
+    spinlock_unlock(&task_list_lock);
     return count;
 }
 
 void scheduler(void)
 {
     struct task_struct *cur, *next;
-    disable_irq();
+    
     if (current != NULL)
     {
         switch (current->task_status)
@@ -204,5 +216,4 @@ void scheduler(void)
             break;
         }
     }
-    enable_irq();
 }

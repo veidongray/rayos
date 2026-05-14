@@ -7,6 +7,6 @@
 #define ALIGN_4K(x) ALIGN_UP((x), 4096)
 #define ALIGN_4B(x) ALIGN_UP((x), 4)
 
-#define ALIGN_ATTR __attribute__((aligned(4096)))
+#define ALIGN_ATTR(align) __attribute__((aligned((align))))
 
 #endif // ALIGNED_H

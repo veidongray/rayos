@@ -29,7 +29,7 @@ struct task_struct
     uint32_t tss_esp0;
     struct list_head list;
 };
-#define INIT_TASK_CURRENT(cur) ALIGN_ATTR struct task_struct *(cur)
+#define INIT_TASK_CURRENT(cur) ALIGN_ATTR(4096) struct task_struct *(cur)
 
 extern uint32_t task_esp;
 extern INIT_TASK_CURRENT(current);
