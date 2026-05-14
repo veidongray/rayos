@@ -14,7 +14,6 @@
 
 struct page
 {
-    int kref;
     uint32_t *base;
     struct list_head list;
 };

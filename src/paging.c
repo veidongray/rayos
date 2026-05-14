@@ -81,12 +81,10 @@ int page_init(void)
         if ((uint32_t)global_page_list[i].base < pages_list_end)
         {
             // 标记已经被使用的地址
-            global_page_list[i].kref = 1;
             list_add_tail(&global_page_list[i].list, &used_page_list);
         }
         else
         {
-            global_page_list[i].kref = 0;
             list_add_tail(&global_page_list[i].list, &free_page_list);
         }
     }
@@ -102,7 +100,6 @@ struct page *alloc_page(void)
         return NULL;
 
     fp = container_of(free_page_list.next, struct page, list);
-    fp->kref++;
     list_del(&fp->list);
     list_add_tail(&fp->list, &used_page_list);
     return fp;
@@ -110,7 +107,6 @@ struct page *alloc_page(void)
 
 void free_page(struct page *fp)
 {
-    fp->kref = 0;
     list_del(&fp->list);
     list_add_tail(&fp->list, &free_page_list);
 }
