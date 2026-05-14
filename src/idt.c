@@ -61,18 +61,7 @@ int idt_init(void)
     load_idt(idt, sizeof(idt));
     pic_remap(0x20, 0x28);
     timer_init();
-    enable_irq();
     return 0;
-}
-
-void enable_irq(void)
-{
-    asm volatile("sti");
-}
-
-void disable_irq(void)
-{
-    asm volatile("cli");
 }
 
 int is_interrupts_enabled(void)

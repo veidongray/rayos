@@ -35,6 +35,7 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
     uint32_t *user_pagedir, *user_table;
     struct task_struct *task;
 
+    disable_irq();
     // copy kernel page dir
     user_pagedir = (uint32_t *)kmalloc_aligned(1024 * sizeof(uint32_t));
     memset(user_pagedir, 0, 1024 * sizeof(uint32_t));
@@ -101,6 +102,7 @@ struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *nam
     task->page_dir = (uint32_t)get_physaddr(user_pagedir);
     strcpy(task->name, name);
     list_add(&task->list, &task_list);
+    enable_irq();
     return task;
 }
 
@@ -110,6 +112,7 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     uint32_t *stack_top;
     struct task_struct *ktask;
 
+    disable_irq();
     // make task stack
     stack = (uint32_t *)kmalloc_aligned(TASK_STACK_LEN);
     memset(stack, 0x0, TASK_STACK_LEN);
@@ -146,6 +149,7 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
         current->task_status = TASK_RUNNING;
         switch_to(current);
     }
+    enable_irq();
     return ktask;
 }
 
