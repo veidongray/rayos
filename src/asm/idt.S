@@ -8,14 +8,18 @@ default_isr:
 
 .global isr_pic_timer
 isr_pic_timer:
+    pushf
     pusha
     call timer_interrupt_handler
     popa
+    popf
     iret
 
 .global	isr_page_fault
 isr_page_fault:
+    pusha
     call page_fault_handler
+    popa
     iret
 
 .global isr_double_fault
@@ -34,7 +38,23 @@ isr_gp_fault:
 
 .global isr_syscall
 isr_syscall:
+    push %esp
+    push %ecx
+    push %edx
+    push %ebx
+    push %ebp
+    push %esi
+    push %edi
+
     push %eax
     call syscall_handler
     add $0x4, %esp
+    
+    pop %edi
+    pop %esi
+    pop %ebp
+    pop %ebx
+    pop %edx
+    pop %ecx
+    pop %esp
     iret

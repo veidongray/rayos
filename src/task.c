@@ -113,7 +113,7 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     uint32_t *stack;
     uint32_t *stack_top;
     struct task_struct *ktask;
-    
+
     // make task stack
     stack = (uint32_t *)kmalloc_aligned(TASK_STACK_LEN);
     memset(stack, 0x0, TASK_STACK_LEN);
@@ -141,7 +141,7 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     ktask->task_level = TASK_KERN;
     strcpy(ktask->name, name);
     get_cr3(&ktask->page_dir);
-    
+
     spinlock_lock(&task_list_lock);
     list_add(&ktask->list, &task_list);
     spinlock_unlock(&task_list_lock);
@@ -172,7 +172,8 @@ size_t total_tasks(void)
 void scheduler(void)
 {
     struct task_struct *cur, *next;
-    
+
+    disable_irq();
     if (current != NULL)
     {
         switch (current->task_status)
@@ -186,6 +187,19 @@ void scheduler(void)
             current = next;
             // update task status
             cur->task_status = TASK_READY;
+            next->task_status = TASK_RUNNING;
+
+            update_tss_esp0(next->tss_esp0);
+            load_page_directory((uint32_t *)next->page_dir);
+            context_switch(cur, next);
+            break;
+
+        case TASK_BLOCKED:
+            next = container_of(task_list.next, struct task_struct, list);
+
+            cur = current;
+            current = next;
+            // update task status
             next->task_status = TASK_RUNNING;
 
             update_tss_esp0(next->tss_esp0);
@@ -213,6 +227,7 @@ void scheduler(void)
 
         default:
             // Do nothing
+            enable_irq();
             break;
         }
     }

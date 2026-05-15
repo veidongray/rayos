@@ -28,43 +28,52 @@ _end_mboot:
 .type _start, @function
 _start:
     # save multiboot info address and magic number for later use
-    addl $(VIRT_OFFSET), %ebx
-    movl %ebx, (_mboot_info - VIRT_OFFSET)
-    movl %eax, (_mboot_magic - VIRT_OFFSET)
+    add $(VIRT_OFFSET), %ebx
+    mov %ebx, (_mboot_info - VIRT_OFFSET)
+    mov %eax, (_mboot_magic - VIRT_OFFSET)
+
+    # initial registers
+    xor %eax, %eax
+    mov %eax, %ebx
+    mov %eax, %ecx
+    mov %eax, %edx
+    mov %eax, %esi
+    mov %eax, %edi
     
     # setup early page
-    movl $(_boot_page_directory - VIRT_OFFSET), %eax
-    movl $(_boot_page_table - VIRT_OFFSET), %ebx
-    movl %ebx, (%eax)
+    # map kernel to 0xc0000000+
+    mov $(_boot_page_directory - VIRT_OFFSET), %eax
+    mov $(_boot_page_table - VIRT_OFFSET), %ebx
+    mov %ebx, (%eax)
     orl $0x3, (%eax)
-    movl %ebx, 0xc00(%eax)
+    mov %ebx, 0xc00(%eax)
     orl $0x3, 0xc00(%eax)
-    movl %eax, 0xffc(%eax)
+    mov %eax, 0xffc(%eax)
     orl $0x3, 0xffc(%eax)
 
-    movl $1024, %ecx
-    xorl %eax, %eax
+    mov $1024, %ecx
+    xor %eax, %eax
     orl $0x3, %eax
-    movl $(_boot_page_table - VIRT_OFFSET), %edi
+    mov $(_boot_page_table - VIRT_OFFSET), %edi
 _fill_page_table:
-    movl %eax, (%edi)
-    addl $0x1000, %eax
-    addl $0x4, %edi
+    mov %eax, (%edi)
+    add $0x1000, %eax
+    add $0x4, %edi
     loop _fill_page_table
 
     # load page diretory
-    movl $(_boot_page_directory - VIRT_OFFSET), %eax
-    movl %eax, %cr3
+    mov $(_boot_page_directory - VIRT_OFFSET), %eax
+    mov %eax, %cr3
 
     # enable page
-    movl %cr0, %eax
-    orl $0x80000000, %eax
-    movl %eax, %cr0
+    mov %cr0, %eax
+    or $0x80000000, %eax
+    mov %eax, %cr0
 
     ljmp $0x10, $startup_32
 startup_32:
     # Set up the stack
-    movl $_kstack_top, %esp
+    mov $_kstack_top, %esp
     jmp start_kernel
     hlt
     jmp startup_32

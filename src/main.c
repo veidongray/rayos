@@ -14,10 +14,14 @@
 #include "printk.h"
 #include "syscall.h"
 #include "libc/stdio.h"
+#include "semaphore.h"
+
+static struct semaphore sem;
 
 void kernel_init000(void *arg)
 {
     arg = arg;
+    semaphore_p(&sem);
     while (1)
     {
         printk("%s\n", current->name);
@@ -29,6 +33,7 @@ void kernel_init111(void *arg)
     arg = arg;
     while (1)
     {
+        semaphore_v(&sem);
         printk("%s\n", current->name);
     }
 }
@@ -71,6 +76,7 @@ void kernel_init(void *arg)
 {
     arg = arg;
 
+    semaphore_init(&sem, 0);
     ktask_create(kernel_init000, 0, "KERNEL_TASK 0");
     ktask_create(kernel_init111, 0, "KERNEL_TASK 1");
     utask_create(user_func000, "USER_TASK 0\n", "user_func000");

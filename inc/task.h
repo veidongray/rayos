@@ -8,7 +8,7 @@
 // task status
 #define TASK_RUNNING 0x0
 #define TASK_READY 0x1
-#define TASK_WAITING 0x2
+#define TASK_BLOCKED 0x2
 #define TASK_DEAD 0x3
 
 // task level
