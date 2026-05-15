@@ -6,6 +6,7 @@
 #include "gdt.h"
 #include "panic.h"
 #include <stddef.h>
+#include "apic.h"
 
 static struct idt_entry idt[256] __attribute__((aligned(4096)));
 void set_idt_entry(uint8_t vector, void *isr, uint8_t flags)
@@ -74,6 +75,7 @@ int is_interrupts_enabled(void)
 void timer_interrupt_handler(void)
 {
     pic_sendEOI(0); // Send End of Interrupt (EOI) signal to PIC
+    lapic_write(LAPIC_EOI, 0);
     scheduler();
 }
 

@@ -18,7 +18,9 @@ isr_pic_timer:
 .global	isr_page_fault
 isr_page_fault:
     pusha
+    pushl 32(%esp)
     call page_fault_handler
+    add $4, %esp
     popa
     iret
 

@@ -138,7 +138,7 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     ktask->stack = stack;
     ktask->tss_esp0 = 0;
     ktask->task_status = TASK_READY;
-    ktask->task_level = TASK_KERN;
+    ktask->task_level = TASK_KERNEL;
     strcpy(ktask->name, name);
     get_cr3(&ktask->page_dir);
 

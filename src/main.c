@@ -15,6 +15,7 @@
 #include "syscall.h"
 #include "libc/stdio.h"
 #include "semaphore.h"
+#include "apic.h"
 
 static struct semaphore sem;
 
@@ -101,6 +102,7 @@ void start_kernel(void)
     page_init();
     mm_init();
     task_init();
+    apic_init();
 
     // Never return
     ktask_create(kernel_init, 0, "kernel_init");

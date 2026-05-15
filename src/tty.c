@@ -4,8 +4,10 @@
 #include "libc/string.h"
 #include "aligned.h"
 
-ALIGN_ATTR(4096) static uint8_t *cgaptr = (uint8_t *)0xC00B8000;
-ALIGN_ATTR(4096) static uint8_t cga_buffer[4000];
+ALIGN_ATTR(4096)
+static uint8_t *cgaptr = (uint8_t *)0xC00B8000;
+ALIGN_ATTR(4096)
+static uint8_t cga_buffer[4000];
 static uint8_t **get_cgaptr(void)
 {
     return &cgaptr;
@@ -240,5 +242,9 @@ int cga_printf(const char *format, ...)
 int tty_init(void)
 {
     // Do nothing...
+    for (int i = 0; i < 4000; i++)
+    {
+        cga_printf(" ");
+    }
     return 0;
 }

@@ -1,4 +1,4 @@
-OBJS =  list.o panic.o atomic.o spinlock.o semaphore.o
+OBJS =  list.o panic.o atomic.o spinlock.o semaphore.o cpuid.o
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
