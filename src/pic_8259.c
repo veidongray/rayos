@@ -27,7 +27,7 @@
 
 #define CASCADE_IRQ 2
 
-void timer_init(void)
+void pic_timer_init(void)
 {
     // configure channel 0 to mode 2
     outb(PIT_COMMAND_PORT, PIT_CMD_CH0_MODE2);

@@ -41,8 +41,7 @@ void pic_disable(void);
 void pic_set_mask(uint8_t IRQline);
 void pic_clear_mask(uint8_t IRQline);
 void pic_sendEOI(uint8_t irq);
-void timer_init(void);
-// 让 PIT 等待大约 10 毫秒
+void pic_timer_init(void);
 void pit_prepare_sleep_10ms(void);
 void pit_wait_10ms(void);
 
