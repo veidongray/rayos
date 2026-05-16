@@ -6,8 +6,12 @@
 #include "gdt.h"
 #include "panic.h"
 #include <stddef.h>
+#include "apic.h"
+#include "aligned.h"
 
-static struct idt_entry idt[256] __attribute__((aligned(4096)));
+ALIGN_ATTR(4096)
+static struct idt_entry idt[256];
+
 void set_idt_entry(uint8_t vector, void *isr, uint8_t flags)
 {
     struct idt_entry *descriptor = &idt[vector];
@@ -39,6 +43,7 @@ int idt_init(void)
 {
     uint32_t i;
 
+    // 先将所有的中断号都配置成默认处理函数
     for (i = 0; i < 256; ++i)
         set_idt_entry(i, default_isr, 0);
 
@@ -59,8 +64,10 @@ int idt_init(void)
     set_idt_entry(128, isr_syscall, 0xEE);
 
     load_idt(idt, sizeof(idt));
+    
+    // PIC 初始化
     pic_remap(0x20, 0x28);
-    timer_init();
+    pic_timer_init();
     return 0;
 }
 
@@ -73,7 +80,10 @@ int is_interrupts_enabled(void)
 
 void timer_interrupt_handler(void)
 {
-    pic_sendEOI(0); // Send End of Interrupt (EOI) signal to PIC
+    // 先发送相关的EOI
+    // 如果滞后可能会导致中断永远关断
+    pic_sendEOI(0);
+    lapic_write(LAPIC_EOI, 0);
     scheduler();
 }
 

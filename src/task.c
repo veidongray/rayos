@@ -113,7 +113,7 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     uint32_t *stack;
     uint32_t *stack_top;
     struct task_struct *ktask;
-    
+
     // make task stack
     stack = (uint32_t *)kmalloc_aligned(TASK_STACK_LEN);
     memset(stack, 0x0, TASK_STACK_LEN);
@@ -134,18 +134,50 @@ struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *nam
     *(--stack_top) = KDATA_SELECTOR; // gs
 
     ktask = (struct task_struct *)kmalloc_aligned(sizeof(struct task_struct));
+
+    /*
+     * esp 成员变量用于保存当前任务的栈顶
+     * 在任务切换换出的时候会将切换时的栈保存到 esp 成员变量
+     * 在任务切换换入的时候会将 esp 成员变量的值写入%esp寄存器
+    */
     ktask->esp = (uint32_t)stack_top;
+
+    /*
+     * stack 成员变量只是为了保存使用kmalloc创建的stack的地址
+     * 用于后续任务退出时进行free释放
+    */
     ktask->stack = stack;
+
+    /*
+     * 内核态任务中断的时候并不涉及权限转换
+     * 所以并不需要从 tss 读取 esp0
+     * 这里设置成 0 就好
+    */
     ktask->tss_esp0 = 0;
     ktask->task_status = TASK_READY;
-    ktask->task_level = TASK_KERN;
+    ktask->task_level = TASK_KERNEL;
     strcpy(ktask->name, name);
+
+    /* 由于是内核任务
+     * 并且运行ktask_create()的时候可以确定运行在内核态
+     * 那么只需要获取当前的页目录表就行
+     * 所有的内核态任务都使用同一个页目录表
+    */
     get_cr3(&ktask->page_dir);
-    
+
+    // 将任务添加到任务队列中
     spinlock_lock(&task_list_lock);
     list_add(&ktask->list, &task_list);
     spinlock_unlock(&task_list_lock);
 
+    /*
+     * 如果是系统中第一个任务
+     * 那么直接让 current 等于刚刚创建的 task
+     * 然后执行 switch_to 直接切换到刚刚创建的 task 中
+     * 不需要通过 context_switch
+     * 如果直接通过 context_switch 的话会导致 esp 无法切换成功
+     * 程序就会永远停在初始化代码上而不能进入第一个 task
+    */
     if (current == NULL)
     {
         // means first ktask
@@ -172,7 +204,8 @@ size_t total_tasks(void)
 void scheduler(void)
 {
     struct task_struct *cur, *next;
-    
+
+    disable_irq();
     if (current != NULL)
     {
         switch (current->task_status)
@@ -186,6 +219,19 @@ void scheduler(void)
             current = next;
             // update task status
             cur->task_status = TASK_READY;
+            next->task_status = TASK_RUNNING;
+
+            update_tss_esp0(next->tss_esp0);
+            load_page_directory((uint32_t *)next->page_dir);
+            context_switch(cur, next);
+            break;
+
+        case TASK_BLOCKED:
+            next = container_of(task_list.next, struct task_struct, list);
+
+            cur = current;
+            current = next;
+            // update task status
             next->task_status = TASK_RUNNING;
 
             update_tss_esp0(next->tss_esp0);
@@ -213,6 +259,7 @@ void scheduler(void)
 
         default:
             // Do nothing
+            enable_irq();
             break;
         }
     }

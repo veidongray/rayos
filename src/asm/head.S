@@ -28,43 +28,59 @@ _end_mboot:
 .type _start, @function
 _start:
     # save multiboot info address and magic number for later use
-    addl $(VIRT_OFFSET), %ebx
-    movl %ebx, (_mboot_info - VIRT_OFFSET)
-    movl %eax, (_mboot_magic - VIRT_OFFSET)
+    # 因为 GRUB 将 info 和 magic 的地址分别放到 ebx 和 eax 中
+    # 这里先将两个寄存器的内容存到_mboot_info和_mboot_magic中
+    add $(VIRT_OFFSET), %ebx
+    mov %ebx, (_mboot_info - VIRT_OFFSET)
+    mov %eax, (_mboot_magic - VIRT_OFFSET)
+
+    # initial registers
+    xor %eax, %eax
+    mov %eax, %ebx
+    mov %eax, %ecx
+    mov %eax, %edx
+    mov %eax, %esi
+    mov %eax, %edi
     
     # setup early page
-    movl $(_boot_page_directory - VIRT_OFFSET), %eax
-    movl $(_boot_page_table - VIRT_OFFSET), %ebx
-    movl %ebx, (%eax)
+    # map kernel to 0xc0000000+
+    # 因为连接时已经连接到0xc0000000以上的地址
+    # 为了防止后面的符号访问出错
+    # 所以要先初始化一部分分页
+    # 保证在系统初始化的时候能够正常访问0xc0000000以上的地址
+    mov $(_boot_page_directory - VIRT_OFFSET), %eax
+    mov $(_boot_page_table - VIRT_OFFSET), %ebx
+    mov %ebx, (%eax)
     orl $0x3, (%eax)
-    movl %ebx, 0xc00(%eax)
+    mov %ebx, 0xc00(%eax)
     orl $0x3, 0xc00(%eax)
-    movl %eax, 0xffc(%eax)
+    mov %eax, 0xffc(%eax)
     orl $0x3, 0xffc(%eax)
 
-    movl $1024, %ecx
-    xorl %eax, %eax
+    mov $1024, %ecx
+    xor %eax, %eax
     orl $0x3, %eax
-    movl $(_boot_page_table - VIRT_OFFSET), %edi
+    mov $(_boot_page_table - VIRT_OFFSET), %edi
 _fill_page_table:
-    movl %eax, (%edi)
-    addl $0x1000, %eax
-    addl $0x4, %edi
+    mov %eax, (%edi)
+    add $0x1000, %eax
+    add $0x4, %edi
     loop _fill_page_table
 
     # load page diretory
-    movl $(_boot_page_directory - VIRT_OFFSET), %eax
-    movl %eax, %cr3
+    mov $(_boot_page_directory - VIRT_OFFSET), %eax
+    mov %eax, %cr3
 
     # enable page
-    movl %cr0, %eax
-    orl $0x80000000, %eax
-    movl %eax, %cr0
+    mov %cr0, %eax
+    or $0x80000000, %eax
+    mov %eax, %cr0
 
+    # 这一步的跳转主要是为了刷新 CPU 指令缓存
     ljmp $0x10, $startup_32
 startup_32:
     # Set up the stack
-    movl $_kstack_top, %esp
+    mov $_kstack_top, %esp
     jmp start_kernel
     hlt
     jmp startup_32
@@ -72,28 +88,29 @@ startup_32:
 .align 4096
 .section .data
 
-### early page setup begin ###
+# 这两个地址空间用来保存boot时的页配置
+# 因为 boot 后需要马上映射一部分地址到0xc0000000
 .global	_boot_page_directory
 _boot_page_directory:
     .space 4096
-    
 .global	_boot_page_table
 _boot_page_table:
     .space 4096
-### early page setup end ###
 
-### grub params begin ###
+# 用来存储 multiboot 信息的空间
 .global _mboot_info
 _mboot_info:
     .long 0
 .global _mboot_magic
 _mboot_magic:
     .long 0
-### grub params end ###
 
-### kernel stack begin ###
+# 这个栈空间只会在第一个任务启动前使用
+# 也就是系统初始化的时候会使用
+# 第一个任务启动之后后面的任务都会使用自己的栈空间
+# 所以不需要太大
 .global _kstack
 _kstack:
-    .space 1024 * 1024  # 1MB stack
+    .space 128 * 1024  # 128KB stack
 _kstack_top:
 ### kernel stack end ###

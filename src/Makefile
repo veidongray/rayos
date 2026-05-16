@@ -1,5 +1,5 @@
 OBJS =  main.o          \
-        tty.o         \
+        tty.o           \
         multiboot2.o    \
         gdt.o           \
         idt.o           \
@@ -8,7 +8,8 @@ OBJS =  main.o          \
         paging.o        \
         task.o          \
         mm.o            \
-        syscall.o
+        syscall.o       \
+        apic.o
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@

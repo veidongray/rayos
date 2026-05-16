@@ -5,15 +5,23 @@
 #include "list.h"
 #include "aligned.h"
 
-// task status
-#define TASK_RUNNING 0x0
-#define TASK_READY 0x1
-#define TASK_WAITING 0x2
-#define TASK_DEAD 0x3
+typedef enum
+{
+    TASK_RUNNING = 0,
+    TASK_READY,
+    TASK_BLOCKED,
+    TASK_INTERRUPTIBLE,
+    TASK_UNINTERRUPTIBLE,
+    TASK_STOPPED,
+    TASK_ZOMBIE,
+    TASK_DEAD
+} task_state_t;
 
-// task level
-#define TASK_KERN 0x0
-#define TASK_USER 0x1
+typedef enum
+{
+    TASK_KERNEL = 0,
+    TASK_USER = 1
+} task_level_t;
 
 #define TASK_STACK_LEN (128 * 1024)
 #define TASK_CODE_BEGIN 0x40000000
@@ -23,10 +31,10 @@ struct task_struct
     char name[32];
     uint32_t esp;
     uint32_t *stack;
-    uint32_t task_status;
     uint32_t page_dir;
-    uint32_t task_level;
     uint32_t tss_esp0;
+    task_level_t task_level;
+    task_state_t task_status;
     struct list_head list;
 };
 #define INIT_TASK_CURRENT(cur) ALIGN_ATTR(4096) struct task_struct *(cur)
