@@ -19,6 +19,6 @@ struct multiboot2_mmap_entry {
 } __attribute__((packed));
 
 void parse_multiboot2_mmap(void* mbi_addr);
-uint32_t get_total_mem(void);
 void total_memory_init(void);
+uint64_t get_total_mem(void);
 #endif // MULTIBOOT2_H

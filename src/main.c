@@ -88,23 +88,39 @@ void kernel_init(void *arg)
     }
 }
 
+ALIGN_ATTR(4096) uint64_t pml4[512];
+ALIGN_ATTR(4096) uint64_t pdpt[512];
+ALIGN_ATTR(4096) uint64_t pd[512];
+ALIGN_ATTR(4096) uint64_t pt[512];
+
 void start_kernel(void)
 {
+    uint64_t i;
+
+    for (i = 0; i < 512; i++)
+    {
+        pml4[i] = 0;
+        pdpt[i] = 0;
+        pd[i] = 0;
+        pt[i] = 0;
+    }
+
+    while (1);
     // step 1.
-    early_page_init();
-    total_memory_init();
-    early_mm_init();
+    // early_page_init();
+    // total_memory_init();
+    // early_mm_init();
 
     // step 2.
-    gdt_init();
-    idt_init();
-    tty_init();
-    page_init();
-    mm_init();
-    task_init();
-    apic_init();
+    // gdt_init();
+    // idt_init();
+    // tty_init();
+    // page_init();
+    // mm_init();
+    // task_init();
+    // apic_init();
 
     // Never return
-    ktask_create(kernel_init, 0, "kernel_init");
-    PANIC("PANIC");
+    // ktask_create(kernel_init, 0, "kernel_init");
+    // PANIC("PANIC");
 }

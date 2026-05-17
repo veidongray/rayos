@@ -4,13 +4,13 @@
 #include "list.h"
 #include <stdint.h>
 
-#define flush_tlb()                \
-    do                             \
-    {                              \
-        asm volatile(              \
-            "mov %cr3, %eax\r\n"   \
-            "mov %eax, %cr3\r\n"); \
-    } while (0)
+#define flush_tlb()
+// do                             \
+// {                              \
+//     asm volatile(              \
+//         "mov %cr3, %eax\r\n"   \
+//         "mov %eax, %cr3\r\n"); \
+// } while (0)
 
 struct page
 {

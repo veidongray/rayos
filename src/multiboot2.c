@@ -2,7 +2,7 @@
 #include "tty.h"
 #include "panic.h"
 
-static uint32_t total_mem = 0;
+static uint64_t total_mem = 0;
 
 extern uint32_t _mboot_info[];
 extern uint32_t _mboot_magic[];
@@ -41,7 +41,7 @@ void parse_multiboot2_mmap(void *mbi_addr)
     }
 }
 
-uint32_t get_total_mem(void)
+uint64_t get_total_mem(void)
 {
     return total_mem;
 }
@@ -50,7 +50,7 @@ void total_memory_init(void)
 {
     if (_mboot_magic[0] == 0x36d76289)
     {
-        parse_multiboot2_mmap((uint32_t *)_mboot_info[0]);
+        parse_multiboot2_mmap((uint64_t *)_mboot_info[0]);
     }
     else
     {

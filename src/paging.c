@@ -15,7 +15,7 @@
 extern uint32_t _virt_offset[];
 extern uint32_t _kernel_phys_end_aligned[];
 extern uint32_t _kernel_virt_end_aligned[];
-static uint32_t early_tables[4096] __attribute__((aligned(4096)));
+static uint64_t early_tables[4096] __attribute__((aligned(4096)));
 static uint32_t kpage_directory[1024] __attribute__((aligned(4096)));
 static uint32_t *kpage_tables = NULL;
 static struct page *global_page_list = NULL;
@@ -27,8 +27,8 @@ SPINLOCK_INIT(used_page_list_lock);
 
 void early_page_init(void)
 {
-    uint32_t i;
-    uint32_t cr3, *cr3ptr;
+    uint64_t i;
+    uint64_t cr3, *cr3ptr;
     get_cr3(&cr3);
 
     for (i = 0; i < 4096; i++)
@@ -232,11 +232,11 @@ int unmap_page_range(void *virtualaddr, size_t len)
 
 void get_cr3(uint32_t *cr3)
 {
-    asm volatile(
-        "movl %%cr3, %0"
-        : "=r"(*cr3)
-        :
-        : "memory");
+    // asm volatile(
+    //     "movl %%cr3, %0"
+    //     : "=r"(*cr3)
+    //     :
+    //     : "memory");
 }
 
 void copy_kernel_pagedir(uint32_t *pd)

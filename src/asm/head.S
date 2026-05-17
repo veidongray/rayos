@@ -142,6 +142,8 @@ gdt64_ptr:
     .word gdt64_end - gdt64 - 1
     .long gdt64 - VIRT_OFFSET     # 32位阶段用物理地址
 
+.global _mboot_info
+.global _mboot_magic
 _mboot_info: .long 0
 _mboot_magic: .long 0
 

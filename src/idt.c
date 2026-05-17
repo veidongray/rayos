@@ -89,9 +89,9 @@ void timer_interrupt_handler(void)
 
 void page_fault_handler(uint32_t error_code)
 {
-    uint32_t faulting_address;
-    asm volatile("mov %%cr2, %0" : "=r"(faulting_address)); // Get the faulting address from CR2
-    PANIC("Page Fault! Error code: 0x%x, Faulting address: 0x%x\n", error_code, faulting_address);
+    // uint32_t faulting_address;
+    // asm volatile("mov %%cr2, %0" : "=r"(faulting_address)); // Get the faulting address from CR2
+    // PANIC("Page Fault! Error code: 0x%x, Faulting address: 0x%x\n", error_code, faulting_address);
 }
 
 void double_fault_handler(void)
