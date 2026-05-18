@@ -88,10 +88,14 @@ void kernel_init(void *arg)
     }
 }
 
-ALIGN_ATTR(4096) uint64_t pml4[512];
-ALIGN_ATTR(4096) uint64_t pdpt[512];
-ALIGN_ATTR(4096) uint64_t pd[512];
-ALIGN_ATTR(4096) uint64_t pt[512];
+ALIGN_ATTR(4096)
+uint64_t pml4[512];
+ALIGN_ATTR(4096)
+uint64_t pdpt[512];
+ALIGN_ATTR(4096)
+uint64_t pd[512];
+ALIGN_ATTR(4096)
+uint64_t pt[512];
 
 void start_kernel(void)
 {
@@ -104,8 +108,9 @@ void start_kernel(void)
         pd[i] = 0;
         pt[i] = 0;
     }
-
-    while (1);
+    gdt_init();
+    while (1)
+        ;
     // step 1.
     // early_page_init();
     // total_memory_init();

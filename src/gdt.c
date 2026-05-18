@@ -1,78 +1,115 @@
+#include <stdint.h>
 #include "gdt.h"
-#include "tty.h"
-#include "libc/string.h"
+#include "aligned.h"
 
-static struct tss_entry tss;
-static struct gdt_entry descriptors[6] __attribute__((aligned(4096)));
-static struct gdtr gdtr __attribute__((aligned(4096)));
+// Each define here is for a specific flag in the descriptor.
+// Refer to the intel documentation for a description of what each one does.
+#define SEG_DESCTYPE(x) ((x) << 0x04)      // Descriptor type (0 for system, 1 for code/data)
+#define SEG_PRES(x) ((x) << 0x07)          // Present
+#define SEG_SAVL(x) ((x) << 0x0C)          // Available for system use
+#define SEG_LONG(x) ((x) << 0x0D)          // Long mode
+#define SEG_SIZE(x) ((x) << 0x0E)          // Size (0 for 16-bit, 1 for 32)
+#define SEG_GRAN(x) ((x) << 0x0F)          // Granularity (0 for 1B - 1MB, 1 for 4KB - 4GB)
+#define SEG_PRIV(x) (((x) & 0x03) << 0x05) // Set privilege level (0 - 3)
 
-int create_gdt_entry(struct gdt_entry *entry, uint32_t base,
-                     uint32_t limit, uint8_t access, uint8_t granularity)
+#define SEG_DATA_RD 0x00        // Read-Only
+#define SEG_DATA_RDA 0x01       // Read-Only, accessed
+#define SEG_DATA_RDWR 0x02      // Read/Write
+#define SEG_DATA_RDWRA 0x03     // Read/Write, accessed
+#define SEG_DATA_RDEXPD 0x04    // Read-Only, expand-down
+#define SEG_DATA_RDEXPDA 0x05   // Read-Only, expand-down, accessed
+#define SEG_DATA_RDWREXPD 0x06  // Read/Write, expand-down
+#define SEG_DATA_RDWREXPDA 0x07 // Read/Write, expand-down, accessed
+#define SEG_CODE_EX 0x08        // Execute-Only
+#define SEG_CODE_EXA 0x09       // Execute-Only, accessed
+#define SEG_CODE_EXRD 0x0A      // Execute/Read
+#define SEG_CODE_EXRDA 0x0B     // Execute/Read, accessed
+#define SEG_CODE_EXC 0x0C       // Execute-Only, conforming
+#define SEG_CODE_EXCA 0x0D      // Execute-Only, conforming, accessed
+#define SEG_CODE_EXRDC 0x0E     // Execute/Read, conforming
+#define SEG_CODE_EXRDCA 0x0F    // Execute/Read, conforming, accessed
+
+#define GDT_CODE_PL0 SEG_DESCTYPE(1) | SEG_PRES(1) | SEG_SAVL(0) | \
+                         SEG_LONG(0) | SEG_SIZE(1) | SEG_GRAN(1) | \
+                         SEG_PRIV(0) | SEG_CODE_EXRD
+
+#define GDT_DATA_PL0 SEG_DESCTYPE(1) | SEG_PRES(1) | SEG_SAVL(0) | \
+                         SEG_LONG(0) | SEG_SIZE(1) | SEG_GRAN(1) | \
+                         SEG_PRIV(0) | SEG_DATA_RDWR
+
+#define GDT_CODE_PL3 SEG_DESCTYPE(1) | SEG_PRES(1) | SEG_SAVL(0) | \
+                         SEG_LONG(0) | SEG_SIZE(1) | SEG_GRAN(1) | \
+                         SEG_PRIV(3) | SEG_CODE_EXRD
+
+#define GDT_DATA_PL3 SEG_DESCTYPE(1) | SEG_PRES(1) | SEG_SAVL(0) | \
+                         SEG_LONG(0) | SEG_SIZE(1) | SEG_GRAN(1) | \
+                         SEG_PRIV(3) | SEG_DATA_RDWR
+
+#define GDT_CODE64_PL0 SEG_DESCTYPE(1) | SEG_PRES(1) | SEG_SAVL(0) | \
+                           SEG_LONG(1) | SEG_SIZE(0) | SEG_GRAN(1) | \
+                           SEG_PRIV(0) | SEG_CODE_EXRD
+
+#define GDT_DATA64_PL0 SEG_DESCTYPE(1) | SEG_PRES(1) | SEG_SAVL(0) | \
+                           SEG_LONG(0) | SEG_SIZE(1) | SEG_GRAN(1) | \
+                           SEG_PRIV(0) | SEG_DATA_RDWR
+
+#define GDT_CODE64_PL3 SEG_DESCTYPE(1) | SEG_PRES(1) | SEG_SAVL(0) | \
+                           SEG_LONG(1) | SEG_SIZE(0) | SEG_GRAN(1) | \
+                           SEG_PRIV(3) | SEG_CODE_EXRD
+
+#define GDT_DATA64_PL3 SEG_DESCTYPE(1) | SEG_PRES(1) | SEG_SAVL(0) | \
+                           SEG_LONG(0) | SEG_SIZE(1) | SEG_GRAN(1) | \
+                           SEG_PRIV(3) | SEG_DATA_RDWR
+
+uint64_t create_descriptor(uint32_t base, uint32_t limit, uint16_t flag)
 {
-    entry->base_low = base & 0xFFFF;
-    entry->base_mid = (base >> 16) & 0xFF;
-    entry->base_high = (base >> 24) & 0xFF;
-    entry->limit = limit & 0xFFFF;
-    entry->granularity = (limit >> 16) & 0x0F;
-    entry->granularity |= granularity & 0xF0;
-    entry->access = access;
-    return 0;
+    uint64_t descriptor;
+
+    // Create the high 32 bit segment
+    descriptor = limit & 0x000F0000;         // set limit bits 19:16
+    descriptor |= (flag << 8) & 0x00F0FF00;  // set type, p, dpl, s, g, d/b, l and avl fields
+    descriptor |= (base >> 16) & 0x000000FF; // set base bits 23:16
+    descriptor |= base & 0xFF000000;         // set base bits 31:24
+
+    // Shift by 32 to allow for low part of segment
+    descriptor <<= 32;
+
+    // Create the low 32 bit segment
+    descriptor |= base << 16;         // set base bits 15:0
+    descriptor |= limit & 0x0000FFFF; // set limit bits 15:0
+
+    return descriptor;
 }
 
-int load_gdt(struct gdt_entry *gdt, uint16_t size)
+ALIGN_ATTR(4096)
+static uint64_t gdt[5];
+ALIGN_ATTR(4096)
+static struct gdtr64 g;
+ALIGN_ATTR(4096)
+static struct tss_entry tss;
+
+void gdt_init(void)
 {
-    struct gdtr *g = &gdtr;
-    g->limit = size - 1;
-    g->base = (uint32_t)gdt;
+    gdt[0] = create_descriptor(0, 0, 0);
+    gdt[1] = create_descriptor(0, 0xfffff, GDT_CODE64_PL0);
+    gdt[2] = create_descriptor(0, 0xfffff, GDT_DATA64_PL0);
+    gdt[3] = create_descriptor(0, 0xfffff, GDT_CODE64_PL3);
+    gdt[4] = create_descriptor(0, 0xfffff, GDT_DATA64_PL3);
+
+    g.limit = sizeof(gdt) - 1;
+    g.base = (uint64_t)gdt;
 
     asm volatile("lgdt %0" : : "m"(g));
-    return 0;
-}
-
-int gdt_init(void)
-{
-    struct gdt_entry *desc = descriptors;
-    create_gdt_entry(&desc[0], 0, 0, 0, 0);
-    create_gdt_entry(&desc[1], 0, 0xFFFFF, 0x9A, 0xCF); // Kernel code
-    create_gdt_entry(&desc[2], 0, 0xFFFFF, 0x92, 0xCF); // Kernel data
-    create_gdt_entry(&desc[3], 0, 0xFFFFF, 0xFA, 0xCF); // User code
-    create_gdt_entry(&desc[4], 0, 0xFFFFF, 0xF2, 0xCF); // User data
-    create_gdt_entry(&desc[5], (uint32_t)&tss, sizeof(tss) - 1, 0x89, 0x00);
-
-    load_gdt(desc, sizeof(struct gdt_entry) * 6);
-    gdt_flush(&gdtr);
-
-    tss.prev_tss = 0;
-    tss.esp0 = 0x0;
-    tss.ss0 = KDATA_SELECTOR;
-    tss.esp1 = 0;
-    tss.ss1 = 0;
-    tss.esp2 = 0;
-    tss.ss2 = 0;
-    tss.cr3 = 0;
-    tss.eip = 0;
-    tss.eflags = 0;
-    tss.eax = 0;
-    tss.ecx = 0;
-    tss.edx = 0;
-    tss.ebx = 0;
-    tss.esp = 0;
-    tss.ebp = 0;
-    tss.esi = 0;
-    tss.edi = 0;
-    tss.es = 0;
-    tss.cs = 0;
-    tss.ss = 0;
-    tss.ds = 0;
-    tss.fs = 0;
-    tss.gs = 0;
-    tss.ldt = 0;
-    tss.trap = 0;
-    // 关键：设置 iomap_base > limit，表示无 I/O 权限位图
-    tss.iomap_base = sizeof(tss); // e.g., 104 if TSS is 104 bytes
-
-    asm volatile("ltr %%ax" ::"a"(TSS_SELECTOR));
-    return 0;
+    asm volatile(
+        "movq %0, %%rax\r\n"
+        "movw %%ax, %%ds\r\n"
+        "movw %%ax, %%es\r\n"
+        "movw %%ax, %%fs\r\n"
+        "movw %%ax, %%gs\r\n"
+        "movw %%ax, %%ss\r\n"
+        :
+        : "r"(KDATA_SELECTOR)
+        : "rax");
 }
 
 uint32_t get_current_esp(void)

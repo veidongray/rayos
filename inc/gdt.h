@@ -24,6 +24,12 @@ struct gdtr
     uint32_t base;
 } __attribute__((packed));
 
+struct gdtr64
+{
+    uint16_t limit;
+    uint64_t base;
+} __attribute__((packed));
+
 struct tss_entry
 {
     uint32_t prev_tss;
@@ -59,7 +65,7 @@ int create_gdt_entry(struct gdt_entry *entry, uint32_t base,
                      uint32_t limit, uint8_t access, uint8_t granularity);
 int load_gdt(struct gdt_entry *gdt, uint16_t size);
 struct gdtr *get_gdtr(void);
-int gdt_init(void);
+void gdt_init(void);
 void update_tss_esp0(uint32_t esp0);
 uint32_t get_current_esp(void);
 

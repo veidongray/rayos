@@ -107,7 +107,7 @@ _start:
 # =====================================================================
 .code64
 _start64:
-    xorq %rax, %rax
+    movabsq $0x10, %rax
     movw %ax, %ds
     movw %ax, %es
     movw %ax, %ss
