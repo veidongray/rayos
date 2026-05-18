@@ -1,9 +1,5 @@
 # head.o must be first
-OBJS = head.o \
-    switch_to.o \
-    gdt.o \
-    idt.o \
-    paging.o
+OBJS = head.o
 
 %.o: %.S
 	$(CC) $(CFLAGS) -c $< -o $@

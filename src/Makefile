@@ -1,15 +1,4 @@
-OBJS =  main.o          \
-        tty.o           \
-        multiboot2.o    \
-        gdt.o           \
-        idt.o           \
-        pic_8259.o      \
-        io.o            \
-        paging.o        \
-        task.o          \
-        mm.o            \
-        syscall.o       \
-        apic.o
+OBJS =  main.o multiboot2.o gdt.o
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@

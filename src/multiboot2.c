@@ -1,6 +1,4 @@
 #include "multiboot2.h"
-#include "tty.h"
-#include "panic.h"
 
 static uint64_t total_mem = 0;
 
@@ -50,11 +48,6 @@ void total_memory_init(void)
 {
     if (_mboot_magic[0] == 0x36d76289)
     {
-        parse_multiboot2_mmap((uint64_t *)_mboot_info[0]);
-    }
-    else
-    {
-        // If we don't have a valid multiboot magic number, we can't trust the bootloader and should halt
-        PANIC("Lost Bootloader...\n");
+        parse_multiboot2_mmap((void *)((uint64_t)_mboot_info[0]));
     }
 }

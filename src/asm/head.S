@@ -21,16 +21,15 @@ _end_mboot:
 _start:
     cli
     cld
+    
+    # 保存 multiboot 信息（注意：此时仍在低端地址）
+    movl %ebx, (_mboot_info - VIRT_OFFSET)
+    movl %eax, (_mboot_magic - VIRT_OFFSET)
 
     # 关闭分页（GRUB 可能已开启）
     movl %cr0, %eax
     andl $0x7FFFFFFF, %eax
     movl %eax, %cr0
-
-    # 保存 multiboot 信息（注意：此时仍在低端地址）
-    addl $(VIRT_OFFSET), %ebx
-    movl %ebx, (_mboot_info - VIRT_OFFSET)
-    movl %eax, (_mboot_magic - VIRT_OFFSET)
 
     # =====================================================================
     # 1. 创建 64-bit 页表（Higher-half 映射）
@@ -96,7 +95,7 @@ _start:
     movl %eax, %cr0
 
     # 加载 64-bit GDT
-    movl $(gdt64_ptr - VIRT_OFFSET), %eax
+    movl $(_gdt64_ptr - VIRT_OFFSET), %eax
     lgdt (%eax)
 
     # 远跳转进入长模式
@@ -132,15 +131,15 @@ _boot_pd:   .space 4096
 _boot_pt:   .space 4096
 
 .align 8
-gdt64:
+_gdt64:
     .quad 0x0000000000000000
     .quad 0x00af9a000000ffff   # 64-bit code
     .quad 0x00cf92000000ffff   # 64-bit data
-gdt64_end:
+_gdt64_end:
 
-gdt64_ptr:
-    .word gdt64_end - gdt64 - 1
-    .long gdt64 - VIRT_OFFSET     # 32位阶段用物理地址
+_gdt64_ptr:
+    .word _gdt64_end - _gdt64 - 1
+    .long _gdt64 - VIRT_OFFSET     # 32位阶段用物理地址
 
 .global _mboot_info
 .global _mboot_magic

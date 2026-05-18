@@ -1,4 +1,4 @@
-BUILT-IN = src/libc/built-in.o src/asm/built-in.o src/built-in.o src/tools/built-in.o
+BUILT-IN = src/asm/built-in.o src/built-in.o
 
 INCDIR="$(CURDIR)/inc"
 CFLAGS = -m64 -fno-pic                      \
@@ -23,8 +23,6 @@ export LDFLAGS
 build:
 	$(MAKE) -C src/asm built-in.o
 	$(MAKE) -C src built-in.o
-	$(MAKE) -C src/libc built-in.o
-	$(MAKE) -C src/tools built-in.o
 	$(LD) $(LDFLAGS) -T linker.ld -o vmrayos $(BUILT-IN)
 
 iso: build

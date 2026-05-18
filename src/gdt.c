@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include "gdt.h"
-#include "aligned.h"
 
 // Each define here is for a specific flag in the descriptor.
 // Refer to the intel documentation for a description of what each one does.
@@ -61,6 +60,9 @@
                            SEG_LONG(0) | SEG_SIZE(1) | SEG_GRAN(1) | \
                            SEG_PRIV(3) | SEG_DATA_RDWR
 
+__attribute__((aligned(4096))) static uint64_t gdt[5];
+__attribute__((aligned(4096))) static struct gdtr64 g;
+
 uint64_t create_descriptor(uint32_t base, uint32_t limit, uint16_t flag)
 {
     uint64_t descriptor;
@@ -80,13 +82,6 @@ uint64_t create_descriptor(uint32_t base, uint32_t limit, uint16_t flag)
 
     return descriptor;
 }
-
-ALIGN_ATTR(4096)
-static uint64_t gdt[5];
-ALIGN_ATTR(4096)
-static struct gdtr64 g;
-ALIGN_ATTR(4096)
-static struct tss_entry tss;
 
 void gdt_init(void)
 {
@@ -110,16 +105,4 @@ void gdt_init(void)
         :
         : "r"(KDATA_SELECTOR)
         : "rax");
-}
-
-uint32_t get_current_esp(void)
-{
-    uint32_t esp;
-    asm volatile("mov %%esp, %0" : "=r"(esp));
-    return esp;
-}
-
-void update_tss_esp0(uint32_t esp0)
-{
-    tss.esp0 = esp0;
 }
