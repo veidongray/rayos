@@ -1,4 +1,4 @@
-OBJS =  main.o multiboot2.o gdt.o
+OBJS =  main.o multiboot2.o gdt.o page.o
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
