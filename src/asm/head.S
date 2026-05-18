@@ -11,7 +11,7 @@ _mboot:
     .word 0, 0, 8
 _end_mboot:
 
-.set VIRT_OFFSET, 0xffffffff80000000
+.set VIRT_OFFSET, 0xffffffffC0000000
 
 # =====================================================================
 .code32 
@@ -54,8 +54,8 @@ _start:
     orl  $0x3, %eax
     movl %eax, 0(%edi)            # PDPT[0]
 
-    # PDPT[510] → PD（higher-half 0xffffffff80000000） ← 关键修改
-    movl %eax, 510*8(%edi)
+    # PDPT[510] → PD（higher-half 0xffffffffC0000000） ← 关键修改
+    movl %eax, 511*8(%edi)
 
     # PD[0] → PT（2MB 页表）
     movl $(_boot_pd - VIRT_OFFSET), %edi
