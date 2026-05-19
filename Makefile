@@ -24,6 +24,7 @@ build:
 	$(MAKE) -C src/asm built-in.o
 	$(MAKE) -C src built-in.o
 	$(LD) $(LDFLAGS) -T linker.ld -o vmrayos $(BUILT-IN)
+	find src -name "*.o" ! -name "built-in.o" -type f -exec rm -f {} +
 
 iso: build
 	cp vmrayos iso/boot/
