@@ -11,7 +11,7 @@ CFLAGS = -m64 -fno-pic                      \
     -g -fno-omit-frame-pointer              \
     -fno-asynchronous-unwind-tables         \
     -std=gnu99                              \
-	-mcmodel=kernel							\
+	-mcmodel=kernel -mcmodel=large			\
     -I $(INCDIR)
 
 LDFLAGS = -m elf_x86_64

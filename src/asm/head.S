@@ -11,7 +11,7 @@ _mboot:
     .word 0, 0, 8
 _end_mboot:
 
-.set VIRT_OFFSET, 0xffffffffC0000000
+.set VIRT_OFFSET, 0xffff800000000000
 
 # =====================================================================
 .code32 
@@ -40,24 +40,21 @@ _start:
     rep stosl
 
     # PML4[0]   → PDPT（低端恒等映射，方便过渡）
-    # PML4[511] → PDPT（高端 higher-half）
+    # PML4[256] → PDPT（高端 higher-half）
     movl $(_boot_pml4 - VIRT_OFFSET), %edi
     movl $(_boot_pdpt - VIRT_OFFSET), %eax
     orl  $0x3, %eax
 
-    movl %eax, 0(%edi)            # PML4[0]
-    movl %eax, 511*8(%edi)        # PML4[511]  ← 关键修改
+    movl %eax, (%edi)            # PML4[0]
+    movl %eax, 256*8(%edi)        # PML4[256]
 
     # PDPT[0] → PD（低端 0~1GB）
     movl $(_boot_pdpt - VIRT_OFFSET), %edi
     movl $(_boot_pd - VIRT_OFFSET), %eax
     orl  $0x3, %eax
-    movl %eax, 0(%edi)            # PDPT[0]
+    movl %eax, (%edi)            # PDPT[0]
 
-    # PDPT[510] → PD（higher-half 0xffffffffC0000000） ← 关键修改
-    movl %eax, 511*8(%edi)
-
-    # PD[0] → PT（2MB 页表）
+    # PD[0] → PT
     movl $(_boot_pd - VIRT_OFFSET), %edi
     movl $(_boot_pt - VIRT_OFFSET), %eax
     orl  $0x3, %eax

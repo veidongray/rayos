@@ -4,7 +4,8 @@
 #include "multiboot2.h"
 
 #define PAGE_SIZE 0x1000ULL
-#define KERNEL_BASE 0xFFFFFFFFC0000000ULL
+#define KERNEL_BASE 0xffff800000000000ULL
+#define PML4_BASE 0xFFFFFFFFFFFFFULL
 #define ALIGN_4K(val) (((uint64_t)(val) & ~0xfff) + 4096)
 
 __attribute__((aligned(4096))) static uint64_t pml4[512];
@@ -31,21 +32,21 @@ void page_init(void)
         total_pte = (128 * 1024 * 1024) / PAGE_SIZE;
         total_pde = (total_pte / 512);
 
-        pml4[511] = ((uint64_t)pdpt - KERNEL_BASE) | 0x3ULL;
-        pdpt[511] = ((uint64_t)pd - KERNEL_BASE) | 0x3ULL;
+        pml4[511] = ((uint64_t)pml4 - KERNEL_BASE) | 0x3ULL;
+        pml4[256] = ((uint64_t)pdpt - KERNEL_BASE) | 0x3ULL;
+        pdpt[0] = ((uint64_t)pd - KERNEL_BASE) | 0x3ULL;
+
         pt = kernel_virt_end_aligned;
         for (i = 0; i < total_pde; i++)
         {
             pd[i] = ((uint64_t)pt + (i * PAGE_SIZE) - KERNEL_BASE) | 0x3ULL;
         }
-        pd[511] = ((uint64_t)(&(pt[511])) - KERNEL_BASE) | 0x3ULL;
 
         for (i = 0; i < total_pte; i++)
         {
             pt[i] = (i * PAGE_SIZE) | 0x3ULL;
             kernel_virt_end_aligned++;
         }
-        pt[511] = ((uint64_t)pml4 - KERNEL_BASE) | 0x3ULL;
 
         // mark used page
         bitmap_init(&bmp_page_map, page_map, 512 * 64);
@@ -58,15 +59,8 @@ void page_init(void)
     load_pml4((uint64_t)pml4 - KERNEL_BASE);
 
     *(volatile uint8_t *)(KERNEL_BASE + 0xb8000) = '?';
-    asm volatile(
-        "movq %0, %%rax\r\n"
-        "movq %1, %%rbx\r\n"
-        "movq %2, %%rcx\r\n"
-        "movq %3, %%rdx\r\n"
-        "movq %4, %%r8\r\n"
-        :
-        : "r"(get_cr3()), "r"(pdpt), "r"(pd), "r"(pt), "r"(kernel_virt_end_aligned)
-        : "rax", "rbx", "rcx", "rdx", "r8");
+    map_page(0xb8000, 0xffff7000000b8000ULL, 0x3);
+    *(volatile uint8_t *)0xffff7000000b8000ULL = '&';
 }
 
 uint64_t alloc_page(void)
@@ -88,20 +82,40 @@ void free_page(uint64_t physaddr)
 
 int map_page(uint64_t physaddr, uint64_t virtaddr, uint64_t flags)
 {
-    uint64_t pml4_index;
-    uint64_t pdpt_index;
-    uint64_t pd_index;
-    uint64_t pt_index;
-    uint64_t *pml4;
-    uint64_t *pdpt;
-    uint64_t *pd;
-    uint64_t *pt;
+    uint64_t pml4_idx, pdpt_idx, pd_idx, pt_idx;
+    uint64_t *map_pml4, *map_pdpt, *map_pd, *map_pt;
 
-    pml4_index = (physaddr >> 39) & 0x1ffULL;
-    pdpt_index = (physaddr >> 30) & 0x1ffULL;
-    pd_index = (physaddr >> 21) & 0x1ffULL;
-    pt_index = (physaddr >> 12) & 0x1ffULL;
-    pml4 = get_cr3();
+    pml4_idx = (virtaddr >> 39) & 0x1FF;
+    pdpt_idx = (virtaddr >> 30) & 0x1FF;
+    pd_idx = (virtaddr >> 21) & 0x1FF;
+    pt_idx = (virtaddr >> 12) & 0x1FF;
+
+    // 所有地址均为 canonical（高16位全1），适用于 x86-64 递归页表映射
+    map_pml4 = (uint64_t *)(PML4_BASE << 12ULL);
+    if (!(map_pml4[pml4_idx] & 0x1ULL))
+    {
+        map_pml4[pml4_idx] = alloc_page() | flags | 0x1ULL;
+    }
+    map_pdpt = (uint64_t *)((PML4_BASE << 21ULL) + (pml4_idx << 12ULL));
+    if (!(map_pdpt[pdpt_idx] & 0x1ULL))
+    {
+        map_pdpt[pdpt_idx] = alloc_page() | flags | 0x1ULL;
+    }
+    map_pd = (uint64_t *)((PML4_BASE << 30ULL) + (pml4_idx << 21ULL) + (pdpt_idx << 12ULL));
+    if (!(map_pd[pd_idx] & 0x1ULL))
+    {
+        map_pd[pd_idx] = alloc_page() | flags | 0x1ULL;
+    }
+    map_pt = (uint64_t *)((PML4_BASE << 39ULL) + (pml4_idx << 30ULL) + (pdpt_idx << 21ULL) + (pd_idx << 12ULL));
+    if (map_pt[pt_idx] & 0x1ULL)
+    {
+        // already map
+        return -1;
+    }
+    map_pt[pt_idx] = (physaddr & ~0xfff) | flags | 0x1ULL;
+    asm volatile(
+        "movq %cr3, %rax\r\n"
+        "movq %rax, %cr3\r\n");
 }
 
 uint64_t get_cr3(void)
