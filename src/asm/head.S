@@ -47,6 +47,8 @@ _start:
 
     movl %eax, (%edi)            # PML4[0]
     movl %eax, 256*8(%edi)        # PML4[256]
+    movl %edi, 511*8(%edi)          # PML4[511]
+    addl $0x3, 511*8(%edi)
 
     # PDPT[0] → PD（低端 0~1GB）
     movl $(_boot_pdpt - VIRT_OFFSET), %edi

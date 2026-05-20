@@ -8,5 +8,7 @@ void start_kernel(void)
     gdt_init();
     page_init();
     while (1)
-        ;
+    {
+        asm volatile("hlt");
+    }
 }
