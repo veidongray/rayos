@@ -5,7 +5,7 @@
 #define PAGE_SIZE 0x1000ULL
 #define KERNEL_BASE 0xffff800000000000ULL
 #define PML4_BASE 0xFFFFFFFFFFFFFULL
-#define ALIGN_4K(val) (((uint64_t)(val) & ~0xfff) + 4096)
+#define BOOTMAP_LEN 0x800000
 
 extern uint64_t _kernel_phys_end_aligned[];
 extern uint64_t _kernel_virt_end_aligned[];
@@ -14,15 +14,12 @@ static bitmap_t page_alloc_bitmap;
 
 void page_init(void)
 {
-    // mark used page
     bitmap_init(&page_alloc_bitmap, page_bitmap_data, 512 * 64);
+    // mark used page
+    bitmap_set_range(&page_alloc_bitmap, 0, (uint64_t)_kernel_phys_end_aligned >> 12);
+    // unmap unused page
+    unmap_page_range((uint64_t)_kernel_virt_end_aligned, (BOOTMAP_LEN - (uint64_t)_kernel_phys_end_aligned) >> 12);
 
-    if ((uint64_t)_kernel_phys_end_aligned <= 0x200000)
-    {
-        bitmap_set_range(&page_alloc_bitmap, 0, (uint64_t)_kernel_phys_end_aligned >> 12);
-        unmap_page_range((uint64_t)_kernel_virt_end_aligned, (0x200000 - (uint64_t)_kernel_phys_end_aligned) >> 12);
-    }
-    
     map_page(0xb8000, 0xb8000, 0x3);
     *(volatile uint8_t *)0xb8000 = '?';
 }
