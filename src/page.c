@@ -3,18 +3,18 @@
 #include <multiboot2.h>
 
 #define PAGE_SIZE 0x1000ULL
-#define BOOTMAP_LEN 0x800000
+#define BOOTMAP_LEN 0x1000000
 #define PML4_BASE 0xFFFFFFFFFFFFFULL
 #define KERNEL_BASE 0xffff800000000000ULL
 
+static bitmap_t page_alloc_bitmap;
+static uint64_t page_bitmap_data[512];
 extern uint64_t _kernel_phys_end_aligned[];
 extern uint64_t _kernel_virt_end_aligned[];
-static uint64_t page_bitmap_data[512];
-static bitmap_t page_alloc_bitmap;
 
 void page_init(void)
 {
-    bitmap_init(&page_alloc_bitmap, page_bitmap_data, 512 * 64);
+    bitmap_init(&page_alloc_bitmap, page_bitmap_data, sizeof(page_bitmap_data));
     // mark used page
     bitmap_set_range(&page_alloc_bitmap, 0, (uint64_t)_kernel_phys_end_aligned >> 12);
     // unmap unused page

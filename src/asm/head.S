@@ -12,7 +12,7 @@ _mboot:
 _end_mboot:
 
 .set VIRT_OFFSET, 0xffff800000000000
-.set NUM_PT, 16 # 32MB
+.set NUM_PT, 64 # 128MB
 
 # =====================================================================
 .code32 
