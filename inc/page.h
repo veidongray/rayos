@@ -1,8 +1,7 @@
 #ifndef PAGE_H
 #define PAGE_H
 
-#include <stdint.h>
-#include <stddef.h>
+#include <types.h>
 
 int unmap_page_range(uint64_t virtaddr, size_t len);
 int map_page_range(uint64_t physaddr, uint64_t virtaddr, uint64_t flags, size_t len);

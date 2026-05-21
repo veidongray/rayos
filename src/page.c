@@ -1,11 +1,11 @@
-#include "page.h"
-#include "bitmap.h"
-#include "multiboot2.h"
+#include <page.h>
+#include <bitmap.h>
+#include <multiboot2.h>
 
 #define PAGE_SIZE 0x1000ULL
-#define KERNEL_BASE 0xffff800000000000ULL
-#define PML4_BASE 0xFFFFFFFFFFFFFULL
 #define BOOTMAP_LEN 0x800000
+#define PML4_BASE 0xFFFFFFFFFFFFFULL
+#define KERNEL_BASE 0xffff800000000000ULL
 
 extern uint64_t _kernel_phys_end_aligned[];
 extern uint64_t _kernel_virt_end_aligned[];

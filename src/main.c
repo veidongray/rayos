@@ -1,6 +1,6 @@
-#include "gdt.h"
-#include "page.h"
-#include "multiboot2.h"
+#include <gdt.h>
+#include <page.h>
+#include <multiboot2.h>
 
 void start_kernel(void)
 {

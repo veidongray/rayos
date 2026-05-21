@@ -1,4 +1,4 @@
-#include "multiboot2.h"
+#include <multiboot2.h>
 
 static uint64_t total_mem = 0;
 

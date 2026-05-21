@@ -12,6 +12,7 @@ _mboot:
 _end_mboot:
 
 .set VIRT_OFFSET, 0xffff800000000000
+.set NUM_PT, 16 # 32MB
 
 # =====================================================================
 .code32 
@@ -32,7 +33,7 @@ _start:
     movl %eax, %cr0
 
     # =====================================================================
-    # 1. 创建 64-bit 页表（Higher-half 映射前 8MB）
+    # 1. 创建 64-bit 页表（Higher-half 映射）
     # =====================================================================
     movl $(_boot_pml4 - VIRT_OFFSET), %edi
     xorl %eax, %eax
@@ -57,25 +58,23 @@ _start:
     movl %eax, (%edi)            # PDPT[0]
 
     # PD[0] → PT0
-    # PD[1] → PT1
     movl $(_boot_pd - VIRT_OFFSET), %edi
-    movl $(_boot_pt0 - VIRT_OFFSET), %eax
+    movl $(_boot_pt - VIRT_OFFSET), %eax
     orl  $0x3, %eax
-    movl %eax, (%edi)
-    movl $(_boot_pt1 - VIRT_OFFSET), %eax
-    orl  $0x3, %eax
-    movl %eax, 8(%edi)
-    movl $(_boot_pt2 - VIRT_OFFSET), %eax
-    orl  $0x3, %eax
-    movl %eax, 16(%edi)
-    movl $(_boot_pt3 - VIRT_OFFSET), %eax
-    orl  $0x3, %eax
-    movl %eax, 24(%edi)
+    movl $0x0, %edx
+    movl $NUM_PT, %ecx
 
-    # Setup PT0
-    movl $(_boot_pt0 - VIRT_OFFSET), %edi
+0:
+    movl %eax, (%edi, %edx, 8)
+    addl $0x1000, %eax
+    incl %edx
+    decl %ecx
+    jnz 0b
+
+    # Setup PT
+    movl $(_boot_pt - VIRT_OFFSET), %edi
     movl $0x00000003, %eax          # Present + Writable
-    movl $512, %ecx
+    movl $(512 * NUM_PT), %ecx
 
 1:  movl %eax, (%edi)               # 低 32 位
     movl $0, 4(%edi)                # 高 32 位清零
@@ -83,42 +82,6 @@ _start:
     addl $8, %edi
     decl %ecx
     jnz 1b                          # 使用局部标签 + jnz 代替 loop
-
-    # Setup PT1
-    movl $(_boot_pt1 - VIRT_OFFSET), %edi
-    movl $0x00200003, %eax          # Present + Writable
-    movl $512, %ecx
-
-2:  movl %eax, (%edi)               # 低 32 位
-    movl $0, 4(%edi)                # 高 32 位清零
-    addl $0x1000, %eax
-    addl $8, %edi
-    decl %ecx
-    jnz 2b                          # 使用局部标签 + jnz 代替 loop
-
-        # Setup PT2
-    movl $(_boot_pt2 - VIRT_OFFSET), %edi
-    movl $0x00400003, %eax          # Present + Writable
-    movl $512, %ecx
-
-3:  movl %eax, (%edi)               # 低 32 位
-    movl $0, 4(%edi)                # 高 32 位清零
-    addl $0x1000, %eax
-    addl $8, %edi
-    decl %ecx
-    jnz 3b                          # 使用局部标签 + jnz 代替 loop
-
-        # Setup PT3
-    movl $(_boot_pt3 - VIRT_OFFSET), %edi
-    movl $0x00600003, %eax          # Present + Writable
-    movl $512, %ecx
-
-4:  movl %eax, (%edi)               # 低 32 位
-    movl $0, 4(%edi)                # 高 32 位清零
-    addl $0x1000, %eax
-    addl $8, %edi
-    decl %ecx
-    jnz 4b                          # 使用局部标签 + jnz 代替 loop
 
     # =====================================================================
     # 2. 进入长模式
@@ -173,10 +136,7 @@ _loop:
 _boot_pml4: .space 4096
 _boot_pdpt: .space 4096
 _boot_pd:   .space 4096
-_boot_pt0:  .space 4096
-_boot_pt1:  .space 4096
-_boot_pt2:  .space 4096
-_boot_pt3:  .space 4096
+_boot_pt:   .space 4096 * NUM_PT
 
 .align 8
 _gdt64:

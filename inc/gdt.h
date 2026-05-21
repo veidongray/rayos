@@ -1,7 +1,7 @@
 #ifndef GDT_H
 #define GDT_H
 
-#include <stdint.h>
+#include <types.h>
 #define KCODE_SELECTOR (0x08UL | 0x0UL)
 #define KDATA_SELECTOR (0x10UL | 0x0UL)
 #define UCODE_SELECTOR (0x18UL | 0x3UL)

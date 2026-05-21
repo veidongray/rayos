@@ -10,8 +10,9 @@ CFLAGS = -m64 -fno-pic                      \
     -Wall -Wextra                           \
     -g -fno-omit-frame-pointer              \
     -fno-asynchronous-unwind-tables         \
+	-nostdlib -nostdinc						\
     -std=gnu99                              \
-	-mcmodel=kernel -mcmodel=large			\
+	-mcmodel=large							\
     -I $(INCDIR)
 
 LDFLAGS = -m elf_x86_64

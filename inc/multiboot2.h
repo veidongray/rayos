@@ -1,8 +1,7 @@
 #ifndef MULTIBOOT2_H
 #define MULTIBOOT2_H
 
-#include <stdint.h>
-#include <stddef.h>
+#include <types.h>
 
 #define MULTIBOOT2_TAG_MMAP 6
 
