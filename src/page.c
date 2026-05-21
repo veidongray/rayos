@@ -2,7 +2,6 @@
 #include <bitmap.h>
 #include <multiboot2.h>
 
-#define PAGE_SIZE 0x1000ULL
 #define BOOTMAP_LEN 0x1000000
 #define PML4_BASE 0xFFFFFFFFFFFFFULL
 #define KERNEL_BASE 0xffff800000000000ULL
@@ -16,12 +15,9 @@ void page_init(void)
 {
     bitmap_init(&page_alloc_bitmap, page_bitmap_data, sizeof(page_bitmap_data));
     // mark used page
-    bitmap_set_range(&page_alloc_bitmap, 0, (uint64_t)_kernel_phys_end_aligned >> 12);
+    bitmap_set_range(&page_alloc_bitmap, 0, (uint64_t)_kernel_phys_end_aligned >> PAGE_SHIFT);
     // unmap unused page
     unmap_page_range((uint64_t)_kernel_virt_end_aligned, (BOOTMAP_LEN - (uint64_t)_kernel_phys_end_aligned) >> 12);
-
-    map_page(0xb8000, 0xb8000, 0x3);
-    *(volatile uint8_t *)0xb8000 = '?';
 }
 
 uint64_t alloc_pages(size_t order)
@@ -40,7 +36,7 @@ uint64_t alloc_pages(size_t order)
 
 void free_pages(uint64_t physaddr, size_t order)
 {
-    bitmap_free_range(&page_alloc_bitmap, physaddr >> 12, 0x1 << order);
+    bitmap_free_range(&page_alloc_bitmap, physaddr >> PAGE_SHIFT, 0x1 << order);
 }
 
 int map_page_range(uint64_t physaddr, uint64_t virtaddr, uint64_t flags, size_t len)
@@ -92,6 +88,7 @@ int map_page_range(uint64_t physaddr, uint64_t virtaddr, uint64_t flags, size_t 
         if (map_pt[pt_idx] & 0x1ULL)
         {
             // already map
+            unmap_page_range(virtaddr, i);
             return i;
         }
         map_pt[pt_idx] = (physaddr & ~0xfff) | flags | 0x1ULL;
