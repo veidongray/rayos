@@ -2,6 +2,7 @@
 #include <gdt.h>
 #include <pic.h>
 #include <page.h>
+#include <task.h>
 #include <lapic.h>
 #include <multiboot2.h>
 
@@ -12,7 +13,8 @@ void start_kernel(void)
     page_init();
     int_init();
     lapic_init();
-    enable_irq();
+
+    task_create(NULL, NULL, NULL, TASK_KERN);
     while (1)
     {
         asm volatile("hlt");
