@@ -5,6 +5,7 @@
 
 #define PAGE_SHIFT 12
 #define PAGE_SIZE 0x1000ULL
+#define KERNEL_BASE 0xffff800000000000ULL
 
 int unmap_page_range(uint64_t virtaddr, size_t len);
 int map_page_range(uint64_t physaddr, uint64_t virtaddr, uint64_t flags, size_t len);

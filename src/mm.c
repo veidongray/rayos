@@ -1,7 +1,7 @@
 #include <mm.h>
 #include <page.h>
 
-#define KMEMADDR_BEGIN 0xffff900000000000ULL
+#define KMEM_BASE 0xffff900000000000ULL
 
 void *kmalloc(size_t size)
 {
@@ -18,13 +18,13 @@ void *kmalloc(size_t size)
     if ((int64_t)ret_physaddr < 0)
         return NULL;
 
-    ret_map = map_page_range(ret_physaddr, KMEMADDR_BEGIN + ret_physaddr, 0x3, 0x1 << nr_pages);
+    ret_map = map_page_range(ret_physaddr, KMEM_BASE + ret_physaddr, 0x3, 0x1 << nr_pages);
     if (ret_map < nr_pages)
         return NULL;
 
-    vm = (struct vmap_area *)(KMEMADDR_BEGIN + ret_physaddr);
-    vm->va_start = KMEMADDR_BEGIN + ret_physaddr + sizeof(struct vmap_area);
-    vm->va_end = KMEMADDR_BEGIN + ret_physaddr + (nr_pages * PAGE_SIZE);
+    vm = (struct vmap_area *)(KMEM_BASE + ret_physaddr);
+    vm->va_start = KMEM_BASE + ret_physaddr + sizeof(struct vmap_area);
+    vm->va_end = KMEM_BASE + ret_physaddr + (nr_pages * PAGE_SIZE);
     vm->va_nrpages = nr_pages;
     return (void *)vm->va_start;
 }

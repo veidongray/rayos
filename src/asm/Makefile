@@ -1,5 +1,5 @@
 # head.o must be first
-OBJS = head.o
+OBJS = head.o isr_stubs.o
 
 %.o: %.S
 	$(CC) $(CFLAGS) -c $< -o $@

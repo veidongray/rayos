@@ -4,7 +4,6 @@
 
 #define BOOTMAP_LEN 0x1000000
 #define PML4_BASE 0xFFFFFFFFFFFFFULL
-#define KERNEL_BASE 0xffff800000000000ULL
 
 static bitmap_t page_alloc_bitmap;
 static uint64_t page_bitmap_data[512];
