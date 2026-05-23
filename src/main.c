@@ -6,6 +6,13 @@
 #include <lapic.h>
 #include <multiboot2.h>
 
+void task0(void *args)
+{
+    args = args;
+    while (1)
+        ;
+}
+
 void start_kernel(void)
 {
     total_memory_init();
@@ -14,7 +21,7 @@ void start_kernel(void)
     int_init();
     lapic_init();
 
-    task_create(NULL, NULL, NULL, TASK_KERN);
+    task_create(task0, (void *)0x12344321, "task0", TASK_KERN);
     while (1)
     {
         asm volatile("hlt");

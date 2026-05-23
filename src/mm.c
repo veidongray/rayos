@@ -6,26 +6,26 @@
 void *kmalloc(size_t size)
 {
     int ret_map;
-    int nr_pages;
+    int nr_order;
     uint64_t ret_physaddr;
     struct vmap_area *vm;
 
     if (size == 0)
         return NULL;
 
-    nr_pages = size_to_order(size + sizeof(struct vmap_area));
-    ret_physaddr = alloc_pages(nr_pages);
+    nr_order = size_to_order(size + sizeof(struct vmap_area));
+    ret_physaddr = alloc_pages(nr_order);
     if ((int64_t)ret_physaddr < 0)
         return NULL;
 
-    ret_map = map_page_range(ret_physaddr, KMEM_BASE + ret_physaddr, 0x3, 0x1 << nr_pages);
-    if (ret_map < nr_pages)
+    ret_map = map_page_range(ret_physaddr, KMEM_BASE + ret_physaddr, 0x3, 0x1 << nr_order);
+    if (ret_map < (0x1 << nr_order))
         return NULL;
 
     vm = (struct vmap_area *)(KMEM_BASE + ret_physaddr);
     vm->va_start = KMEM_BASE + ret_physaddr + sizeof(struct vmap_area);
-    vm->va_end = KMEM_BASE + ret_physaddr + (nr_pages * PAGE_SIZE);
-    vm->va_nrpages = nr_pages;
+    vm->va_end = KMEM_BASE + ret_physaddr + ((0x1 << nr_order) * PAGE_SIZE);
+    vm->va_nrpages = 0x1 << nr_order;
     return (void *)vm->va_start;
 }
 

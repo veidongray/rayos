@@ -41,15 +41,19 @@ void free_pages(uint64_t physaddr, size_t order)
 int map_page_range(uint64_t physaddr, uint64_t virtaddr, uint64_t flags, size_t len)
 {
     size_t i, j;
+    uint64_t va, pa;
     uint64_t pml4_idx, pdpt_idx, pd_idx, pt_idx;
     uint64_t *map_pml4, *map_pdpt, *map_pd, *map_pt;
 
-    for (i = 0; i < len; i++, physaddr += 0x1000, virtaddr += 0x1000)
+    va = virtaddr;
+    pa = physaddr;
+
+    for (i = 0; i < len; i++, pa += 0x1000, va += 0x1000)
     {
-        pml4_idx = (virtaddr >> 39) & 0x1FF;
-        pdpt_idx = (virtaddr >> 30) & 0x1FF;
-        pd_idx = (virtaddr >> 21) & 0x1FF;
-        pt_idx = (virtaddr >> 12) & 0x1FF;
+        pml4_idx = (va >> 39) & 0x1FF;
+        pdpt_idx = (va >> 30) & 0x1FF;
+        pd_idx = (va >> 21) & 0x1FF;
+        pt_idx = (va >> 12) & 0x1FF;
 
         // 所有地址均为 canonical（高16位全1），适用于 x86-64 递归页表映射
         map_pml4 = (uint64_t *)(PML4_BASE << 12ULL);
@@ -88,9 +92,9 @@ int map_page_range(uint64_t physaddr, uint64_t virtaddr, uint64_t flags, size_t 
         {
             // already map
             unmap_page_range(virtaddr, i);
-            return i;
+            return -i;
         }
-        map_pt[pt_idx] = (physaddr & ~0xfff) | flags | 0x1ULL;
+        map_pt[pt_idx] = (pa & ~0xfff) | flags | 0x1ULL;
         asm volatile(
             "movq %cr3, %rax\r\n"
             "movq %rax, %cr3\r\n");
