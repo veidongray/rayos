@@ -25,7 +25,7 @@ uint64_t alloc_pages(size_t order)
     int start;
 
     start = bitmap_find_first_zero(&page_alloc_bitmap, 0);
-    ret = bitmap_alloc_range(&page_alloc_bitmap, 0x1 << order, start);
+    ret = bitmap_alloc_range(&page_alloc_bitmap, order_to_pages(order), start);
     if (ret < 0)
     {
         return ret;
@@ -35,7 +35,7 @@ uint64_t alloc_pages(size_t order)
 
 void free_pages(uint64_t physaddr, size_t order)
 {
-    bitmap_free_range(&page_alloc_bitmap, physaddr >> PAGE_SHIFT, 0x1 << order);
+    bitmap_free_range(&page_alloc_bitmap, physaddr >> PAGE_SHIFT, order_to_pages(order));
 }
 
 int map_page_range(uint64_t physaddr, uint64_t virtaddr, uint64_t flags, size_t len)
@@ -91,7 +91,7 @@ int map_page_range(uint64_t physaddr, uint64_t virtaddr, uint64_t flags, size_t 
         if (map_pt[pt_idx] & 0x1ULL)
         {
             // already map
-            unmap_page_range(virtaddr, i);
+            unmap_page_range(virtaddr, i - 1);
             return -i;
         }
         map_pt[pt_idx] = (pa & ~0xfff) | flags | 0x1ULL;
@@ -105,15 +105,18 @@ int map_page_range(uint64_t physaddr, uint64_t virtaddr, uint64_t flags, size_t 
 int unmap_page_range(uint64_t virtaddr, size_t len)
 {
     size_t i;
+    uint64_t va;
     uint64_t pml4_idx, pdpt_idx, pd_idx, pt_idx;
     uint64_t *map_pml4, *map_pdpt, *map_pd, *map_pt;
 
-    for (i = 0; i < len; i++, virtaddr += 0x1000)
+    va = virtaddr;
+
+    for (i = 0; i < len; i++, va += 0x1000)
     {
-        pml4_idx = (virtaddr >> 39) & 0x1FF;
-        pdpt_idx = (virtaddr >> 30) & 0x1FF;
-        pd_idx = (virtaddr >> 21) & 0x1FF;
-        pt_idx = (virtaddr >> 12) & 0x1FF;
+        pml4_idx = (va >> 39) & 0x1FF;
+        pdpt_idx = (va >> 30) & 0x1FF;
+        pd_idx = (va >> 21) & 0x1FF;
+        pt_idx = (va >> 12) & 0x1FF;
 
         map_pml4 = (uint64_t *)(PML4_BASE << 12ULL);
         if (!(map_pml4[pml4_idx] & 0x1ULL))
@@ -201,4 +204,17 @@ void load_pml4(uint64_t pml4_physaddr)
         :
         : "r"(pml4_physaddr)
         : "rax");
+}
+
+uint64_t order_to_pages(size_t order)
+{
+    return 0x1 << order;
+}
+
+uint64_t size_to_order(size_t size)
+{
+    if (size == 0)
+        return 0;
+    size_t pages = (size + (1UL << PAGE_SHIFT) - 1) >> PAGE_SHIFT;
+    return fls(pages - 1);
 }

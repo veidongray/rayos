@@ -11,6 +11,7 @@
 
 enum task_status
 {
+    TASK_EXIT,
     TASK_DEAD,
     TASK_READY,
     TASK_RUNNING,
@@ -27,7 +28,10 @@ struct task_struct
     enum task_status status;
 };
 
+void task_exit(void);
+void scheduler(void);
 extern void switch_to(uint64_t *rsp); // from switch_to.S
+extern void context_switch(uint64_t **cur_rsp, uint64_t **next_rsp); // from switch_to.S
 struct task_struct *task_create(void (*task_func)(void *), void *args, char *name, int flags);
 
 #endif // TASK_H

@@ -12,8 +12,11 @@ switch_to:
 context_switch:
     PUSH_ALL
 
+    movq %rsp, (%rdi)
+    movq (%rsi), %rsp
 resume_context:
     POP_ALL
+    sti
     retq
 
 .global switch_to_user

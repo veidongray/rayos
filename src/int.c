@@ -1,5 +1,6 @@
 #include <int.h>
 #include <pic.h>
+#include <task.h>
 #include <lapic.h>
 
 __attribute__((aligned(4096))) static idtr_t idtr;
@@ -52,4 +53,5 @@ void isr_handler0(void)
 void lapic_timer_handler(void)
 {
     lapic_send_eoi();
+    scheduler();
 }
