@@ -1,7 +1,8 @@
 #ifndef MM_H
 #define MM_H
 
-#include <types.h>
+#include <stdint.h>
+#include <stddef.h>
 
 struct vmap_area
 {

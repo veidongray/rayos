@@ -19,7 +19,7 @@ void *kmalloc(size_t size)
         return NULL;
 
     ret_map = map_page_range(ret_physaddr, KMEM_BASE + ret_physaddr, 0x3, order_to_pages(nr_order));
-    if (ret_map < order_to_pages(nr_order))
+    if ((uint64_t)ret_map < order_to_pages(nr_order))
         return NULL;
 
     vm = (struct vmap_area *)(KMEM_BASE + ret_physaddr);

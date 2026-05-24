@@ -1,7 +1,7 @@
 #ifndef INT_H
 #define INT_H
 
-#include <types.h>
+#include <stdint.h>
 
 typedef struct
 {

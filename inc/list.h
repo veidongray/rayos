@@ -1,7 +1,7 @@
 #ifndef LIST_H
 #define LIST_H
 
-#include <types.h>
+#include <stdint.h>
 
 struct list_head
 {

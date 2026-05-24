@@ -60,8 +60,7 @@ void task_exit(void)
 
 void scheduler(void)
 {
-    struct list_head *pos;
-    struct task_struct *cur, *next, *t;
+    struct task_struct *cur, *next;
 
     if (current)
     {

@@ -2,7 +2,7 @@
 #define TASK_H
 
 #include <list.h>
-#include <types.h>
+#include <stdint.h>
 
 #define TASK_USER (1 << 0)
 #define TASK_KERN (1 << 1)

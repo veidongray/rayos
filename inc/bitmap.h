@@ -1,7 +1,7 @@
 #ifndef BITMAP_H
 #define BITMAP_H
 
-#include <types.h>
+#include <stdint.h>
 
 typedef struct
 {

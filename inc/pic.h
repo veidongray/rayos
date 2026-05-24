@@ -1,7 +1,7 @@
 #ifndef PIC_H
 #define PIC_H
 
-#include <types.h>
+#include <stdint.h>
 
 #define PIT_COMMAND_PORT 0x43
 #define PIT_CHANNEL0_PORT 0x40

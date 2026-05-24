@@ -10,7 +10,7 @@ CFLAGS = -m64 -fno-pic                      \
     -Wall -Wextra                           \
     -g -fno-omit-frame-pointer              \
     -fno-asynchronous-unwind-tables         \
-	-nostdlib -nostdinc						\
+	-nostdlib 								\
     -std=gnu99                              \
 	-mcmodel=large							\
     -I $(INCDIR)

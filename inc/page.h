@@ -1,7 +1,8 @@
 #ifndef PAGE_H
 #define PAGE_H
 
-#include <types.h>
+#include <stdint.h>
+#include <stddef.h>
 
 #define PAGE_SHIFT 12
 #define PAGE_SIZE 0x1000ULL
