@@ -21,7 +21,7 @@ void task1(void *args)
 {
     args = args;
     while (1)
-        ;
+        printf("%s\n", get_current()->name);
 }
 
 void task0(void *args)
@@ -30,7 +30,7 @@ void task0(void *args)
     task_create(task1, (void *)0x12344321, "task1", TASK_FLAGS_KERN);
     task_create(user0, 0, "user0", TASK_FLAGS_USER);
     while (1)
-        ;
+        printf("%s\n", get_current()->name);
 }
 
 void start_kernel(void)

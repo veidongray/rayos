@@ -4,7 +4,7 @@
         {
             "label": "run-qemu",
             "type": "shell",
-            "command": "make qemu-dbg -C ${workspaceFolder}",
+            "command": "make qemu-gdb -C ${workspaceFolder}",
             "isBackground": true
         }
     ]

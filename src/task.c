@@ -6,7 +6,7 @@
 #include <lib/printf/printf.h>
 #include <lib/string/string.h>
 
-struct task_struct *current = NULL;
+static struct task_struct *current = NULL;
 LIST_HEAD(task_list);
 
 __attribute__((aligned(4096))) static uint64_t user_rsp0[1024];
@@ -16,7 +16,7 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
     struct context *context;
     struct task_struct *task;
 
-    task = (struct task_struct *)kmalloc(sizeof(struct task_struct));
+    task = (struct task_struct *)kzalloc(sizeof(struct task_struct));
     if (task == NULL)
         return NULL;
 
@@ -24,7 +24,7 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
     if (flags & TASK_FLAGS_KERN)
     {
         task->pml4 = get_cr3();
-        task->stack = (uint64_t *)kmalloc(TASK_STACK_SIZE_MAX);
+        task->stack = (uint64_t *)kzalloc(TASK_STACK_SIZE_MAX);
         if (task->stack == NULL)
             return NULL;
 
@@ -80,6 +80,7 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
         user_pt[pt_idx] = alloc_page() | 0x7;
 
         map_page(user_pt[0] & ~0xfff, 0x0000400000000000, 0x7);
+        memset(task_code, 0, 0x1000);
         memcpy(task_code, task_func, 1024);
         task->rsp = (uint64_t *)((uint64_t)task_code + 2048);
         *(--task->rsp) = (uint64_t)task_exit;
@@ -120,6 +121,7 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
 
     task->flags = flags;
     task->status = TASK_READY;
+    memset(task->name, 0x0, 32);
     memcpy(task->name, name, strlen(name));
     list_add(&task->list, &task_list);
 
@@ -213,4 +215,9 @@ uint64_t get_cr3(void)
         :
         : "rax");
     return retval;
+}
+
+struct task_struct *get_current(void)
+{
+    return current;
 }
