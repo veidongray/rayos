@@ -1,5 +1,6 @@
 #include <gdt.h>
 #include <stdint.h>
+#include <lib/printf/printf.h>
 
 // Each define here is for a specific flag in the descriptor.
 // Refer to the intel documentation for a description of what each one does.
@@ -60,8 +61,10 @@
                            SEG_LONG(0) | SEG_SIZE(1) | SEG_GRAN(1) | \
                            SEG_PRIV(3) | SEG_DATA_RDWR
 
-__attribute__((aligned(4096))) static uint64_t gdt[5];
+__attribute__((aligned(4096))) static uint64_t gdt[7];
 __attribute__((aligned(4096))) static struct gdtr64 g;
+__attribute__((aligned(4096))) static struct tss_entry tss;
+static uint8_t kernel_stack[16384] __attribute__((aligned(16)));
 
 uint64_t create_descriptor(uint32_t base, uint32_t limit, uint16_t flag)
 {
@@ -85,24 +88,50 @@ uint64_t create_descriptor(uint32_t base, uint32_t limit, uint16_t flag)
 
 void gdt_init(void)
 {
-    gdt[0] = create_descriptor(0, 0, 0);
+    // 初始化 TSS
+    tss.rsp0 = (uint64_t)(kernel_stack + sizeof(kernel_stack)); // 有效栈顶
+    tss.rsp1 = 0;
+    tss.rsp2 = 0;
+    tss.ist1 = 0;                              // 可选：为 NMI/Double Fault 设置 IST 栈
+    tss.iomap_base = sizeof(struct tss_entry); // 禁用 I/O 位图
+
+    gdt[0] = 0; // null descriptor
     gdt[1] = create_descriptor(0, 0xfffff, GDT_CODE64_PL0);
     gdt[2] = create_descriptor(0, 0xfffff, GDT_DATA64_PL0);
     gdt[3] = create_descriptor(0, 0xfffff, GDT_CODE64_PL3);
     gdt[4] = create_descriptor(0, 0xfffff, GDT_DATA64_PL3);
 
-    g.limit = sizeof(gdt) - 1;
+    uint64_t tss_base = (uint64_t)&tss;
+    uint32_t tss_limit = sizeof(struct tss_entry) - 1;
+
+    // Low 64 bits
+    gdt[5] = ((uint64_t)(tss_limit & 0xFFFF)) | ((tss_base & 0xFFFFFFULL) << 16) | (0x89ULL << 40) | ((uint64_t)(tss_limit & 0xF0000) << 48);
+
+    // High 64 bits: base[63:32]
+    gdt[6] = tss_base >> 32;
+
+    g.limit = sizeof(gdt) * sizeof(uint64_t) - 1; // 注意：这里应是字节数！
     g.base = (uint64_t)gdt;
 
-    asm volatile("lgdt %0" : : "m"(g));
+    asm volatile("lgdt %0" ::"m"(g));
+
+    // 重载段寄存器
     asm volatile(
-        "movq %0, %%rax\r\n"
-        "movw %%ax, %%ds\r\n"
-        "movw %%ax, %%es\r\n"
-        "movw %%ax, %%fs\r\n"
-        "movw %%ax, %%gs\r\n"
-        "movw %%ax, %%ss\r\n"
+        "movq %0, %%rax\n\t"
+        "movw %%ax, %%ds\n\t"
+        "movw %%ax, %%es\n\t"
+        "movw %%ax, %%fs\n\t"
+        "movw %%ax, %%gs\n\t"
+        "movw %%ax, %%ss"
         :
-        : "r"(KDATA_SELECTOR)
+        : "r"((uint64_t)KDATA_SELECTOR)
         : "rax");
+
+    // 加载 TSS
+    asm volatile("ltr %%ax" ::"a"(TSS_SELECTOR));
+}
+
+void update_tss_rsp0(uint64_t rsp0)
+{
+    tss.rsp0 = rsp0;
 }

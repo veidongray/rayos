@@ -10,11 +10,16 @@
 #include <lib/printf/printf.h>
 #include <multiboot2.h>
 
+void user0(void *args)
+{
+    args = args;
+    while (1)
+        ;
+}
+
 void task1(void *args)
 {
     args = args;
-    printf("task1 %#x\n", args);
-    printf("task name %s\n", current->name);
     while (1)
         ;
 }
@@ -22,9 +27,8 @@ void task1(void *args)
 void task0(void *args)
 {
     args = args;
-    task_create(task1, (void *)0x12344321, "task1", TASK_KERN);
-    printf("task0 %#x\n", args);
-    printf("task name %s\n", current->name);
+    task_create(task1, (void *)0x12344321, "task1", TASK_FLAGS_KERN);
+    task_create(user0, 0, "user0", TASK_FLAGS_USER);
     while (1)
         ;
 }
@@ -38,7 +42,7 @@ void start_kernel(void)
     lapic_init();
     uart_init();
 
-    task_create(task0, (void *)0x12344321, "task0", TASK_KERN);
+    task_create(task0, (void *)0x12344321, "task0", TASK_FLAGS_KERN);
     while (1)
     {
         asm volatile("hlt");

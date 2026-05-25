@@ -3,7 +3,6 @@
 #include <multiboot2.h>
 
 #define BOOTMAP_LEN 0x1000000
-#define PML4_BASE 0xFFFFFFFFFFFFFULL
 
 static bitmap_t page_alloc_bitmap;
 static uint64_t page_bitmap_data[512];
@@ -91,8 +90,8 @@ int map_page_range(uint64_t physaddr, uint64_t virtaddr, uint64_t flags, size_t 
         if (map_pt[pt_idx] & 0x1ULL)
         {
             // already map
-            unmap_page_range(virtaddr, i - 1);
-            return -i;
+            unmap_page_range(virtaddr, i);
+            return i;
         }
         map_pt[pt_idx] = (pa & ~0xfff) | flags | 0x1ULL;
         asm volatile(
@@ -182,18 +181,6 @@ uint64_t get_physaddr(uint64_t virtaddr)
         return (map_pt[pt_idx] & ~0xfff) + (virtaddr & 0xfff);
     }
     return -1;
-}
-
-uint64_t get_cr3(void)
-{
-    uint64_t retval;
-
-    asm volatile(
-        "movq %%cr3, %0"
-        : "=r"(retval)
-        :
-        : "rax");
-    return retval;
 }
 
 void load_pml4(uint64_t pml4_physaddr)

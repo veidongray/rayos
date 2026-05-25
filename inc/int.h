@@ -20,19 +20,6 @@ typedef struct
     uint64_t base;
 } __attribute__((packed)) idtr_t;
 
-typedef struct interrupt_frame
-{
-    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
-    uint64_t rbp, rdi, rsi, rdx, rcx, rbx, rax;
-    uint64_t vector;
-    uint64_t error_code;
-    uint64_t rip;
-    uint64_t cs;
-    uint64_t rflags;
-    uint64_t rsp; // 仅用户态有效
-    uint64_t ss;  // 仅用户态有效
-} __attribute__((packed)) interrupt_frame_t;
-
 #define enable_irq() asm volatile("sti")
 #define disable_irq() asm volatile("cli")
 

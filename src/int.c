@@ -2,6 +2,7 @@
 #include <pic.h>
 #include <task.h>
 #include <lapic.h>
+#include <lib/printf/printf.h>
 
 __attribute__((aligned(4096))) static idtr_t idtr;
 __attribute__((aligned(4096))) static idt_entry_t idt[256]; // Create an array of IDT entries; aligned for performance
