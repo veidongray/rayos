@@ -11,7 +11,7 @@ void spinlock_lock(spinlock_t *lock)
     // Continuously try to acquire the lock using compare-and-swap
     while (1)
     {                         // Loop until success
-        int32_t expected = 0; // Expected unlocked state
+        int64_t expected = 0; // Expected unlocked state
         // Attempt to swap 1 (locked) into the lock if it's currently 0 (unlocked)
         if (atomic_compare_exchange(lock, &expected, 1))
         {
@@ -36,7 +36,7 @@ void spinlock_unlock(spinlock_t *lock)
 
 int spinlock_try_lock(spinlock_t *lock)
 {
-    int32_t expected = 0; // Expected unlocked state
+    int64_t expected = 0; // Expected unlocked state
     // Try once to swap 1 (locked) into the lock if it's currently 0 (unlocked)
     if (atomic_compare_exchange(lock, &expected, 1))
     {
