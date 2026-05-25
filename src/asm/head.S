@@ -16,7 +16,7 @@ _end_mboot:
 
 # =====================================================================
 .code32 
-.section .text
+.section .text.head
 .global _start
 .type _start, @function
 _start:

@@ -1,6 +1,7 @@
 #include <mm.h>
 #include <int.h>
 #include <task.h>
+#include <lib/string/string.h>
 
 struct task_struct *current = NULL;
 LIST_HEAD(task_list);
@@ -39,6 +40,7 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
 
     task->flags = flags;
     task->status = TASK_READY;
+    memcpy(task->name, name, strlen(name));
     list_add(&task->list, &task_list);
 
     if (current == NULL)

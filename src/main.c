@@ -7,13 +7,14 @@
 #include <task.h>
 #include <uart.h>
 #include <lapic.h>
-#include <printf.h>
+#include <lib/printf/printf.h>
 #include <multiboot2.h>
 
 void task1(void *args)
 {
     args = args;
     printf("task1 %#x\n", args);
+    printf("task name %s\n", current->name);
     while (1)
         ;
 }
@@ -23,6 +24,7 @@ void task0(void *args)
     args = args;
     task_create(task1, (void *)0x12344321, "task1", TASK_KERN);
     printf("task0 %#x\n", args);
+    printf("task name %s\n", current->name);
     while (1)
         ;
 }

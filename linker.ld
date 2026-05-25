@@ -11,6 +11,7 @@ SECTIONS
 
     .text ALIGN(4K) : AT(ADDR(.text) - VIRT_OFFSET) {
 	    *(.multiboot2)
+        *(.text.head)
 	    *(.text)
     }
 

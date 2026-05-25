@@ -1,7 +1,6 @@
 .include "asm/common.inc"
 
 .section .note.GNU-stack,"",@progbits
-
 .section .text
 .global switch_to
 switch_to:

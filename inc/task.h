@@ -28,6 +28,8 @@ struct task_struct
     enum task_status status;
 };
 
+extern struct task_struct *current;
+
 void task_exit(void);
 void scheduler(void);
 extern void switch_to(uint64_t *rsp); // from switch_to.S
