@@ -3,13 +3,18 @@
 #include <gdt.h>
 #include <task.h>
 #include <page.h>
+#include <queue.h>
 #include <lib/printf/printf.h>
 #include <lib/string/string.h>
 
 static struct task_struct *current = NULL;
+static queue_t task_runqueue;
 LIST_HEAD(task_list);
 
-__attribute__((aligned(4096))) static uint64_t user_rsp0[1024];
+void task_manager_init(void)
+{
+    QUEUE_INIT(&task_runqueue);
+}
 
 struct task_struct *task_create(void (*task_func)(void *), void *args, char *name, int flags)
 {
@@ -32,7 +37,7 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
         *(--task->rsp) = (uint64_t)task_exit;
         *(--task->rsp) = (uint64_t)task_func;
 
-        task->rsp0 = (uint64_t)user_rsp0;
+        task->rsp0 = (uint64_t)0x0;
         task->rsp = (uint64_t *)((uint64_t)task->rsp - sizeof(struct context));
         context = (struct context *)task->rsp;
         context->r15 = 0;
@@ -189,6 +194,19 @@ void scheduler(void)
             context_switch(&cur->rsp, &next->rsp);
             break;
 
+        case TASK_BLOCKED:
+            next = container_of(task_list.next, struct task_struct, list);
+
+            cur = current;
+            current = next;
+            // update task status
+            next->status = TASK_RUNNING;
+
+            set_cr3(next->pml4);
+            update_tss_rsp0(next->rsp0);
+            context_switch(&cur->rsp, &next->rsp);
+            break;
+
         default:
             break;
         }
@@ -220,4 +238,9 @@ uint64_t get_cr3(void)
 struct task_struct *get_current(void)
 {
     return current;
+}
+
+struct list_head *get_tasklist(void)
+{
+    return &task_list;
 }

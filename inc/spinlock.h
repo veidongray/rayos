@@ -10,6 +10,6 @@ typedef volatile int64_t spinlock_t;
 void spinlock_init(spinlock_t *lock);
 void spinlock_lock(spinlock_t *lock);
 void spinlock_unlock(spinlock_t *lock);
-int spinlock_try_lock(spinlock_t *lock);
+int spinlock_trylock(spinlock_t *lock);
 
 #endif // SPINLOCK_H

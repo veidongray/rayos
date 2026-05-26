@@ -34,7 +34,7 @@ void spinlock_unlock(spinlock_t *lock)
     asm volatile("mfence" ::: "memory");
 }
 
-int spinlock_try_lock(spinlock_t *lock)
+int spinlock_trylock(spinlock_t *lock)
 {
     int64_t expected = 0; // Expected unlocked state
     // Try once to swap 1 (locked) into the lock if it's currently 0 (unlocked)

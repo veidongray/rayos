@@ -39,9 +39,11 @@ struct context
 void task_exit(void);
 void scheduler(void);
 uint64_t get_cr3(void);
+void task_manager_init(void);
 void set_cr3(uint64_t pml4addr);
 extern void switch_to_user(void);     // from switch_to.S
 extern void switch_to(uint64_t *rsp); // from switch_to.S
+struct list_head *get_tasklist(void);
 struct task_struct *get_current(void);
 extern void context_switch(uint64_t **cur_rsp, uint64_t **next_rsp); // from switch_to.S
 struct task_struct *task_create(void (*task_func)(void *), void *args, char *name, int flags);
