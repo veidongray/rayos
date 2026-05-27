@@ -50,5 +50,6 @@ void kfree(void *virtaddr)
     struct vmap_area *vm;
 
     vm = (struct vmap_area *)((uint64_t)virtaddr - sizeof(struct vmap_area));
+    free_pages(get_physaddr((uint64_t)virtaddr), vm->va_nrpages);
     unmap_page_range((uint64_t)vm, vm->va_nrpages);
 }

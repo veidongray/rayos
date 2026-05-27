@@ -21,3 +21,14 @@ struct list_head *queue_dequeue(queue_t *q)
     spinlock_unlock(&q->lock);
     return node;
 }
+
+int queue_empty(queue_t *q)
+{
+    int is_empty;
+
+    spinlock_lock(&q->lock);
+    is_empty = list_empty(&q->head);
+    spinlock_unlock(&q->lock);
+
+    return is_empty;
+}

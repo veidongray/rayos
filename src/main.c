@@ -8,10 +8,11 @@
 #include <uart.h>
 #include <lapic.h>
 #include <mutex.h>
+#include <bitmap.h>
 #include <multiboot2.h>
 #include <lib/printf/printf.h>
 
-mutex_t mutex;
+static mutex_t mutex;
 
 void user0(void *args)
 {

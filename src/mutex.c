@@ -3,57 +3,42 @@
 #include <mutex.h>
 #include <atomic.h>
 
-void mutex_init(mutex_t *mutex)
+void mutex_init(mutex_t *mt)
 {
-    atomic_store(&mutex->locked, MUTEX_UNLOCK);
-    spinlock_init(&mutex->spinlock);
-    INIT_LIST_HEAD(&mutex->wait_queue);
+    QUEUE_INIT(&mt->wait_queue);
+    atomic_store(&mt->locked, MUTEX_UNLOCK);
 }
 
-int mutex_trylock(mutex_t *mutex)
+int mutex_trylock(mutex_t *mt)
 {
     int64_t expected = MUTEX_UNLOCK;
-    return atomic_compare_exchange(&mutex->locked, &expected, MUTEX_LOCKED);
+    return atomic_compare_exchange(&mt->locked, &expected, MUTEX_LOCKED);
 }
 
-int mutex_lock(mutex_t *mutex)
+int mutex_lock(mutex_t *mt)
 {
     struct task_struct *current;
 
-    while (!mutex_trylock(mutex))
+    while (!mutex_trylock(mt))
     {
-        spinlock_lock(&mutex->spinlock);
         current = get_current();
-        list_del(&current->list);
-        list_add_tail(&current->list, &mutex->wait_queue);
-        spinlock_unlock(&mutex->spinlock);
-
         current->status = TASK_BLOCKED;
-        disable_irq();
+        queue_enqueue(&mt->wait_queue, &current->list);
         scheduler();
     }
     return 1;
 }
 
-int mutex_unlock(mutex_t *mutex)
+int mutex_unlock(mutex_t *mt)
 {
-    struct list_head *task_list;
     struct task_struct *task;
 
-    spinlock_lock(&mutex->spinlock);
-    atomic_store(&mutex->locked, MUTEX_UNLOCK);
-    if (!list_empty(&mutex->wait_queue))
+    atomic_store(&mt->locked, MUTEX_UNLOCK);
+    if (!queue_empty(&mt->wait_queue))
     {
-        task_list = get_tasklist();
-        task = container_of(mutex->wait_queue.next, struct task_struct, list);
-        list_del(&task->list);
-        list_add(&task->list, task_list);
+        task = container_of(queue_dequeue(&mt->wait_queue), struct task_struct, list);
         task->status = TASK_READY;
-        spinlock_unlock(&mutex->spinlock);
-    }
-    else
-    {
-        spinlock_unlock(&mutex->spinlock);
+        queue_enqueue(get_task_readyqueue(), &task->list);
     }
     return 0;
 }

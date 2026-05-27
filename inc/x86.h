@@ -27,4 +27,26 @@ static inline void io_wait(void)
     outb(0x80, 0);
 }
 
+static inline void write_cr3(uint64_t pml4addr)
+{
+    asm volatile(
+        "movq %0, %%rax\r\n"
+        "movq %%rax, %%cr3\r\n"
+        :
+        : "r"(pml4addr)
+        : "rax");
+}
+
+static inline uint64_t read_cr3(void)
+{
+    uint64_t retval;
+
+    asm volatile(
+        "movq %%cr3, %0"
+        : "=r"(retval)
+        :
+        : "rax");
+    return retval;
+}
+
 #endif // X86_H

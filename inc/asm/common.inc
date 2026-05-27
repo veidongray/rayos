@@ -1,4 +1,5 @@
 .macro PUSH_ALL
+    pushfq
     pushq %rax
     pushq %rbx
     pushq %rcx
@@ -32,4 +33,5 @@
     popq %rcx
     popq %rbx
     popq %rax
+    popfq
 .endm

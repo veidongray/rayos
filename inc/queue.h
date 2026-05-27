@@ -23,4 +23,6 @@ void queue_enqueue(queue_t *q, struct list_head *node);
 // 出队（头取）
 struct list_head *queue_dequeue(queue_t *q);
 
+int queue_empty(queue_t *q);
+
 #endif // QUEUE_H

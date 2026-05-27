@@ -20,8 +20,8 @@ typedef struct
     uint64_t base;
 } __attribute__((packed)) idtr_t;
 
-#define enable_irq() asm volatile("sti")
-#define disable_irq() asm volatile("cli")
+#define local_irq_enable() asm volatile("sti")
+#define local_irq_disable() asm volatile("cli")
 
 void int_init(void);
 void idt_set_descriptor(uint8_t vector, void *isr, uint8_t flags);

@@ -1,21 +1,32 @@
 #include <page.h>
 #include <bitmap.h>
+#include <alignes.h>
 #include <multiboot2.h>
 
-#define BOOTMAP_LEN 0x1000000
+#define BOOTMAP_LEN 0x1000000 // 128MB
 
-static bitmap_t page_alloc_bitmap;
-static uint64_t page_bitmap_data[512];
+bitmap_t page_alloc_bitmap;
+static uint64_t *page_bitmap_data;
 extern uint64_t _kernel_phys_end_aligned[];
 extern uint64_t _kernel_virt_end_aligned[];
 
 void page_init(void)
 {
-    bitmap_init(&page_alloc_bitmap, page_bitmap_data, sizeof(page_bitmap_data));
+    size_t mem;
+    size_t bits;
+    size_t bitmap_data_bytes;
+
+    mem = ALIGNED_UP(get_total_mem(), PAGE_SIZE);
+    bits = mem >> PAGE_SHIFT;
+    bitmap_data_bytes = ALIGNED_UP(bits >> 3, PAGE_SIZE);
+    page_bitmap_data = (uint64_t *)_kernel_virt_end_aligned;
+
+    bitmap_init(&page_alloc_bitmap, page_bitmap_data, bits);
     // mark used page
-    bitmap_set_range(&page_alloc_bitmap, 0, (uint64_t)_kernel_phys_end_aligned >> PAGE_SHIFT);
+    bitmap_set_range(&page_alloc_bitmap, 0, ((uint64_t)_kernel_phys_end_aligned + bitmap_data_bytes) >> PAGE_SHIFT);
     // unmap unused page
-    unmap_page_range((uint64_t)_kernel_virt_end_aligned, (BOOTMAP_LEN - (uint64_t)_kernel_phys_end_aligned) >> 12);
+    unmap_page_range((uint64_t)_kernel_virt_end_aligned + bitmap_data_bytes,
+                     (BOOTMAP_LEN - (uint64_t)_kernel_phys_end_aligned - bitmap_data_bytes) >> PAGE_SHIFT);
 }
 
 uint64_t alloc_pages(size_t order)

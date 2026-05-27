@@ -1,4 +1,5 @@
 #include <mm.h>
+#include <x86.h>
 #include <int.h>
 #include <gdt.h>
 #include <task.h>
@@ -8,12 +9,11 @@
 #include <lib/string/string.h>
 
 static struct task_struct *current = NULL;
-static queue_t task_runqueue;
-LIST_HEAD(task_list);
+static queue_t task_readyqueue;
 
 void task_manager_init(void)
 {
-    QUEUE_INIT(&task_runqueue);
+    QUEUE_INIT(&task_readyqueue);
 }
 
 struct task_struct *task_create(void (*task_func)(void *), void *args, char *name, int flags)
@@ -28,7 +28,7 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
     // 构造任务栈
     if (flags & TASK_FLAGS_KERN)
     {
-        task->pml4 = get_cr3();
+        task->pml4 = read_cr3();
         task->stack = (uint64_t *)kzalloc(TASK_STACK_SIZE_MAX);
         if (task->stack == NULL)
             return NULL;
@@ -54,6 +54,7 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
         context->rdx = 0;
         context->rdi = (uint64_t)args;
         context->rsi = 0;
+        context->rflags = 0x202;
     }
     else if (flags & TASK_FLAGS_USER)
     {
@@ -112,6 +113,7 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
         context->rdx = 0;
         context->rdi = (uint64_t)args;
         context->rsi = 0;
+        context->rflags = 0;
 
         // copy kernel pml4
         for (index = 256; index < 512; index++)
@@ -128,7 +130,6 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
     task->status = TASK_READY;
     memset(task->name, 0x0, 32);
     memcpy(task->name, name, strlen(name));
-    list_add(&task->list, &task_list);
 
     if (current == NULL)
     {
@@ -137,102 +138,44 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
         switch_to(task->rsp);
     }
 
+    queue_enqueue(&task_readyqueue, &task->list);
+
     return task;
 }
 
 void task_exit(void)
 {
-    disable_irq();
+    local_irq_disable();
     current->status = TASK_EXIT;
     scheduler();
 }
 
 void scheduler(void)
 {
-    struct task_struct *cur, *next;
+    struct task_struct *old_task, *new_task;
 
     if (current)
     {
-        switch (current->status)
+        if (!queue_empty(&task_readyqueue))
         {
-        case TASK_RUNNING:
-            list_del(&current->list);
-            list_add_tail(&current->list, &task_list);
-            next = container_of(task_list.next, struct task_struct, list);
-            while (next->status == TASK_DEAD)
+            // 就绪队列不为空才进入任务切换
+            old_task = current;
+            new_task = container_of(queue_dequeue(&task_readyqueue), struct task_struct, list);
+
+            new_task->status = TASK_RUNNING;
+            if (old_task->status == TASK_RUNNING)
             {
-                list_del(&next->list);
-                kfree(next->stack);
-                kfree(next);
-                next = container_of(task_list.next, struct task_struct, list);
+                // 如果被切换任务是正常运行的TASK_RUNNIN状态才将其移到队列末尾
+                old_task->status = TASK_READY;
+                queue_enqueue(&task_readyqueue, &old_task->list);
             }
 
-            cur = current;
-            current = next;
-            // update task status
-            cur->status = TASK_READY;
-            next->status = TASK_RUNNING;
-
-            set_cr3(next->pml4);
-            update_tss_rsp0(next->rsp0);
-            context_switch(&cur->rsp, &next->rsp);
-            break;
-
-        case TASK_EXIT:
-            list_del(&current->list);
-            list_add_tail(&current->list, &task_list);
-            next = container_of(task_list.next, struct task_struct, list);
-
-            cur = current;
-            current = next;
-            // update task status
-            cur->status = TASK_DEAD;
-            next->status = TASK_RUNNING;
-
-            set_cr3(next->pml4);
-            update_tss_rsp0(next->rsp0);
-            context_switch(&cur->rsp, &next->rsp);
-            break;
-
-        case TASK_BLOCKED:
-            next = container_of(task_list.next, struct task_struct, list);
-
-            cur = current;
-            current = next;
-            // update task status
-            next->status = TASK_RUNNING;
-
-            set_cr3(next->pml4);
-            update_tss_rsp0(next->rsp0);
-            context_switch(&cur->rsp, &next->rsp);
-            break;
-
-        default:
-            break;
+            current = new_task;
+            write_cr3(new_task->pml4);
+            update_tss_rsp0(new_task->rsp0);
+            context_switch(&old_task->rsp, &new_task->rsp);
         }
     }
-}
-
-void set_cr3(uint64_t pml4addr)
-{
-    asm volatile(
-        "movq %0, %%rax\r\n"
-        "movq %%rax, %%cr3\r\n"
-        :
-        : "r"(pml4addr)
-        : "rax");
-}
-
-uint64_t get_cr3(void)
-{
-    uint64_t retval;
-
-    asm volatile(
-        "movq %%cr3, %0"
-        : "=r"(retval)
-        :
-        : "rax");
-    return retval;
 }
 
 struct task_struct *get_current(void)
@@ -240,7 +183,7 @@ struct task_struct *get_current(void)
     return current;
 }
 
-struct list_head *get_tasklist(void)
+queue_t *get_task_readyqueue(void)
 {
-    return &task_list;
+    return &task_readyqueue;
 }
