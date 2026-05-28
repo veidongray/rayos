@@ -102,7 +102,7 @@ int map_page_range(uint64_t physaddr, uint64_t virtaddr, uint64_t flags, size_t 
         {
             // already map
             unmap_page_range(virtaddr, i);
-            return i;
+            return -1;
         }
         map_pt[pt_idx] = (pa & ~0xfff) | flags | 0x1ULL;
         asm volatile(

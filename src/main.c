@@ -1,5 +1,6 @@
 #include <mm.h>
 #include <x86.h>
+#include <pci.h>
 #include <int.h>
 #include <gdt.h>
 #include <pic.h>
@@ -56,9 +57,10 @@ void start_kernel(void)
     int_init();
     lapic_init();
     uart_init();
+    pci_init();
     task_manager_init();
 
-    task_create(task0, (void *)0x12344321, "task0", TASK_FLAGS_KERN);
+    // task_create(task0, (void *)0x12344321, "task0", TASK_FLAGS_KERN);
     while (1)
     {
         asm volatile("hlt");

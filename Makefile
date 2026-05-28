@@ -31,21 +31,36 @@ build:
 	$(LD) $(LDFLAGS) -T linker.ld -o vmrayos $(BUILT-IN)
 	find src -name "*.o" ! -name "built-in.o" -type f -exec rm -f {} +
 
-iso: build
+disk.img:
+	dd if=/dev/zero of=disk.img bs=1M count=128
+	mkfs.fat -F 32 disk.img
+
+iso: build disk.img
 	cp vmrayos iso/boot/
 	grub-mkrescue -o rayos.iso iso/
 
 qemu: iso
-	qemu-system-x86_64 -smp 2 -m 128M -cdrom rayos.iso
+	qemu-system-x86_64 -machine q35 -smp 2 -m 128M \
+    -cdrom rayos.iso -boot d \
+    -drive file=disk.img,if=none,id=disk0,format=raw \
+    -device ide-hd,drive=disk0,bus=ide.0
 
 qemu-dbg: iso
-	qemu-system-x86_64 -smp 2 -m 128M -no-reboot -serial file:serial0.log -d int,guest_errors,mmu -D qemu.log -cdrom rayos.iso
+	qemu-system-x86_64 -machine q35 -smp 2 -m 128M \
+	-no-reboot -serial file:serial0.log -d int,guest_errors,mmu -D qemu.log \
+	-cdrom rayos.iso -boot d \
+    -drive file=disk.img,if=none,id=disk0,format=raw \
+    -device ide-hd,drive=disk0,bus=ide.0
 
 qemu-gdb: iso
-	qemu-system-x86_64 -smp 2 -m 128M -S -s -no-reboot -serial file:serial0.log -d int,guest_errors,mmu -D qemu.log -cdrom rayos.iso
+	qemu-system-x86_64 -machine q35 -smp 2 -m 128M -S -s \
+	-no-reboot -serial file:serial0.log -d int,guest_errors,mmu -D qemu.log \
+	-cdrom rayos.iso -boot d \
+    -drive file=disk.img,if=none,id=disk0,format=raw \
+    -device ide-hd,drive=disk0,bus=ide.0
 
 clean:
-	find . -name "*.o" -type f -exec rm -f {} +
+	find . -type f \( -name "*.o" -o -name "*.log" -o -name "*.iso" -o -name "*.img" \) -exec rm -f {} +
 	$(RM) *.iso vmrayos iso/boot/vmrayos *.log
 
 rebuild: clean build
