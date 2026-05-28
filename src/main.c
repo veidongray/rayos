@@ -4,6 +4,7 @@
 #include <int.h>
 #include <gdt.h>
 #include <pic.h>
+#include <acpi.h>
 #include <page.h>
 #include <task.h>
 #include <uart.h>
@@ -57,6 +58,7 @@ void start_kernel(void)
     int_init();
     lapic_init();
     uart_init();
+    acpi_init();
     pci_init();
     task_manager_init();
 

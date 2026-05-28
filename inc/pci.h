@@ -72,7 +72,10 @@ struct pci_config
     };
 };
 
-// 暴露给内核初始化的主入口函数
+void pci_read_config_pio(uint32_t bus, uint32_t slot, uint32_t func, struct pci_config *pci_config);
+void pci_read_config_mmio(uint32_t bus, uint32_t slot, uint32_t func, struct pci_config *pci_config);
+void pci_read_config(uint32_t bus, uint32_t slot, uint32_t func, struct pci_config *pci_config);
+void pci_probe(void);
 void pci_init(void);
 
 #endif // PCI_H
