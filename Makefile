@@ -17,11 +17,19 @@ CFLAGS = -m64 -fno-pic                      \
 
 LDFLAGS = -m elf_x86_64
 
+ISO := rayos.iso
+QEMU := qemu-system-x86_64
+QEMU_FLAGS := -M q35 -smp 2 -m 128M \
+    -cdrom $(ISO) -boot d \
+    -drive file=disk.img,if=none,id=disk0,format=raw \
+    -device ide-hd,drive=disk0,bus=ide.0
+QEMU_DBG_FLAGS := -no-reboot -serial file:serial0.log -d int,guest_errors,mmu -D qemu.log
+
 export INCDIR
 export CFLAGS
 export LDFLAGS
 
-.PHONY: build iso qemu qemu-dbg qemu-gdb clean rebuild
+.PHONY: build iso qemu qemudbg qemugdb clean rebuild disk.img
 
 build:
 	$(MAKE) -C src/lib/printf built-in.o
@@ -37,27 +45,16 @@ disk.img:
 
 iso: build disk.img
 	cp vmrayos iso/boot/
-	grub-mkrescue -o rayos.iso iso/
+	grub-mkrescue -o $(ISO) iso/
 
 qemu: iso
-	qemu-system-x86_64 -machine q35 -smp 2 -m 128M \
-    -cdrom rayos.iso -boot d \
-    -drive file=disk.img,if=none,id=disk0,format=raw \
-    -device ide-hd,drive=disk0,bus=ide.0
+	$(QEMU) $(QEMU_FLAGS)
 
-qemu-dbg: iso
-	qemu-system-x86_64 -machine q35 -smp 2 -m 128M \
-	-no-reboot -serial file:serial0.log -d int,guest_errors,mmu -D qemu.log \
-	-cdrom rayos.iso -boot d \
-    -drive file=disk.img,if=none,id=disk0,format=raw \
-    -device ide-hd,drive=disk0,bus=ide.0
+qemudbg: iso
+	$(QEMU) $(QEMU_FLAGS) $(QEMU_DBG_FLAGS)
 
-qemu-gdb: iso
-	qemu-system-x86_64 -machine q35 -smp 2 -m 128M -S -s \
-	-no-reboot -serial file:serial0.log -d int,guest_errors,mmu -D qemu.log \
-	-cdrom rayos.iso -boot d \
-    -drive file=disk.img,if=none,id=disk0,format=raw \
-    -device ide-hd,drive=disk0,bus=ide.0
+qemugdb: iso
+	$(QEMU) $(QEMU_FLAGS) $(QEMU_DBG_FLAGS) -S -s
 
 clean:
 	find . -type f \( -name "*.o" -o -name "*.log" -o -name "*.iso" -o -name "*.img" \) -exec rm -f {} +

@@ -2,10 +2,10 @@
 #include <x86.h>
 #include <pci.h>
 #include <page.h>
-#include <lib/printf/printf.h>
-
-#define USE_MMIO 1
-#define PCI_MMIO_BASE 0xB0000000
+#include <acpi.h>
+#include <ahci.h>
+#include <printk.h>
+#include <lib/string/string.h>
 
 void pci_read_config_pio(uint32_t bus, uint32_t slot, uint32_t func, struct pci_config *pci_config)
 {
@@ -42,8 +42,7 @@ void pci_read_config_mmio(uint32_t bus, uint32_t slot, uint32_t func, struct pci
                            ((func & 0x07) << 12) |
                            (count & 0xFFF);
 
-        // 这里的 PCI_MMIO_BASE 必须是已经建立好页表映射的内核虚拟地址
-        mmio_addr = (volatile uint32_t *)(PCI_MMIO_BASE + offset);
+        mmio_addr = (volatile uint32_t *)(acpi_find_mcfg_pci_mmio_base(0) + offset);
 
         // 直接像读取内存一样读取寄存器
         *(data++) = *mmio_addr;
@@ -52,14 +51,12 @@ void pci_read_config_mmio(uint32_t bus, uint32_t slot, uint32_t func, struct pci
 
 void pci_read_config(uint32_t bus, uint32_t slot, uint32_t func, struct pci_config *pci_config)
 {
-    if (USE_MMIO)
-    {
-        pci_read_config_mmio(bus, slot, func, pci_config);
-    }
-    else
-    {
-        pci_read_config_pio(bus, slot, func, pci_config);
-    }
+#define USE_MMIO
+#ifdef USE_MMIO
+    pci_read_config_mmio(bus, slot, func, pci_config);
+#else
+    pci_read_config_pio(bus, slot, func, pci_config);
+#endif
 }
 
 void pci_probe(void)
@@ -74,9 +71,18 @@ void pci_probe(void)
             for (func = 0; func < 8; func++)
             {
                 pci_read_config(bus, slot, func, &pc);
+                if (pc.header.prof_if == 0x01 && pc.header.sub_class_code == 0x06 && pc.header.base_class_code == 0x01)
+                {
+                    struct pci_config *ahci = (struct pci_config *)kmalloc(sizeof(struct pci_config));
+
+                    memcpy(ahci, &pc, sizeof(struct pci_config));
+                    printk("AHCI Device Found %x:%x\n", ahci->header.vendor_id, ahci->header.device_id);
+                    printk("AHCI bar5 %#llx\n", ahci->type0.bar[5]);
+                    ahci_init((uintptr_t)ahci->type0.bar[5]);
+                }
                 if ((pc.header.vendor_id != 0xffff) && (pc.header.vendor_id != 0x0000))
                 {
-                    printf("PCI %04llx:%04llx, HeaderType %02llx\n", pc.header.vendor_id, pc.header.device_id, pc.header.header_type);
+                    printk("PCI %04llx:%04llx, HeaderType %02llx\n", pc.header.vendor_id, pc.header.device_id, pc.header.header_type);
                 }
             }
         }
@@ -85,6 +91,6 @@ void pci_probe(void)
 
 void pci_init(void)
 {
-    map_page_range((uint64_t)PCI_MMIO_BASE, (uint64_t)PCI_MMIO_BASE, 0x1b, 65536);
+    map_page_range((uint64_t)acpi_find_mcfg_pci_mmio_base(0), (uint64_t)acpi_find_mcfg_pci_mmio_base(0), 0x1b, 65536);
     pci_probe();
 }

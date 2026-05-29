@@ -21,7 +21,7 @@ struct pci_config_header
     uint8_t latency_timer;
     uint8_t header_type;
     uint8_t bist;
-};
+} __attribute__((packed));
 
 struct pci_config_type0
 {
@@ -36,7 +36,7 @@ struct pci_config_type0
     uint8_t interrupt_pin;
     uint8_t min_gnt;
     uint8_t max_lat;
-};
+} __attribute__((packed));
 
 struct pci_config_type1
 {
@@ -61,12 +61,13 @@ struct pci_config_type1
     uint8_t interrupt_line;
     uint8_t interrupt_pin;
     uint16_t bridge_control;
-};
+} __attribute__((packed));
 
 struct pci_config
 {
     struct pci_config_header header;
-    union {
+    union
+    {
         struct pci_config_type0 type0;
         struct pci_config_type1 type1;
     };

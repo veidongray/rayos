@@ -2,6 +2,7 @@
 #define LAPIC_H
 
 #include <page.h>
+#include <acpi.h>
 #include <stdint.h>
 
 #define LAPIC_BASE 0xFEE00000
