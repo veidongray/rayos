@@ -1,31 +1,273 @@
 #include <ahci.h>
+#include <page.h>
 #include <printk.h>
+#include <lib/string/string.h>
+
+// =============================================================================
+// 1. 严格契合 AHCI HBA 规范的物理内存结构体定义
+// =============================================================================
+
+// 单个命令槽描述符 (Command Header) - 共 32 字节
+struct ahci_cmd_header
+{
+    uint16_t opts;  // Bit 0~4: CFL (CFIS 长度), Bit 6: W (1=写, 0=读)
+    uint16_t prdtl; // PRDT 散集表条目数量
+    uint32_t prdbc; // 硬件自动填写的已传输完成字节计数
+    uint32_t ctba;  // Command Table Base Address (低 32 位物理地址，128字节对齐)
+    uint32_t ctbau; // Command Table Base Address (高 32 位物理地址)
+    uint32_t reserved[4];
+} __attribute__((packed));
+
+// 标准的主机到设备寄存器包 (Host to Device Register FIS) - 共 20 字节
+struct fis_reg_h2d
+{
+    uint8_t fis_type; // 固定为 0x27
+    uint8_t pmport_c; // Bit 7 为 1 代表命令
+    uint8_t command;  // ATA 命令码 (读: 0x25, 写: 0x35)
+    uint8_t features_low;
+    uint8_t lba0;
+    uint8_t lba1;
+    uint8_t lba2;
+    uint8_t device; // LBA模式下固定为 0x40 (1 << 6)
+    uint8_t lba3;
+    uint8_t lba4;
+    uint8_t lba5;
+    uint8_t features_high;
+    uint8_t count_low;
+    uint8_t count_high;
+    uint8_t icc;
+    uint8_t control;
+    uint8_t reserved[4];
+} __attribute__((packed));
+
+// 散集表条目 (PRDT Entry) - 共 16 字节
+struct ahci_prdt_entry
+{
+    uint32_t dba;  // 数据块物理基地址 (低 32 位)
+    uint32_t dbau; // 数据块物理基地址 (高 32 位)
+    uint32_t reserved0;
+    uint32_t dbc; // 传输字节数。最高位 Bit 31 为 1 代表传输完成触发中断
+} __attribute__((packed));
+
+// 完整的命令表结构体 (Command Table) - 开足 4096 字节安全空间
+struct ahci_cmd_table
+{
+    uint8_t cfis[64];                 // 0x00 ~ 0x3F: 容纳各种类型的 CFIS 包 (包含上面的 fis_reg_h2d)
+    uint8_t acmd[32];                 // 0x40 ~ 0x5F: ATAPI 命令空间
+    uint8_t reserved[32];             // 0x6F ~ 0x7F: 保留
+    struct ahci_prdt_entry prdt[128]; // 0x80 开始: 散集表阵列，支持多块内存片段
+} __attribute__((packed));
+
+// =============================================================================
+// 2. 静态物理缓冲区分配 (全部完美对齐)
+// =============================================================================
+__attribute__((aligned(256))) static uint8_t fis_buffer[256];
+__attribute__((aligned(1024))) static struct ahci_cmd_header cl_buffer[32];   // 32个Slot
+__attribute__((aligned(4096))) static struct ahci_cmd_table cmd_table_buffer; // 升级为页级命令表
+__attribute__((aligned(4096))) static uint8_t sector_data[512];               // 保证包在一个物理页内
+
+// =============================================================================
+// 3. 稳健的读写及初始化函数实现
+// =============================================================================
+
+int ahci_sata_read(struct hba_memory_registers *hba, int port_no, uint64_t lba, uint16_t count, void *target_buf_virt)
+{
+    volatile struct port_register *port = &hba->ports[port_no];
+
+    // 确保任何历史挂起中断已被冲刷掉
+    port->PxIS = 0xFFFFFFFFU;
+
+    // 【修正】使用结构体完美掌控 Slot 0，免去错误的 cl_entry[2] 指针偏移计算
+    struct ahci_cmd_header *cmd_hdr = &cl_buffer[0];
+
+    // 配置 Slot 0 的命令头基本属性
+    cmd_hdr->opts = 5 | (0 << 6); // CFL = 5 dwords (20 字节); W = 0 (读命令)
+    cmd_hdr->prdtl = 1;           // 只有 1 个 PRDT 搬运目的地
+    cmd_hdr->prdbc = 0;           // 硬件清零计数器
+
+    // 【修正】通过结构体直接、干净地定位到 CFIS 空间，不改变其物理绑定
+    struct fis_reg_h2d *cfis = (struct fis_reg_h2d *)(cmd_table_buffer.cfis);
+    memset(cfis, 0, sizeof(struct fis_reg_h2d));
+
+    cfis->fis_type = 0x27;    // Register FIS - Host to Device
+    cfis->pmport_c = 1U << 7; // 指明这是一条指令
+    cfis->command = 0x25;     // READ SECTORS EXT (LBA48 读)
+    cfis->device = 1U << 6;   // 启用 LBA 寻址模式
+
+    // 填入 48 位 LBA 地址
+    cfis->lba0 = (uint8_t)(lba & 0xFF);
+    cfis->lba1 = (uint8_t)((lba >> 8) & 0xFF);
+    cfis->lba2 = (uint8_t)((lba >> 16) & 0xFF);
+    cfis->lba3 = (uint8_t)((lba >> 24) & 0xFF);
+    cfis->lba4 = (uint8_t)((lba >> 32) & 0xFF);
+    cfis->lba5 = (uint8_t)((lba >> 40) & 0xFF);
+
+    // 填入需要读取的扇区数
+    cfis->count_low = (uint8_t)(count & 0xFF);
+    cfis->count_high = (uint8_t)((count >> 8) & 0xFF);
+
+    // 【修正】使用结构体 prdt[0] 写入，彻底告别裸物理地址加算带来的惊悚
+    uint64_t target_phys = get_physaddr(target_buf_virt);
+    cmd_table_buffer.prdt[0].dba = (uint32_t)(target_phys & 0xFFFFFFFFU);
+    cmd_table_buffer.prdt[0].dbau = (uint32_t)((target_phys >> 32) & 0xFFFFFFFFU);
+    cmd_table_buffer.prdt[0].reserved0 = 0;
+    // 传输控制：(字节数 - 1) | 传输完毕中断允许 (Bit 31)
+    cmd_table_buffer.prdt[0].dbc = ((count * 512 - 1) & 0x3FFFFFU) | (1U << 31);
+
+    // 等待硬盘空闲
+    while (port->PxTFD & ((1U << 7) | (1U << 3)))
+        ;
+
+    // 清空历史错误信息，防止拒绝接收新命令
+    port->PxSERR = 0xFFFFFFFFU;
+
+    // 临门一脚：向 Slot 0 扔飞镖！
+    port->PxCI = (1U << 0);
+
+    printk("Issued Read Command. Waiting for completion...\n");
+
+    // 轮询等待硬件回收飞镖
+    while (1)
+    {
+        if ((port->PxCI & (1U << 0)) == 0)
+        {
+            break; // 成功！硬件已经完成搬运
+        }
+        // 保险报错退出机制
+        if (port->PxIS & (1U << 30))
+        {
+            printk("[Port %d] -> READ ERROR! Task File Error detected. PxSERR: 0x%08X\n", port_no, port->PxSERR);
+            return -1;
+        }
+    }
+
+    printk("[Port %d] -> READ SUCCESS! 512 bytes DMA transfer complete.\n", port_no);
+    return 0;
+}
+
+// 判定函数
+sata_dev_t ahci_check_device_type(volatile uint32_t signature)
+{
+    // 根据签名精准断定
+    switch (signature)
+    {
+    case 0x00000101:
+        return SATA_DEV_SATA;
+    case 0xEB140101:
+        return SATA_DEV_SATAPI;
+    case 0xC33C0101:
+        return SATA_DEV_SEMB;
+    case 0x96690101:
+        return SATA_DEV_PM;
+    default:
+        return SATA_DEV_NONE;
+    }
+}
 
 void ahci_init(uintptr_t ahci_base)
 {
-    uintptr_t *ahci_virt_base = (uintptr_t *)ahci_base;
-    map_page_range((uint64_t)ahci_base, (uint64_t)ahci_virt_base, 0x1b, 2);
+    size_t nr_ports;
+    uint32_t port_implements;
+    struct hba_memory_registers *hba;
 
-    uint32_t *cap = ahci_virt_base;
-    uint32_t *ghc = ahci_virt_base + 1;
-    uint32_t *pi = ahci_virt_base + 3;
+    printk("AHCI base %#llx\n", ahci_base);
+    hba = (struct hba_memory_registers *)ahci_base;
+    map_page_range((uint64_t)ahci_base, (uint64_t)ahci_base, 0x1b, (sizeof(struct hba_memory_registers) >> PAGE_SHIFT) + 1);
 
-    // AHCI Enable
-    *ghc |= (1U << 31);
-    // HBA Reset
-    *ghc |= (1U << 0);
-    // AHCI Enable Again
-    *ghc |= (1U << 31);
+    // 全局重置与激活 AHCI
+    hba->ghc.ghc |= (1U << 31);
+    hba->ghc.ghc |= (1U << 0);
+    while (hba->ghc.ghc & 0x1U)
+        ;
+    hba->ghc.ghc |= (1U << 31);
 
-    // Read HBA capabilities
-    uint32_t nr_ports = ((*cap) & 0x1f) + 1;
-    uint32_t port_map = (*pi);
-    printk("AHCI Ports %u\n", nr_ports);
-    printk("AHCI Port Map %#llx\n", port_map);
+    nr_ports = (hba->ghc.cap & 0x1f) + 1;
+    port_implements = hba->ghc.pi;
+    printk("AHCI nr_ports %u\n", nr_ports);
+    printk("AHCI port_implements %lx\n", port_implements);
 
-    for (int i = 0; i < nr_ports; i++)
+    for (size_t i = 0; i < nr_ports; i++)
     {
-        volatile uint32_t *port = ahci_virt_base[0x100 + (i * 0x80)];
-        printk("Port %d, PxSIG %#llx\n", i, port[9]);
+        if (!(port_implements & (1U << i)))
+            continue; // 如果主板没有实现这个端口，不要动它
+
+        hba->ports[i].PxCMD |= (1U << 4); // 临时开启 FRE 以读取签名
+
+        // 软延时给电气握手留出微秒级缓冲
+        for (volatile int d = 0; d < 2000000; d++)
+            ;
+
+        if (((hba->ports[i].PxSSTS & 0xfU) == 0x3U) && (((hba->ports[i].PxSSTS & 0xf00U) >> 8) == 0x1U))
+        {
+            sata_dev_t dev_type = ahci_check_device_type(hba->ports[i].PxSIG);
+            if (dev_type == SATA_DEV_SATA)
+            {
+                printk("[Port %d] -> Found SATA Hard Disk (HDD/SSD).\n", i);
+
+                // 彻底刹车停止端口的 DMA 状态机
+                hba->ports[i].PxCMD &= ~(1U << 0);
+                hba->ports[i].PxCMD &= ~(1U << 4);
+
+                while (1)
+                {
+                    if (hba->ports[i].PxCMD & (1U << 15))
+                        continue;
+                    if (hba->ports[i].PxCMD & (1U << 14))
+                        continue;
+                    break;
+                }
+
+                // 分配并配置 Received FIS 物理基地址
+                uint64_t fis_phys = get_physaddr(fis_buffer);
+                hba->ports[i].PxFB = (uint32_t)(fis_phys & 0xFFFFFFFFU);
+                hba->ports[i].PxFBU = (uint32_t)((fis_phys >> 32) & 0xFFFFFFFFU);
+                memset(fis_buffer, 0, 256);
+
+                // 分配并配置 Command List 物理基地址
+                uint64_t cl_phys = get_physaddr(cl_buffer);
+                hba->ports[i].PxCLB = (uint32_t)(cl_phys & 0xFFFFFFFFU);
+                hba->ports[i].PxCLBU = (uint32_t)((cl_phys >> 32) & 0xFFFFFFFFU);
+                memset(cl_buffer, 0, sizeof(cl_buffer));
+
+                // 【关键修正点】优雅且万无一失地绑定 Command Table 物理基地址
+                uint64_t ctba_phys = get_physaddr(&cmd_table_buffer);
+                memset(&cmd_table_buffer, 0, sizeof(struct ahci_cmd_table));
+
+                cl_buffer[0].ctba = (uint32_t)(ctba_phys & 0xFFFFFFFFU);
+                cl_buffer[0].ctbau = (uint32_t)((ctba_phys >> 32) & 0xFFFFFFFFU);
+
+                hba->ports[i].PxSERR = 0xFFFFFFFFU;
+
+                // 按顺序唤醒端口引擎
+                hba->ports[i].PxCMD |= (1U << 4); // FRE 第一步
+                hba->ports[i].PxCMD |= (1U << 0); // ST 第二步
+
+                if ((hba->ports[i].PxCMD & (1U << 15)) && (hba->ports[i].PxCMD & (1U << 14)))
+                {
+                    printk("[Port %d] -> DMA Engine Started Successfully! Nest Built.\n", i);
+
+                    // 筑巢成功后，清空接收区，开盘！
+                    memset(sector_data, 0, 512);
+                    if (ahci_sata_read(hba, i, 0, 1, sector_data) == 0)
+                    {
+                        // 打印 MBR 结束标志人肉验证
+                        printk("MBR Magic: 0x%02X 0x%02X\n", sector_data[510], sector_data[511]);
+                    }
+                }
+                else
+                {
+                    printk("[Port %d] -> DMA Engine failed to start!\n", i);
+                }
+            }
+            // 后续逻辑保持不变...
+            else if (dev_type == SATA_DEV_SATAPI)
+            {
+                printk("[Port %d] -> Found SATAPI CD-ROM. Ignore for now.\n", i);
+            }
+            else
+            {
+                printk("[Port %d] -> No valid SATA device or device busy (SIG: 0x%08X).\n", i, hba->ports[i].PxSIG);
+            }
+        }
     }
 }
