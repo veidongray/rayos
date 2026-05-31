@@ -78,6 +78,8 @@ void pci_probe(void)
                     memcpy(ahci, &pc, sizeof(struct pci_config));
                     printk("AHCI Device Found %x:%x\n", ahci->header.vendor_id, ahci->header.device_id);
                     printk("AHCI bar5 %#llx\n", ahci->type0.bar[5]);
+                    printk("AHCI interrupt line %u\n", ahci->type0.interrupt_line);
+                    printk("AHCI interrupt pin %u\n", ahci->type0.interrupt_pin);
                     ahci_init((uintptr_t)ahci->type0.bar[5]);
                 }
                 if ((pc.header.vendor_id != 0xffff) && (pc.header.vendor_id != 0x0000))

@@ -54,7 +54,7 @@ struct generic_host_control
  */
 struct port_register
 {
-    // === 筑巢核心：DMA 基地址寄存器 ===
+    // === DMA 基地址寄存器 ===
     uint32_t PxCLB;  // 0x00: Command List Base Address (命令列表基物理地址 - 低32位)
                      //       - 必须 1024 字节对齐！
     uint32_t PxCLBU; // 0x04: Command List Base Address Upper (命令列表基物理地址 - 高32位)
@@ -143,6 +143,57 @@ typedef enum
     SATA_DEV_SEMB,   // 桥接管理设备
     SATA_DEV_PM      // 端口多路复用器
 } sata_dev_t;
+
+// 单个命令槽描述符 (Command List Slot) - 共 32 字节
+struct ahci_cmd_list_entry
+{
+    uint16_t opts;  // Bit 0~4: CFL (CFIS 长度), Bit 6: W (1=写, 0=读)
+    uint16_t prdtl; // PRDT 散集表条目数量
+    uint32_t prdbc; // 硬件自动填写的已传输完成字节计数
+    uint32_t ctba;  // Command Table Base Address (低 32 位物理地址，128字节对齐)
+    uint32_t ctbau; // Command Table Base Address (高 32 位物理地址)
+    uint32_t reserved[4];
+} __attribute__((packed));
+
+// 标准的主机到设备寄存器包 (Host to Device Register FIS) - 共 20 字节
+struct fis_reg_h2d
+{
+    uint8_t fis_type; // 固定为 0x27
+    uint8_t pmport_c; // Bit 7 为 1 代表命令
+    uint8_t command;  // ATA 命令码 (读: 0x25, 写: 0x35)
+    uint8_t features_low;
+    uint8_t lba0;
+    uint8_t lba1;
+    uint8_t lba2;
+    uint8_t device; // LBA模式下固定为 0x40 (1 << 6)
+    uint8_t lba3;
+    uint8_t lba4;
+    uint8_t lba5;
+    uint8_t features_high;
+    uint8_t count_low;
+    uint8_t count_high;
+    uint8_t icc;
+    uint8_t control;
+    uint8_t reserved[4];
+} __attribute__((packed));
+
+// 散集表条目 (PRDT Entry) - 共 16 字节
+struct ahci_prdt_entry
+{
+    uint32_t dba;  // 数据块物理基地址 (低 32 位)
+    uint32_t dbau; // 数据块物理基地址 (高 32 位)
+    uint32_t reserved0;
+    uint32_t dbc; // 传输字节数。最高位 Bit 31 为 1 代表传输完成触发中断
+} __attribute__((packed));
+
+// 完整的命令表结构体 (Command Table) - 开足 4096 字节安全空间
+struct ahci_cmd_table
+{
+    uint8_t cfis[64];                 // 0x00 ~ 0x3F: 容纳各种类型的 CFIS 包 (包含上面的 fis_reg_h2d)
+    uint8_t acmd[32];                 // 0x40 ~ 0x5F: ATAPI 命令空间
+    uint8_t reserved[32];             // 0x6F ~ 0x7F: 保留
+    struct ahci_prdt_entry prdt[128]; // 0x80 开始: 散集表阵列，支持多块内存片段
+} __attribute__((packed));
 
 // 判定函数
 sata_dev_t ahci_check_device_type(volatile uint32_t signature);
