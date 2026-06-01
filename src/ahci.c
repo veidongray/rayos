@@ -3,10 +3,107 @@
 #include <printk.h>
 #include <lib/string/string.h>
 
+struct mbr_partition
+{
+    uint8_t boot;
+    uint8_t start_chs[3];
+    uint8_t type;
+    uint8_t end_chs[3];
+
+    uint32_t first_lba;
+    uint32_t sector_count;
+};
+
+struct fat32_bpb
+{
+    /* 0x00 */
+    uint8_t jump_boot[3]; // EB ?? 90
+
+    /* 0x03 */
+    char oem_name[8];
+
+    /* 0x0B */
+    uint16_t bytes_per_sector; // 通常 512
+
+    /* 0x0D */
+    uint8_t sectors_per_cluster;
+
+    /* 0x0E */
+    uint16_t reserved_sector_count;
+
+    /* 0x10 */
+    uint8_t num_fats; // 通常 2
+
+    /* 0x11 */
+    uint16_t root_entry_count; // FAT32 = 0
+
+    /* 0x13 */
+    uint16_t total_sectors_16; // FAT32通常为0
+
+    /* 0x15 */
+    uint8_t media;
+
+    /* 0x16 */
+    uint16_t fat_size_16; // FAT32 = 0
+
+    /* 0x18 */
+    uint16_t sectors_per_track;
+
+    /* 0x1A */
+    uint16_t num_heads;
+
+    /* 0x1C */
+    uint32_t hidden_sectors;
+
+    /* 0x20 */
+    uint32_t total_sectors_32;
+
+    /* ===== FAT32 Extended BPB ===== */
+
+    /* 0x24 */
+    uint32_t fat_size_32;
+
+    /* 0x28 */
+    uint16_t ext_flags;
+
+    /* 0x2A */
+    uint16_t fs_version;
+
+    /* 0x2C */
+    uint32_t root_cluster; // 通常 = 2
+
+    /* 0x30 */
+    uint16_t fs_info;
+
+    /* 0x32 */
+    uint16_t backup_boot_sector;
+
+    /* 0x34 */
+    uint8_t reserved[12];
+
+    /* 0x40 */
+    uint8_t drive_number;
+
+    /* 0x41 */
+    uint8_t reserved1;
+
+    /* 0x42 */
+    uint8_t boot_signature; // 0x29
+
+    /* 0x43 */
+    uint32_t volume_id;
+
+    /* 0x47 */
+    char volume_label[11];
+
+    /* 0x52 */
+    char filesystem_type[8]; // "FAT32   "
+} __attribute__((packed));
+
 __attribute__((aligned(256))) static uint8_t fis_buffer[256];
 __attribute__((aligned(1024))) static struct ahci_cmd_list_entry cl_buffer[32]; // 32个Slot
 __attribute__((aligned(4096))) static struct ahci_cmd_table cmd_table_buffer;   // 升级为页级命令表
-__attribute__((aligned(4096))) static uint8_t sector_data[512];                 // 保证包在一个物理页内
+__attribute__((aligned(4096))) static uint8_t sector_data[512 * 16];            // 保证包在一个物理页内
 static struct hba_memory_registers *hba;
 
 int ahci_sata_read(struct hba_memory_registers *hba, int port_no, uint64_t lba, uint16_t count, void *target_buf_virt)
@@ -210,10 +307,26 @@ void ahci_init(uintptr_t ahci_base)
 
                     // 筑巢成功后，清空接收区，开盘！
                     memset(sector_data, 0, 512);
-                    if (ahci_sata_read(hba, i, 0, 1, sector_data) == 0)
+                    if (ahci_sata_read(hba, i, 0, 16, sector_data) == 0)
                     {
+                        for (int i = 0xc00; i < 0x1000; i += 4)
+                            printk("%02x %02x %02x %02x \n", sector_data[i], sector_data[i + 1], sector_data[i + 2], sector_data[i + 3]);
+                        struct mbr_partition *mbr_part = (struct mbr_partition *)&sector_data[446];
+                        struct fat32_bpb *bpb = (struct fat32_bpb *)sector_data;
                         // 打印 MBR 结束标志人肉验证
                         printk("MBR Magic: 0x%02X 0x%02X\n", sector_data[510], sector_data[511]);
+                        printk("MBR first_lba %u\n", mbr_part->first_lba);
+                        printk("MBR sector_count %u\n", mbr_part->sector_count);
+                        printk("MBR type %u\n", mbr_part->type);
+                        printk("Bytes/Sector      : %u\n", bpb->bytes_per_sector);
+                        printk("Sectors/Cluster   : %u\n", bpb->sectors_per_cluster);
+                        printk("Reserved Sectors  : %u\n", bpb->reserved_sector_count);
+                        printk("FAT Count         : %u\n", bpb->num_fats);
+                        printk("FAT Size          : %u\n", bpb->fat_size_32);
+                        printk("Root Cluster      : %u\n", bpb->root_cluster);
+                        printk("FAT OEM name      : %s\n", bpb->oem_name);
+                        printk("FAT Volume ID     : %llx\n", bpb->volume_id);
+                        printk("FAT total sectors : %llu\n", bpb->total_sectors_32);
                     }
                 }
                 else
