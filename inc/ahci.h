@@ -198,5 +198,7 @@ struct ahci_cmd_table
 // 判定函数
 sata_dev_t ahci_check_device_type(volatile uint32_t signature);
 void ahci_init(uintptr_t ahci_base);
+int ahci_read(struct port_register *port, uint64_t lba, uint16_t count, void *target_buf_virt);
+int ahci_write(struct port_register *port, uint64_t lba, uint16_t count, void *target_buf_virt);
 
 #endif // AHCI_H

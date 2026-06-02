@@ -1,5 +1,8 @@
+#include <mm.h>
+#include <list.h>
 #include <ahci.h>
 #include <page.h>
+#include <align.h>
 #include <printk.h>
 #include <lib/string/string.h>
 
@@ -100,13 +103,55 @@ struct fat32_bpb
     char filesystem_type[8]; // "FAT32   "
 } __attribute__((packed));
 
+struct fat32_dir_entry
+{
+    char name[11];
+
+    uint8_t attr;
+
+    uint8_t nt_reserved;
+
+    uint8_t crt_time_tenth;
+
+    uint16_t crt_time;
+    uint16_t crt_date;
+
+    uint16_t last_access_date;
+
+    uint16_t first_cluster_hi;
+
+    uint16_t write_time;
+    uint16_t write_date;
+
+    uint16_t first_cluster_lo;
+
+    uint32_t file_size;
+
+} __attribute__((packed));
+
+struct fat32_lfn_entry
+{
+    uint8_t order;
+
+    uint16_t name1[5];
+
+    uint8_t attr; // 0x0F
+    uint8_t type;
+    uint8_t checksum;
+
+    uint16_t name2[6];
+
+    uint16_t first_cluster; // 总是0
+
+    uint16_t name3[2];
+} __attribute__((packed));
+
 __attribute__((aligned(256))) static uint8_t fis_buffer[256];
 __attribute__((aligned(1024))) static struct ahci_cmd_list_entry cl_buffer[32]; // 32个Slot
 __attribute__((aligned(4096))) static struct ahci_cmd_table cmd_table_buffer;   // 升级为页级命令表
-__attribute__((aligned(4096))) static uint8_t sector_data[512 * 16];            // 保证包在一个物理页内
 static struct hba_memory_registers *hba;
 
-int ahci_sata_read(struct hba_memory_registers *hba, int port_no, uint64_t lba, uint16_t count, void *target_buf_virt)
+int ahci_dma_transfer(int write, struct port_register *port, uint64_t lba, uint16_t count, void *target_buf_virt)
 {
     /*
     [HBA Port 寄存器]
@@ -132,7 +177,6 @@ int ahci_sata_read(struct hba_memory_registers *hba, int port_no, uint64_t lba, 
   │     └── prdt[1] ──► [物理地址 DBA] + [操作字节数 DBC] ───┼─► (若有多块内存，继续往后接...)
   └──────────────────────────────────────────────────────────┘
     */
-    volatile struct port_register *port = &hba->ports[port_no];
 
     // 确保任何历史挂起中断已被冲刷掉
     port->PxIS = 0xFFFFFFFFU;
@@ -141,9 +185,10 @@ int ahci_sata_read(struct hba_memory_registers *hba, int port_no, uint64_t lba, 
     struct ahci_cmd_list_entry *cmd_hdr = &cl_buffer[0];
 
     // 配置 Slot 0 的命令头基本属性
-    cmd_hdr->opts = 5 | (0 << 6); // CFL = 5 dwords (20 字节); W = 0 (读命令)
-    cmd_hdr->prdtl = 1;           // 只有 1 个 PRDT 搬运目的地
-    cmd_hdr->prdbc = 0;           // 硬件清零计数器
+    cmd_hdr->opts =
+        5 | ((write ? 1 : 0) << 6); // CFL = 5 dwords (20 字节); W = 0 (读命令)
+    cmd_hdr->prdtl = 1;             // 只有 1 个 PRDT 搬运目的地
+    cmd_hdr->prdbc = 0;             // 硬件清零计数器
 
     // 通过结构体直接、干净地定位到 CFIS 空间，不改变其物理绑定
     struct fis_reg_h2d *cfis = (struct fis_reg_h2d *)(cmd_table_buffer.cfis);
@@ -151,8 +196,9 @@ int ahci_sata_read(struct hba_memory_registers *hba, int port_no, uint64_t lba, 
 
     cfis->fis_type = 0x27;    // Register FIS - Host to Device
     cfis->pmport_c = 1U << 7; // 指明这是一条指令
-    cfis->command = 0x25;     // READ SECTORS EXT (LBA48 读)
-    cfis->device = 1U << 6;   // 启用 LBA 寻址模式
+    cfis->command =
+        write ? 0x35 : 0x25; // READ SECTORS EXT (LBA48 读)
+    cfis->device = 1U << 6;  // 启用 LBA 寻址模式
 
     // 填入 48 位 LBA 地址
     cfis->lba0 = (uint8_t)(lba & 0xFF);
@@ -184,8 +230,6 @@ int ahci_sata_read(struct hba_memory_registers *hba, int port_no, uint64_t lba, 
     // 临门一脚：向 Slot 0 扔飞镖！
     port->PxCI = (1U << 0);
 
-    printk("Issued Read Command. Waiting for completion...\n");
-
     // 轮询等待硬件回收飞镖
     while (1)
     {
@@ -196,13 +240,43 @@ int ahci_sata_read(struct hba_memory_registers *hba, int port_no, uint64_t lba, 
         // 保险报错退出机制
         if (port->PxIS & (1U << 30))
         {
-            printk("[Port %d] -> READ ERROR! Task File Error detected. PxSERR: 0x%08X\n", port_no, port->PxSERR);
             return -1;
         }
     }
-
-    printk("[Port %d] -> READ SUCCESS! 512 bytes DMA transfer complete.\n", port_no);
     return 0;
+}
+
+int ahci_read(struct port_register *port, uint64_t lba, uint16_t count, void *target_buf_virt)
+{
+    return ahci_dma_transfer(
+        0,
+        port,
+        lba,
+        count,
+        target_buf_virt);
+}
+
+int ahci_write(struct port_register *port, uint64_t lba, uint16_t count, void *target_buf_virt)
+{
+    return ahci_dma_transfer(
+        1,
+        port,
+        lba,
+        count,
+        target_buf_virt);
+}
+
+uint32_t cluster_to_lba(struct fat32_bpb *bpb, uint32_t cluster)
+{
+    uint32_t data_start_lba = bpb->reserved_sector_count + (bpb->fat_size_32 * bpb->num_fats);
+
+    if (cluster < 2)
+    {
+        return 0; // 或返回错误码，簇0/1无对应LBA
+    }
+
+    // 数据区起始 + 簇偏移 × 每簇扇区数
+    return data_start_lba + (cluster - 2) * bpb->sectors_per_cluster;
 }
 
 // 判定函数
@@ -263,7 +337,7 @@ void ahci_init(uintptr_t ahci_base)
             {
                 printk("[Port %d] -> Found SATA Hard Disk (HDD/SSD).\n", i);
 
-                // 彻底刹车停止端口的 DMA 状态机
+                // 停止端口的 DMA 状态机
                 hba->ports[i].PxCMD &= ~(1U << 0);
                 hba->ports[i].PxCMD &= ~(1U << 4);
 
@@ -304,30 +378,35 @@ void ahci_init(uintptr_t ahci_base)
                 if ((hba->ports[i].PxCMD & (1U << 15)) && (hba->ports[i].PxCMD & (1U << 14)))
                 {
                     printk("[Port %d] -> DMA Engine Started Successfully! Nest Built.\n", i);
-
-                    // 筑巢成功后，清空接收区，开盘！
-                    memset(sector_data, 0, 512);
-                    if (ahci_sata_read(hba, i, 0, 16, sector_data) == 0)
+                    uint8_t *sata_bpb_buffer = (uint8_t *)kmalloc(512 * 32);
+                    struct fat32_bpb *bpb;
+                    memset(sata_bpb_buffer, 0, 512 * 32);
+                    if (ahci_read(&(hba->ports[i]), 0, 32, sata_bpb_buffer) == 0)
                     {
-                        for (int i = 0xc00; i < 0x1000; i += 4)
-                            printk("%02x %02x %02x %02x \n", sector_data[i], sector_data[i + 1], sector_data[i + 2], sector_data[i + 3]);
-                        struct mbr_partition *mbr_part = (struct mbr_partition *)&sector_data[446];
-                        struct fat32_bpb *bpb = (struct fat32_bpb *)sector_data;
-                        // 打印 MBR 结束标志人肉验证
-                        printk("MBR Magic: 0x%02X 0x%02X\n", sector_data[510], sector_data[511]);
-                        printk("MBR first_lba %u\n", mbr_part->first_lba);
-                        printk("MBR sector_count %u\n", mbr_part->sector_count);
-                        printk("MBR type %u\n", mbr_part->type);
-                        printk("Bytes/Sector      : %u\n", bpb->bytes_per_sector);
-                        printk("Sectors/Cluster   : %u\n", bpb->sectors_per_cluster);
-                        printk("Reserved Sectors  : %u\n", bpb->reserved_sector_count);
-                        printk("FAT Count         : %u\n", bpb->num_fats);
-                        printk("FAT Size          : %u\n", bpb->fat_size_32);
-                        printk("Root Cluster      : %u\n", bpb->root_cluster);
-                        printk("FAT OEM name      : %s\n", bpb->oem_name);
-                        printk("FAT Volume ID     : %llx\n", bpb->volume_id);
-                        printk("FAT total sectors : %llu\n", bpb->total_sectors_32);
+                        bpb = (struct fat32_bpb *)sata_bpb_buffer;
+                        printk("`--Bytes/Sector      : %u\n", bpb->bytes_per_sector);
+                        printk("`--Sectors/Cluster   : %u\n", bpb->sectors_per_cluster);
+                        printk("`--Reserved Sectors  : %u\n", bpb->reserved_sector_count);
+                        printk("`--FAT Count         : %u\n", bpb->num_fats);
+                        printk("`--FAT Size          : %u\n", bpb->fat_size_32);
+                        printk("`--Root Cluster      : %u\n", bpb->root_cluster);
+                        printk("`--FAT OEM name      : %s\n", bpb->oem_name);
+                        printk("`--FAT Volume ID     : %llx\n", bpb->volume_id);
+                        printk("`--FAT total sectors : %llu\n", bpb->total_sectors_32);
                     }
+
+                    uint8_t *sata_fat_buffer = (uint8_t *)kmalloc(bpb->fat_size_32 * bpb->bytes_per_sector);
+                    memset(sata_fat_buffer, 0, bpb->fat_size_32 * bpb->sectors_per_cluster);
+                    ahci_read(&(hba->ports[i]), bpb->reserved_sector_count, bpb->fat_size_32, sata_fat_buffer);
+                    uint32_t *fat = (uint32_t *)sata_fat_buffer;
+                    printk("root cluster: %08llx\n", fat[2]);
+                    uint32_t cluster_data_start_lba = cluster_to_lba(bpb, 5);
+                    uint32_t *cluster_data_buffer = kmalloc(bpb->sectors_per_cluster * bpb->bytes_per_sector);
+                    ahci_read(&(hba->ports[i]), cluster_data_start_lba, bpb->sectors_per_cluster, cluster_data_buffer);
+                    printk("cluster data %llx\n", cluster_data_buffer[0]);
+
+                    kfree(sata_bpb_buffer);
+                    kfree(sata_fat_buffer);
                 }
                 else
                 {

@@ -1,6 +1,6 @@
 #include <page.h>
 #include <bitmap.h>
-#include <alignes.h>
+#include <align.h>
 #include <multiboot2.h>
 
 #define BOOTMAP_LEN 0x1000000 // 128MB
@@ -16,9 +16,9 @@ void page_init(void)
     size_t bits;
     size_t bitmap_data_bytes;
 
-    mem = ALIGNED_UP(get_total_mem(), PAGE_SIZE);
+    mem = ALIGN_UP(get_total_mem(), PAGE_SIZE);
     bits = mem >> PAGE_SHIFT;
-    bitmap_data_bytes = ALIGNED_UP(bits >> 3, PAGE_SIZE);
+    bitmap_data_bytes = ALIGN_UP(bits >> 3, PAGE_SIZE);
     page_bitmap_data = (uint64_t *)_kernel_virt_end_aligned;
 
     bitmap_init(&page_alloc_bitmap, page_bitmap_data, bits);
@@ -202,17 +202,4 @@ void load_pml4(uint64_t pml4_physaddr)
         :
         : "r"(pml4_physaddr)
         : "rax");
-}
-
-uint64_t order_to_pages(size_t order)
-{
-    return 0x1 << order;
-}
-
-uint64_t size_to_order(size_t size)
-{
-    if (size == 0)
-        return 0;
-    size_t pages = (size + (1UL << PAGE_SHIFT) - 1) >> PAGE_SHIFT;
-    return fls(pages - 1);
 }

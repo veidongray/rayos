@@ -3,6 +3,6 @@
 
 #include <stdint.h>
 
-#define ALIGNED_UP(val, align) (((uint64_t)(val) + (align)) & ~((align) - 1))
+#define ALIGN_UP(val, align) (((uint64_t)(val) + (align)) & ~((align) - 1))
 
 #endif // ALIGNES_H

@@ -47,9 +47,13 @@ void *kzalloc(size_t size)
 
 void kfree(void *virtaddr)
 {
+    size_t order;
+    uint64_t physaddr;
     struct vmap_area *vm;
 
     vm = (struct vmap_area *)((uint64_t)virtaddr - sizeof(struct vmap_area));
-    free_pages(get_physaddr((uint64_t)virtaddr), vm->va_nrpages);
+    order = size_to_order(vm->va_nrpages * PAGE_SIZE);
+    physaddr = get_physaddr((uint64_t)virtaddr);
+    free_pages(physaddr, order);
     unmap_page_range((uint64_t)vm, vm->va_nrpages);
 }
