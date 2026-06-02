@@ -52,7 +52,7 @@ struct generic_host_control
  * AHCI 单个端口独立的寄存器组 (Port Registers)
  * 每个端口固定占用 0x80 (128字节) 空间
  */
-struct port_register
+struct sata_controller_port_register
 {
     // === DMA 基地址寄存器 ===
     uint32_t PxCLB;  // 0x00: Command List Base Address (命令列表基物理地址 - 低32位)
@@ -118,6 +118,8 @@ struct port_register
 /**
  * 完整的 AHCI HBA 内存映射寄存器空间总表
  * 完美契合 QEMU q35 模拟出的实际物理内存布局 (总大小约为 0x1100 字节)
+ * HBA is an acronym for “host bus adapter”. A host bus adapter refers to the silicon that implements the
+ * AHCI specification to communicate between system memory and Serial ATA devices.
  */
 struct hba_memory_registers
 {
@@ -129,7 +131,7 @@ struct hba_memory_registers
 
     uint8_t vendor_specific_registers[96]; // 0x0A0 ~ 0x0FF: 芯片厂商(如Intel)自定义的扩展寄存器
 
-    struct port_register ports[32]; // 0x100 ~ 0x10FF: 32个完全平铺连续的端口寄存器阵列！
+    struct sata_controller_port_register ports[32]; // 0x100 ~ 0x10FF: 32个完全平铺连续的端口寄存器阵列！
                                     //       - 第0个端口的基地址在 abar + 0x100
                                     //       - 第1个端口的基地址在 abar + 0x180
 } __attribute__((packed));
@@ -198,7 +200,11 @@ struct ahci_cmd_table
 // 判定函数
 sata_dev_t ahci_check_device_type(volatile uint32_t signature);
 void ahci_init(uintptr_t ahci_base);
-int ahci_read(struct port_register *port, uint64_t lba, uint16_t count, void *target_buf_virt);
-int ahci_write(struct port_register *port, uint64_t lba, uint16_t count, void *target_buf_virt);
+int ahci_read(struct sata_controller_port_register *port, uint64_t lba, uint16_t count, void *target_buf_virt);
+int ahci_write(struct sata_controller_port_register *port, uint64_t lba, uint16_t count, void *target_buf_virt);
+
+// 全局变量导出
+struct hba_memory_registers *get_host_bus_adapter(void);
+struct sata_device *get_sata_device(void);
 
 #endif // AHCI_H
