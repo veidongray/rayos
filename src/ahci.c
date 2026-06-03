@@ -240,7 +240,7 @@ void ahci_init(uintptr_t ahci_base)
                     sata_dev->hba = hba;
                     sata_dev->port_no = i;
                     
-                    fat32_readdir("/");
+                    fat32_readdir("/dir0/");
                 }
                 else
                 {
