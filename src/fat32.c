@@ -158,7 +158,7 @@ int fat32_readdir_cluster(uint32_t cluster)
             {
                 goto done;
             }
-            if (entry->sfn_entry.name[0] == 0xE5)
+            if ((uint8_t)entry->sfn_entry.name[0] == 0xE5)
             {
                 continue;
             }
@@ -189,9 +189,9 @@ int fat32_readdir_cluster(uint32_t cluster)
              * 没有LFN
              */
             {
-                char sfn_name[32];
+                char sfn_name[16];
                 sfn_to_ascii(entry->sfn_entry.name, sfn_name);
-                fat32_print(entry, name_buf);
+                fat32_print(entry, sfn_name);
             }
         }
         cluster = fat_table[cluster];
@@ -247,8 +247,6 @@ int fat32_lookup_in_cluster(uint32_t dir_cluster, const char *name, struct fat32
         ahci_read(port, cluster_to_lba(bpb, dir_cluster), bpb->sectors_per_cluster, cluster_buf);
         entry = (struct fat32_dir_entry *)cluster_buf;
 
-        memset(name_buf, 0, 512);
-
         for (uint32_t i = 0; i < entries_per_cluster; i++, entry++)
         {
             // 空目录项，目录结束
@@ -256,7 +254,7 @@ int fat32_lookup_in_cluster(uint32_t dir_cluster, const char *name, struct fat32
                 goto not_found;
 
             // 已删除的目录项
-            if (entry->sfn_entry.name[0] == 0xE5)
+            if ((uint8_t)entry->sfn_entry.name[0] == 0xE5)
                 continue;
 
             // 长文件名
@@ -264,6 +262,7 @@ int fat32_lookup_in_cluster(uint32_t dir_cluster, const char *name, struct fat32
             {
                 // 拼接 LFN，每个 LFN entry 可存 13 个 UTF16 字符
                 size_t offset = ((entry->lfn_entry.order & 0x1F) - 1) * 13;
+                memset(name_buf, 0, 512);
                 utf16_to_ascii(entry->lfn_entry.name1, name_buf + offset, 5);
                 utf16_to_ascii(entry->lfn_entry.name2, name_buf + offset + 5, 6);
                 utf16_to_ascii(entry->lfn_entry.name3, name_buf + offset + 11, 2);
@@ -272,7 +271,7 @@ int fat32_lookup_in_cluster(uint32_t dir_cluster, const char *name, struct fat32
                 if ((entry->lfn_entry.order & 0x1F) == 1)
                 {
                     entry++; // 指向对应的 SFN
-                    if (strlen(name) == strlen(name_buf) && strcmp(name, name_buf) == 0)
+                    if (strncmp(name, name_buf, strlen(name_buf) + 1) == 0)
                     {
                         memcpy(result, entry, sizeof(struct fat32_dir_entry));
                         goto done;
@@ -282,8 +281,9 @@ int fat32_lookup_in_cluster(uint32_t dir_cluster, const char *name, struct fat32
             }
 
             // SFN 文件名（没有 LFN）
+            memset(name_buf, 0, 512);
             sfn_to_ascii(entry->sfn_entry.name, name_buf); // 需要实现 SFN 转 ASCII 函数
-            if (strcmp(name, name_buf) == 0)
+            if (strncmp(name, name_buf, strlen(name_buf) + 1) == 0)
             {
                 memcpy(result, entry, sizeof(struct fat32_dir_entry));
                 goto done;
