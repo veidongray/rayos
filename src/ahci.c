@@ -239,8 +239,15 @@ void ahci_init(uintptr_t ahci_base)
                     sata_dev = kmalloc(sizeof(struct sata_device));
                     sata_dev->hba = hba;
                     sata_dev->port_no = i;
-                    
+                    sata_dev->port = &hba->ports[i];
+
                     fat32_readdir("/");
+                    char *buf = kzalloc(4096);
+                    int fd = fat32_open("/filenamelarge0");
+                    fat32_read(fd, buf, 4000);
+                    printf("%s", buf);
+                    fat32_close(fd);
+                    kfree(buf);
                 }
                 else
                 {

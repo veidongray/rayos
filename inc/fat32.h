@@ -141,9 +141,13 @@ struct sata_device
 {
     uint32_t port_no;
     struct hba_memory_registers *hba;
+    struct sata_controller_port_register *port;
 };
 
+int fat32_open(const char *path);
+int fat32_close(int fd);
 int fat32_readdir(const char *path);
+int fat32_read(int fd, char *buf, size_t size);
 uint32_t cluster_to_lba(struct fat32_bpb *bpb, uint32_t cluster);
 
 #endif // FAT32_H
