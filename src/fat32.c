@@ -220,7 +220,6 @@ int fat32_lfn_concat(struct fat32_dir_entry *entry, char *buf)
 
 int fat32_readdir_cluster(uint32_t cluster)
 {
-    char sfn_name[16];
     char *cluster_buf;
     char *name_buf;
     uint32_t *fat_table;
@@ -276,9 +275,9 @@ int fat32_readdir_cluster(uint32_t cluster)
                 }
                 else
                 {
-                    memset(sfn_name, 0, 16);
-                    sfn_to_ascii(entry->sfn_entry.name, sfn_name);
-                    fat32_print(entry, sfn_name);
+                    memset(name_buf, 0, 16);
+                    sfn_to_ascii(entry->sfn_entry.name, name_buf);
+                    fat32_print(entry, name_buf);
                 }
             }
         }
