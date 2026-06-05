@@ -241,10 +241,11 @@ void ahci_init(uintptr_t ahci_base)
                     sata_dev->port_no = i;
                     sata_dev->port = &hba->ports[i];
 
-                    fat32_readdir("/");
-                    char *buf = kzalloc(4096);
+                    fat32_readdir("/dir1");
+                    char *buf = kzalloc(100);
                     int fd = fat32_open("/filenamelarge0");
-                    fat32_read(fd, buf, 4000);
+                    // fat32_write(fd, "KKKKKKKKKKKKKKKKKKK", 20);
+                    fat32_read(fd, buf, 16);
                     printf("%s", buf);
                     fat32_close(fd);
                     kfree(buf);

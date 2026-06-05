@@ -148,6 +148,6 @@ int fat32_open(const char *path);
 int fat32_close(int fd);
 int fat32_readdir(const char *path);
 int fat32_read(int fd, char *buf, size_t size);
-uint32_t cluster_to_lba(struct fat32_bpb *bpb, uint32_t cluster);
+int fat32_write(int fd, char *buf, size_t size);
 
 #endif // FAT32_H
