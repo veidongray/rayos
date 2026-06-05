@@ -241,7 +241,13 @@ void ahci_init(uintptr_t ahci_base)
                     sata_dev->port_no = i;
                     sata_dev->port = &hba->ports[i];
 
-                    fat32_readdir("/dir1");
+                    for (int i = 0; i < 32; i++)
+                    {
+                        char buffer[32];
+                        sprintf(buffer, "/mylonglonglonglong%d.txt", i);
+                        fat32_create(buffer);
+                    }
+                    fat32_readdir("/");
                     char *buf = kzalloc(100);
                     int fd = fat32_open("/filenamelarge0");
                     // fat32_write(fd, "KKKKKKKKKKKKKKKKKKK", 20);

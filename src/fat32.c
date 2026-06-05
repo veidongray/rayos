@@ -449,6 +449,7 @@ int fat32_create(const char *path)
     char *dir;
     char *dir_step;
     char *fn;
+    char *fn_step;
     uint8_t *cluster_buf;
     uint32_t new_cluster;
     uint32_t dir_cluster;
@@ -480,6 +481,7 @@ int fat32_create(const char *path)
     // 拿到要创建的文件名
     while (dir_step = path_next(dir_step, fn))
         ;
+    fn_step = fn;
 
     // 将文件名或者目录名从路径中剔除
     // 寻找根路径
@@ -510,6 +512,8 @@ int fat32_create(const char *path)
     bytes_per_cluster = bpb->bytes_per_sector * bpb->sectors_per_cluster;
     cluster_buf = kzalloc(bytes_per_cluster);
     fat_table = kzalloc(bpb->bytes_per_sector);
+    nr_lfn = (strlen(fn) / 13) + 1;
+    fn_step = fn_step + ((nr_lfn - 1) * 13);
 
     // 每簇可存放的目录项数量
     entries_per_cluster = bpb->bytes_per_sector * bpb->sectors_per_cluster / sizeof(struct fat32_dir_entry);
@@ -526,28 +530,21 @@ int fat32_create(const char *path)
                 switch (fat32_need_lfn(fn))
                 {
                 case true:
-                    nr_lfn = (strlen(fn) / 13) + 1;
-
                     for (int j = 0; j < nr_lfn; j++)
                     {
                         for (int k = 0; k < 13; k++)
                         {
-                            if (k < 5)
-                            {
-                                entry->lfn_entry.name1[k] = fn[k];
-                            }
-                            if (k < 11)
-                            {
-                                entry->lfn_entry.name1[k] = fn[k + 5];
-                            }
-                            if (k < 13)
-                            {
-                                entry->lfn_entry.name1[k] = fn[k + 11];
-                            }
+                            if (k < 5 && k >= 0)
+                                entry->lfn_entry.name1[k] = fn_step[k];
+                            if (k < 11 && k >= 5)
+                                entry->lfn_entry.name2[k - 5] = fn_step[k];
+                            if (k < 13 && k >= 11)
+                                entry->lfn_entry.name3[k - 11] = fn_step[k];
                         }
-                        entry->lfn_entry.order = ((nr_lfn - j) == 1) ? (LFN_ORDER_LAST_ENTRY + 1) : (nr_lfn - j);
+                        entry->lfn_entry.order = (j == 0) ? (LFN_ORDER_LAST_ENTRY + nr_lfn) : (nr_lfn - j);
                         entry->lfn_entry.attr = ATTR_LONG_NAME;
                         entry++;
+                        fn_step = fn_step - 13;
                     }
                 case false:
                     // 创建新的SFN
@@ -620,12 +617,6 @@ int fat32_read_cluster(struct fat32_file *fp, char *buf, size_t size)
 
     fat_table = kzalloc(bpb->bytes_per_sector);
 
-    for (int i = 0; i < 32; i++)
-    {
-        char buffer[32];
-        sprintf(buffer, "/dir1/my%d.txt", i);
-        fat32_create(buffer);
-    }
     cluster = (fp->fs.entry.sfn_entry.first_cluster_hi << 16) + fp->fs.entry.sfn_entry.first_cluster_lo;
     bytes_per_cluster = bpb->bytes_per_sector * bpb->sectors_per_cluster;
     cluster_buf = kzalloc(bytes_per_cluster);

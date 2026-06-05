@@ -149,5 +149,6 @@ int fat32_close(int fd);
 int fat32_readdir(const char *path);
 int fat32_read(int fd, char *buf, size_t size);
 int fat32_write(int fd, char *buf, size_t size);
+int fat32_create(const char *path);
 
 #endif // FAT32_H
