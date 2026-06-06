@@ -102,22 +102,20 @@ static inline void sfn_to_ascii(const char *sfn, char *out)
     out[pos] = '\0';
 }
 
-/*
- * 将文件名转换成 FAT32 SFN(8.3) 格式
- *
- * 输入:
- *   "MY.TXT"
- *
- * 输出:
- *   sfn[11] =
- *   {'M','Y',' ',' ',' ',' ',' ',' ',
- *    'T','X','T'}
- */
-int ascii_to_sfn(const char *name, uint8_t sfn[11])
+static inline int toupper(int c)
+{
+    if (c >= 'a' && c <= 'z')
+        return c - 32;
+
+    return c;
+}
+
+static inline int ascii_to_sfn(const char *name, uint8_t sfn[11])
 {
     const char *dot;
-    size_t len;
-    size_t i;
+    size_t base_len;
+    size_t ext_len;
+    int need_lfn = 0;
 
     if (!name || !sfn)
         return -1;
@@ -128,54 +126,68 @@ int ascii_to_sfn(const char *name, uint8_t sfn[11])
 
     if (dot)
     {
-        size_t base_len = dot - name;
-        size_t ext_len = strlen(dot + 1);
+        base_len = dot - name;
+        ext_len = strlen(dot + 1);
 
-        if (base_len == 0 || base_len > 8)
-            return -1;
-
-        if (ext_len > 3)
-            return -1;
-
-        for (i = 0; i < base_len; i++)
-        {
-            char ch = name[i];
-
-            if (ch >= 'a' && ch <= 'z')
-                ch -= 32;
-
-            sfn[i] = ch;
-        }
-
-        for (i = 0; i < ext_len; i++)
-        {
-            char ch = dot[1 + i];
-
-            if (ch >= 'a' && ch <= 'z')
-                ch -= 32;
-
-            sfn[8 + i] = ch;
-        }
+        if (base_len > 8 || ext_len > 3)
+            need_lfn = 1;
     }
     else
     {
-        len = strlen(name);
+        base_len = strlen(name);
+        ext_len = 0;
 
-        if (len == 0 || len > 8)
-            return -1;
+        if (base_len > 8)
+            need_lfn = 1;
+    }
 
-        for (i = 0; i < len; i++)
+    if (!need_lfn)
+    {
+        /* 原来的8.3逻辑 */
+
+        for (size_t i = 0; i < base_len; i++)
         {
-            char ch = name[i];
-
-            if (ch >= 'a' && ch <= 'z')
-                ch -= 32;
-
+            char ch = toupper((unsigned char)name[i]);
             sfn[i] = ch;
+        }
+
+        if (dot)
+        {
+            for (size_t i = 0; i < ext_len; i++)
+            {
+                char ch = toupper((unsigned char)dot[1 + i]);
+                sfn[8 + i] = ch;
+            }
+        }
+
+        return 0;
+    }
+
+    /* 生成SFN别名 */
+
+    for (size_t i = 0; i < 6 && i < base_len; i++)
+    {
+        char ch = toupper((unsigned char)name[i]);
+
+        if (ch == ' ')
+            ch = '_';
+
+        sfn[i] = ch;
+    }
+
+    sfn[6] = '~';
+    sfn[7] = '1';
+
+    if (dot)
+    {
+        for (size_t i = 0; i < 3 && i < ext_len; i++)
+        {
+            char ch = toupper((unsigned char)dot[1 + i]);
+            sfn[8 + i] = ch;
         }
     }
 
-    return 0;
+    return 1; /* 返回1表示需要LFN */
 }
 
 /*
@@ -442,8 +454,65 @@ static inline uint32_t fat32_alloc_cluster(void)
     return -1;
 }
 
+static inline size_t ascii_to_utf16(
+    const char *ascii,
+    uint16_t *utf16,
+    size_t max_chars)
+{
+    size_t len = 0;
+
+    while (*ascii && len < max_chars)
+    {
+        utf16[len++] = (uint8_t)*ascii++;
+    }
+
+    utf16[len] = 0;
+
+    return len;
+}
+
+static inline uint8_t fat32_lfn_checksum(const uint8_t sfn[11])
+{
+    uint8_t sum = 0;
+
+    for (int i = 0; i < 11; i++)
+    {
+        sum = ((sum & 1) << 7) + (sum >> 1) + sfn[i];
+    }
+
+    return sum;
+}
+
+static inline int fat32_make_sfn_entry(struct fat32_dir_entry *entry, const char *fn)
+{
+    // 创建新的SFN
+    ascii_to_sfn(fn, entry->sfn_entry.name);
+    entry->sfn_entry.attr = ATTR_ARCHIVE;
+    entry->sfn_entry.file_size = 0;
+    entry->sfn_entry.first_cluster_hi = 0;
+    entry->sfn_entry.first_cluster_lo = 0;
+    entry->sfn_entry.write_date = 20260605;
+    entry->sfn_entry.write_time = 19923;
+    entry->sfn_entry.last_access_date = 0;
+    return 0;
+}
+
+static inline int fat32_make_lfn_entry(struct fat32_dir_entry *entry, const char *fn, uint8_t order)
+{
+    ascii_to_utf16(fn, entry->lfn_entry.name1, 5);
+    ascii_to_utf16(fn + 5, entry->lfn_entry.name2, 6);
+    ascii_to_utf16(fn + 11, entry->lfn_entry.name3, 2);
+    entry->lfn_entry.order = order;
+    entry->lfn_entry.attr = ATTR_LONG_NAME;
+    entry->lfn_entry.type = 0;
+    entry->lfn_entry.checksum = 0;
+    return 0;
+}
+
 int fat32_create(const char *path)
 {
+    int nr_free_entries;
+    int nr_total_entries;
     int nr_lfn;
     int count;
     char *dir;
@@ -514,6 +583,7 @@ int fat32_create(const char *path)
     fat_table = kzalloc(bpb->bytes_per_sector);
     nr_lfn = (strlen(fn) / 13) + 1;
     fn_step = fn_step + ((nr_lfn - 1) * 13);
+    nr_total_entries = nr_lfn + 1;
 
     // 每簇可存放的目录项数量
     entries_per_cluster = bpb->bytes_per_sector * bpb->sectors_per_cluster / sizeof(struct fat32_dir_entry);
@@ -527,39 +597,19 @@ int fat32_create(const char *path)
             // 空目录项，目录结束
             if ((entry->sfn_entry.name[0] == SFN_NAME0_FREE) || (entry->sfn_entry.name[0] == SFN_NAME0_DELETED))
             {
-                switch (fat32_need_lfn(fn))
+                if (fat32_need_lfn(fn) && (fn_step >= fn))
                 {
-                case true:
-                    for (int j = 0; j < nr_lfn; j++)
-                    {
-                        for (int k = 0; k < 13; k++)
-                        {
-                            if (k < 5 && k >= 0)
-                                entry->lfn_entry.name1[k] = fn_step[k];
-                            if (k < 11 && k >= 5)
-                                entry->lfn_entry.name2[k - 5] = fn_step[k];
-                            if (k < 13 && k >= 11)
-                                entry->lfn_entry.name3[k - 11] = fn_step[k];
-                        }
-                        entry->lfn_entry.order = (j == 0) ? (LFN_ORDER_LAST_ENTRY + nr_lfn) : (nr_lfn - j);
-                        entry->lfn_entry.attr = ATTR_LONG_NAME;
-                        entry++;
-                        fn_step = fn_step - 13;
-                    }
-                case false:
-                    // 创建新的SFN
-                    ascii_to_sfn(fn, entry->sfn_entry.name);
-                    entry->sfn_entry.attr = ATTR_ARCHIVE;
-                    entry->sfn_entry.file_size = 0;
-                    entry->sfn_entry.first_cluster_hi = 0;
-                    entry->sfn_entry.first_cluster_lo = 0;
-                    entry->sfn_entry.write_date = 20260605;
-                    entry->sfn_entry.write_time = 19923;
-                    entry->sfn_entry.last_access_date = 0;
+                    fat32_make_lfn_entry(entry, fn_step, ((nr_total_entries - nr_lfn) == 1) ? (LFN_ORDER_LAST_ENTRY | nr_lfn) : nr_lfn);
+                    ahci_write(sata_dev->port, cluster_to_lba(bpb, dir_cluster), bpb->sectors_per_cluster, cluster_buf);
+                }
+                else
+                {
+                    fat32_make_sfn_entry(entry, fn);
                     ahci_write(sata_dev->port, cluster_to_lba(bpb, dir_cluster), bpb->sectors_per_cluster, cluster_buf);
                     goto done;
-                    break;
                 }
+                nr_lfn--;
+                fn_step = fn_step - 13;
             }
         }
 
@@ -584,7 +634,6 @@ int fat32_create(const char *path)
             dir_cluster = new_cluster;
 
             // 清空新的簇
-            ahci_read(sata_dev->port, cluster_to_lba(bpb, dir_cluster), bpb->sectors_per_cluster, cluster_buf);
             memset(cluster_buf, 0, bytes_per_cluster);
             ahci_write(sata_dev->port, cluster_to_lba(bpb, dir_cluster), bpb->sectors_per_cluster, cluster_buf);
         }
