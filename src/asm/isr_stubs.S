@@ -36,6 +36,7 @@ lapic_timer_stub:
 isr_syscall_stub:
     PUSH_ALL
 
+    movq %rsp, %rdi
     call isr_syscall_handler
 
     POP_ALL

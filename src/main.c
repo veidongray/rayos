@@ -19,14 +19,6 @@
 void user0(void *args)
 {
     args = args;
-    uint64_t arg[6];
-    arg[0] = SYS_OPEN;
-    arg[1] = "/test";
-    asm volatile(
-        "movq %0, %%rdi\r\n"
-        "int $0x80\r\n"
-        :
-        : "r"((uint64_t)arg));
     while (1)
         ;
 }
@@ -42,6 +34,24 @@ void kernel_init(void *args)
            bitmap_usage_percent(&page_alloc_bitmap));
 
     task_create(user0, 0, "user0", TASK_FLAGS_USER);
+
+    creat("/stdin", 0);
+    open("/stdin", 0);
+    creat("/stdout", 0);
+    open("/stdout", 0);
+    creat("/stderr", 0);
+    open("/stderr", 0);
+
+    creat("/test", 0);
+    int fd = open("/test", 0);
+    printk("fd = %d\n", fd);
+    char *buf;
+
+    buf = kmalloc(1024);
+    write(fd, "wocaofulenimade", 16);
+    read(fd, buf, 10);
+    printk("%s\n", buf);
+    kfree(buf);
 
     while (1)
     {

@@ -60,17 +60,35 @@ void lapic_timer_handler(void)
     scheduler();
 }
 
-int isr_syscall_handler(void *args)
+int isr_syscall_handler(struct context *ctx)
 {
-    printk("Sys Call ISR\n");
-    switch (((uint64_t *)args)[0])
+    uint64_t nr = ctx->rax;
+
+    switch (nr)
     {
     case SYS_OPEN:
-        return sys_open(((uint64_t *)args)[1]);
+        ctx->rax = sys_open(ctx->rdi);
+        break;
+
+    case SYS_CLOSE:
+        ctx->rax = sys_close(ctx->rdi);
         break;
 
     case SYS_READ:
-        return sys_read(((uint64_t *)args)[1], ((uint64_t *)args)[2], ((uint64_t *)args)[3]);
+        ctx->rax = sys_read(ctx->rdi, ctx->rsi, ctx->rdx);
+        break;
+
+    case SYS_WRITE:
+        ctx->rax = sys_write(ctx->rdi, ctx->rsi, ctx->rdx);
+        break;
+
+    case SYS_CREATE:
+        ctx->rax = sys_create(ctx->rdi);
+        break;
+
+    default:
+        ctx->rax = -1;
         break;
     }
+    return 0;
 }

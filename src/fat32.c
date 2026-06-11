@@ -37,7 +37,7 @@ struct fat32_file
 };
 LIST_HEAD(g_fat32_file_list);
 
-static int g_fd_count = 3;
+static int g_fd_count = 0;
 
 static inline int fat32_get_parent(const char *path, char *parent)
 {
@@ -755,7 +755,6 @@ int fat32_write_cluster(struct fat32_file *fp, const char *buf, size_t size)
             {
                 if (strncmp(entry->sfn_entry.name, fp->fs.entry.sfn_entry.name, 11) == 0)
                 {
-                    printk("Found!!!!\n");
                     fp->fs.entry.sfn_entry.file_size = size;
                     memcpy(entry, &fp->fs.entry, sizeof(struct fat32_dir_entry));
                     ahci_write(fp->fs.sata_dev->port, cluster_to_lba(fp->fs.bpb, cluster), fp->fs.bpb->sectors_per_cluster, clusbuff);
