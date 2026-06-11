@@ -78,7 +78,7 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
         map_page(alloc_page(), (uint64_t)user_pd, 0x7);
         map_page(alloc_page(), (uint64_t)user_pt, 0x7);
 
-        task->rsp0 = (uint64_t)kzalloc(1024) + 1024;
+        task->rsp0 = (uint64_t)kzalloc(120 * 1024) + (120 * 1024);
         task->pml4 = get_physaddr((uint64_t)user_pml4);
         user_pml4[pml4_idx] = get_physaddr((uint64_t)user_pdpt) | 0x7;
         user_pdpt[pdpt_idx] = get_physaddr((uint64_t)user_pd) | 0x7;

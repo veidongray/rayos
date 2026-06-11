@@ -24,6 +24,7 @@ struct fat32_fs
     struct fat32_bpb *bpb;
     struct sata_device *sata_dev;
     struct fat32_dir_entry entry;
+    struct fat32_dir_entry parent_entry;
 };
 
 struct fat32_file
@@ -37,6 +38,34 @@ struct fat32_file
 LIST_HEAD(g_fat32_file_list);
 
 static int g_fd_count = 3;
+
+static inline int fat32_get_parent(const char *path, char *parent)
+{
+    char *p;
+    size_t len;
+
+    len = strlen(path);
+
+    if (len <= 1)
+    {
+        strcpy(parent, "/");
+        return 0;
+    }
+
+    strcpy(parent, path);
+
+    p = strrchr(parent, '/');
+
+    if (!p)
+        return -1;
+
+    if (p == parent)
+        parent[1] = '\0';
+    else
+        *p = '\0';
+
+    return 0;
+}
 
 static inline uint32_t cluster_to_lba(struct fat32_bpb *bpb, uint32_t cluster)
 {
@@ -426,7 +455,7 @@ static inline uint32_t fat32_alloc_cluster(void)
     ahci_read(port, 0, 1, bpb);
 
     fat_table = kzalloc(bpb->bytes_per_sector);
-    entries_per_sector = bpb->bytes_per_sector / sizeof(uint32_t);
+    entries_per_sector = bpb->bytes_per_sector / 32;
 
     for (nr_fat = 0; nr_fat < bpb->fat_size_32; nr_fat++)
     {
@@ -699,14 +728,59 @@ done:
 int fat32_write_cluster(struct fat32_file *fp, const char *buf, size_t size)
 {
     uint32_t cluster;
+    char *buff;
+    uint8_t *clusbuff;
+    uint32_t *fat_table;
+    int entries_per_cluster;
+    struct fat32_dir_entry *entry;
 
+    entries_per_cluster = (fp->fs.bpb->bytes_per_sector * fp->fs.bpb->sectors_per_cluster) / 32;
     if (fp->size == 0)
     {
         // 第一次写入，需要先找可用簇
+        clusbuff = kzalloc(fp->fs.bpb->bytes_per_sector * fp->fs.bpb->sectors_per_cluster);
+        fat_table = kzalloc(fp->fs.bpb->fat_size_32 * fp->fs.bpb->bytes_per_sector);
         cluster = fat32_alloc_cluster();
         fp->fs.entry.sfn_entry.first_cluster_hi = (cluster & 0xffff0000) >> 16;
         fp->fs.entry.sfn_entry.first_cluster_lo = cluster & 0x0000ffff;
+
+        // 写回目录项内容
+        cluster = (fp->fs.parent_entry.sfn_entry.first_cluster_hi << 16) + fp->fs.parent_entry.sfn_entry.first_cluster_lo;
+        while (!FAT32_EOC(cluster))
+        {
+            ahci_read(fp->fs.sata_dev->port, cluster_to_lba(fp->fs.bpb, cluster), fp->fs.bpb->sectors_per_cluster, clusbuff);
+            entry = clusbuff;
+
+            for (int i = 0; i < entries_per_cluster; i++, entry++)
+            {
+                if (strncmp(entry->sfn_entry.name, fp->fs.entry.sfn_entry.name, 11) == 0)
+                {
+                    printk("Found!!!!\n");
+                    fp->fs.entry.sfn_entry.file_size = size;
+                    memcpy(entry, &fp->fs.entry, sizeof(struct fat32_dir_entry));
+                    ahci_write(fp->fs.sata_dev->port, cluster_to_lba(fp->fs.bpb, cluster), fp->fs.bpb->sectors_per_cluster, clusbuff);
+                    goto done;
+                }
+            }
+            // 读取当前 cluster 索引表
+            ahci_read(fp->fs.sata_dev->port, fp->fs.bpb->reserved_sector_count + (cluster * sizeof(uint32_t) / fp->fs.bpb->bytes_per_sector), 1, fat_table);
+            cluster = fat_table[(cluster % fp->fs.bpb->bytes_per_sector % (fp->fs.bpb->bytes_per_sector / sizeof(uint32_t)))];
+        }
+
+    done:
+        kfree(clusbuff);
+        kfree(fat_table);
     }
+
+    buff = kmalloc(size);
+    memcpy(buff, buf, size);
+    for (char *b = buff; b < (buff + size); b += fp->fs.bpb->bytes_per_sector)
+    {
+        ahci_write(fp->fs.sata_dev->port,
+                   cluster_to_lba(fp->fs.bpb, (fp->fs.entry.sfn_entry.first_cluster_hi << 16) + fp->fs.entry.sfn_entry.first_cluster_lo),
+                   1, b);
+    }
+    kfree(buff);
 }
 
 /**
@@ -883,7 +957,7 @@ int fat32_read(int fd, char *buf, size_t size)
     {
         return -1;
     }
-    fat32_read_cluster(fp, buf, (size > fp->size) ? fp->size : size);
+    fat32_read_cluster(fp, buf, size);
     return 0;
 }
 
@@ -895,15 +969,21 @@ int fat32_write(int fd, char *buf, size_t size)
     {
         return -1;
     }
-    // fat32_write_cluster(fp, buf, strlen(buf));
+    fat32_write_cluster(fp, buf, strlen(buf));
     return 0;
 }
 
 int fat32_open(const char *path)
 {
     int ret;
+    char *parent;
     struct fat32_bpb *bpb;
     struct fat32_dir_entry entry;
+    struct fat32_dir_entry parent_entry;
+
+    // 记录路径的父目录
+    parent = kmalloc(strlen(path));
+    fat32_get_parent(path, parent);
 
     ret = fat32_lookup(path, &entry);
     if (ret < 0)
@@ -917,19 +997,32 @@ int fat32_open(const char *path)
     }
     else
     {
-        struct fat32_file *fp = kmalloc(sizeof(struct fat32_file));
+        struct fat32_file *fp = kzalloc(sizeof(struct fat32_file));
         fp->fd = g_fd_count++;
         fp->size = entry.sfn_entry.file_size;
-        fp->path = kmalloc(strlen(path) + 1);
+        fp->path = kzalloc(strlen(path) + 1);
         memcpy(fp->path, path, strlen(path) + 1);
         list_add_tail(&fp->list, &g_fat32_file_list);
 
         // 获取 sata 设备端口
         fp->fs.sata_dev = get_sata_device();
         memcpy(&fp->fs.entry, &entry, sizeof(struct fat32_dir_entry));
+
+        if ((strlen(parent) == 1) && (strncmp(parent, "/", 1) == 0))
+        {
+            fp->fs.parent_entry.sfn_entry.name[0] = '/';
+            fp->fs.parent_entry.sfn_entry.first_cluster_lo = 2;
+        }
+        else
+        {
+            fat32_lookup(parent, &parent_entry);
+            memcpy(&fp->fs.parent_entry, &parent_entry, sizeof(struct fat32_dir_entry));
+        }
+
         bpb = kzalloc(512);
         ahci_read(fp->fs.sata_dev->port, 0, 1, bpb);
         fp->fs.bpb = bpb;
+        memcpy(fp->fs.bpb, bpb, sizeof(struct fat32_bpb));
         return fp->fd;
     }
     return -1;

@@ -2,6 +2,7 @@
 #define FAT32_h
 
 #include <stdint.h>
+#include <stddef.h>
 
 /* ========== 基础属性位定义 ========== */
 #define ATTR_READ_ONLY 0x01

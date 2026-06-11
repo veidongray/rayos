@@ -1,6 +1,7 @@
 #include <page.h>
 #include <bitmap.h>
 #include <align.h>
+#include <printk.h>
 #include <multiboot2.h>
 
 #define BOOTMAP_LEN 0x1000000 // 128MB
@@ -108,6 +109,10 @@ int map_page_range(uint64_t physaddr, uint64_t virtaddr, uint64_t flags, size_t 
         asm volatile(
             "movq %cr3, %rax\r\n"
             "movq %rax, %cr3\r\n");
+#define MAP_PAGE_DEBUG 0
+#if MAP_PAGE_DEBUG
+        printk("map %#llx -> %#llx\n", pa, va);
+#endif // MAP_PAGE_DEBUG
     }
     return i;
 }

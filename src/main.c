@@ -1,5 +1,6 @@
 #include <mm.h>
 #include <x86.h>
+#include <vfs.h>
 #include <pci.h>
 #include <int.h>
 #include <gdt.h>
@@ -12,41 +13,38 @@
 #include <mutex.h>
 #include <bitmap.h>
 #include <printk.h>
+#include <syscall.h>
 #include <multiboot2.h>
-
-static mutex_t mutex;
 
 void user0(void *args)
 {
     args = args;
+    uint64_t arg[6];
+    arg[0] = SYS_OPEN;
+    arg[1] = "/test";
+    asm volatile(
+        "movq %0, %%rdi\r\n"
+        "int $0x80\r\n"
+        :
+        : "r"((uint64_t)arg));
     while (1)
         ;
 }
 
-void task1(void *args)
+void kernel_init(void *args)
 {
     args = args;
-    mutex_lock(&mutex);
-    printk("MUTEX %s\n", get_current()->name);
-    mutex_unlock(&mutex);
-    while (1)
-    {
-        printk("%s\n", get_current()->name);
-    }
-}
+    task_create(vfs_task, NULL, "vfs_task", TASK_FLAGS_KERN);
 
-void task0(void *args)
-{
-    args = args;
+    extern bitmap_t page_alloc_bitmap;
+    printk("total mem: %llu, used %llu, used percent %llu%%\n",
+           get_total_mem(), bitmap_count_set(&page_alloc_bitmap) * 4096,
+           bitmap_usage_percent(&page_alloc_bitmap));
+
     task_create(user0, 0, "user0", TASK_FLAGS_USER);
-    mutex_init(&mutex);
-    mutex_lock(&mutex);
-    printk("MUTEX %s\n", get_current()->name);
-    mutex_unlock(&mutex);
-    task_create(task1, (void *)0x12344321, "task1", TASK_FLAGS_KERN);
+
     while (1)
     {
-        printk("%s\n", get_current()->name);
     }
 }
 
@@ -56,17 +54,13 @@ void start_kernel(void)
     gdt_init();
     page_init();
     int_init();
+    uart_init();
     acpi_init();
     lapic_init();
-    uart_init();
     pci_init();
     task_manager_init();
 
-    extern bitmap_t page_alloc_bitmap;
-    printk("total mem: %llu, used %llu, used percent %llu%%\n",
-           get_total_mem(), bitmap_count_set(&page_alloc_bitmap) * 4096,
-           bitmap_usage_percent(&page_alloc_bitmap));
-    // task_create(task0, (void *)0x12344321, "task0", TASK_FLAGS_KERN);
+    task_create(kernel_init, NULL, "kernel_init", TASK_FLAGS_KERN);
     while (1)
     {
         asm volatile("hlt");

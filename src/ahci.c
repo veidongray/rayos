@@ -163,8 +163,8 @@ void ahci_init(uintptr_t ahci_base)
     uint32_t port_implements;
 
     printk("AHCI base %#llx\n", ahci_base);
-    hba = (struct hba_memory_registers *)ahci_base;
-    map_page_range((uint64_t)ahci_base, (uint64_t)ahci_base, 0x1b, (sizeof(struct hba_memory_registers) >> PAGE_SHIFT) + 1);
+    hba = (struct hba_memory_registers *)((uint64_t)ahci_base + KERNEL_BASE);
+    map_page_range((uint64_t)ahci_base, (uint64_t)ahci_base + KERNEL_BASE, 0x1b, (sizeof(struct hba_memory_registers) >> PAGE_SHIFT) + 1);
 
     // 全局重置与激活 AHCI
     hba->ghc.ghc |= (1U << 31);
@@ -241,20 +241,15 @@ void ahci_init(uintptr_t ahci_base)
                     sata_dev->port_no = i;
                     sata_dev->port = &hba->ports[i];
 
-                    for (int i = 0; i < 32; i++)
-                    {
-                        char buffer[32];
-                        sprintf(buffer, "/mylonglonglonglong%d.txt", i);
-                        fat32_create(buffer);
-                    }
-                    fat32_readdir("/");
-                    char *buf = kzalloc(100);
-                    int fd = fat32_open("/filenamelarge0");
-                    // fat32_write(fd, "KKKKKKKKKKKKKKKKKKK", 20);
-                    fat32_read(fd, buf, 16);
-                    printf("%s", buf);
-                    fat32_close(fd);
-                    kfree(buf);
+                    // fat32_create("/write_test");
+                    // fat32_readdir("/");
+                    // char *buf = kzalloc(100);
+                    // int fd = fat32_open("/write_test");
+                    // fat32_write(fd, "aaaaaaaKKKKKKKfdhjsklahf", 40);
+                    // fat32_read(fd, buf, 128);
+                    // printf("%s", buf);
+                    // fat32_close(fd);
+                    // kfree(buf);
                 }
                 else
                 {

@@ -1,4 +1,5 @@
 #include <pic.h>
+#include <acpi.h>
 #include <page.h>
 #include <lapic.h>
 
@@ -7,7 +8,7 @@ static uint32_t ticks_per_10ms = 0;
 void lapic_init(void)
 {
     // map 0xfee00000
-    map_page(LAPIC_BASE, KERNEL_BASE + LAPIC_BASE, 0x1b);
+    map_page(LAPIC_BASE, KERNEL_BASE + acpi_find_madt_lapic_base(), 0x1b);
 
     lapic_calibrate();
     // mask PIC

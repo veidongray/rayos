@@ -1,8 +1,9 @@
 #include <int.h>
 #include <pic.h>
+#include <vfs.h>
 #include <task.h>
 #include <lapic.h>
-#include <lib/printf/printf.h>
+#include <printk.h>
 
 __attribute__((aligned(4096))) static idtr_t idtr;
 __attribute__((aligned(4096))) static idt_entry_t idt[256]; // Create an array of IDT entries; aligned for performance
@@ -12,6 +13,7 @@ void isr_handler0(void);
 extern void isr_stub0(void);
 extern void isr_default_stub(void);
 extern void lapic_timer_stub(void);
+extern void isr_syscall_stub(void);
 
 void int_init(void)
 {
@@ -23,6 +25,7 @@ void int_init(void)
     }
     idt_set_descriptor(0, isr_stub0, 0x8E);
     idt_set_descriptor(32, lapic_timer_stub, 0x8E);
+    idt_set_descriptor(0x80, isr_syscall_stub, 0xEE);
 
     idtr.base = (uint64_t)idt;
     idtr.limit = sizeof(idt) - 1;
@@ -55,4 +58,19 @@ void lapic_timer_handler(void)
 {
     lapic_send_eoi();
     scheduler();
+}
+
+int isr_syscall_handler(void *args)
+{
+    printk("Sys Call ISR\n");
+    switch (((uint64_t *)args)[0])
+    {
+    case SYS_OPEN:
+        return sys_open(((uint64_t *)args)[1]);
+        break;
+
+    case SYS_READ:
+        return sys_read(((uint64_t *)args)[1], ((uint64_t *)args)[2], ((uint64_t *)args)[3]);
+        break;
+    }
 }

@@ -93,6 +93,6 @@ void pci_probe(void)
 
 void pci_init(void)
 {
-    map_page_range((uint64_t)acpi_find_mcfg_pci_mmio_base(0), (uint64_t)acpi_find_mcfg_pci_mmio_base(0), 0x1b, 65536);
+    map_page_range((uint64_t)acpi_find_mcfg_pci_mmio_base(0), (uint64_t)acpi_find_mcfg_pci_mmio_base(0) + KERNEL_BASE, 0x1b, 65536);
     pci_probe();
 }

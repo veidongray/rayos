@@ -30,3 +30,13 @@ lapic_timer_stub:
 
     # 返回
     iretq
+
+.extern isr_syscall_handler
+.global isr_syscall_stub
+isr_syscall_stub:
+    PUSH_ALL
+
+    call isr_syscall_handler
+
+    POP_ALL
+    iretq
