@@ -21,7 +21,6 @@ void kernel_init(void *args)
     int fd;
     char *data;
     args = args;
-    task_create(vfs_task, NULL, "vfs_task", TASK_FLAGS_KERN);
 
     creat("/stdin", 0);
     open("/stdin", 0);
@@ -47,6 +46,7 @@ void kernel_init(void *args)
 
     while (1)
     {
+        // Do nothing.
     }
 }
 

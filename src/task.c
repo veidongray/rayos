@@ -85,7 +85,7 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
         user_pd[pd_idx] = get_physaddr((uint64_t)user_pt) | 0x7;
         user_pt[pt_idx] = alloc_page() | 0x7;
 
-        map_page(user_pt[0] & ~0xfff, 0x0000400000000000, 0x7);
+        map_page(user_pt[0] & ~0xfff, task_code, 0x7);
         memset(task_code, 0, 0x1000);
         memcpy(task_code, task_func, 1024);
         task->rsp = (uint64_t *)((uint64_t)task_code + 2048);
@@ -124,6 +124,7 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
         unmap_page((uint64_t)user_pdpt);
         unmap_page((uint64_t)user_pd);
         unmap_page((uint64_t)user_pt);
+        unmap_page((uint64_t)task_code);
     }
 
     task->flags = flags;
