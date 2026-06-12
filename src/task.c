@@ -11,9 +11,114 @@
 static struct task_struct *current = NULL;
 static queue_t task_readyqueue;
 
-void task_manager_init(void)
+static inline void task_manager_init(void)
 {
     QUEUE_INIT(&task_readyqueue);
+}
+
+static inline int __kerntask_create(struct task_struct *task, void (*task_func)(void *), void *args)
+{
+    struct context *context;
+    task->pml4 = read_cr3();
+    task->stack = (uint64_t *)kzalloc(TASK_STACK_SIZE_MAX);
+    if (task->stack == NULL)
+        return NULL;
+
+    task->rsp = (uint64_t *)((uint64_t)task->stack + TASK_STACK_SIZE_MAX);
+    *(--task->rsp) = (uint64_t)task_exit;
+    *(--task->rsp) = (uint64_t)task_func;
+
+    task->rsp0 = (uint64_t)0x0;
+    task->rsp = (uint64_t *)((uint64_t)task->rsp - sizeof(struct context));
+    context = (struct context *)task->rsp;
+    context->r15 = 0;
+    context->r14 = 0;
+    context->r13 = 0;
+    context->r12 = 0;
+    context->r11 = 0;
+    context->r10 = 0;
+    context->r9 = 0;
+    context->r8 = 0;
+    context->rax = 0;
+    context->rbx = 0;
+    context->rcx = 0;
+    context->rdx = 0;
+    context->rdi = (uint64_t)args;
+    context->rsi = 0;
+    context->rflags = 0x202;
+}
+
+static inline int __usertask_create(struct task_struct *task, void (*task_func)(void *), void *args)
+{
+    uint64_t index;
+    uint64_t pml4_idx, pdpt_idx, pd_idx, pt_idx;
+    uint64_t *user_pml4 = (uint64_t *)0x0000700000000000;
+    uint64_t *user_pdpt = (uint64_t *)0x0000700000001000;
+    uint64_t *user_pd = (uint64_t *)0x0000700000002000;
+    uint64_t *user_pt = (uint64_t *)0x0000700000003000;
+    uint64_t *task_code = (uint64_t *)0x0000400000000000;
+    struct context *context;
+
+    pml4_idx = ((uint64_t)task_code >> 39) & 0x1FF;
+    pdpt_idx = ((uint64_t)task_code >> 30) & 0x1FF;
+    pd_idx = ((uint64_t)task_code >> 21) & 0x1FF;
+    pt_idx = ((uint64_t)task_code >> 12) & 0x1FF;
+
+    // 因为kmalloc不能保证返回的地址4K对齐
+    // 所以这里使用手动分配页再映射的方式确保对齐
+    map_page(alloc_page(), (uint64_t)user_pml4, 0x7);
+    map_page(alloc_page(), (uint64_t)user_pdpt, 0x7);
+    map_page(alloc_page(), (uint64_t)user_pd, 0x7);
+    map_page(alloc_page(), (uint64_t)user_pt, 0x7);
+
+    task->rsp0 = (uint64_t)kzalloc(120 * 1024) + (120 * 1024);
+    task->pml4 = get_physaddr((uint64_t)user_pml4);
+    user_pml4[pml4_idx] = get_physaddr((uint64_t)user_pdpt) | 0x7;
+    user_pdpt[pdpt_idx] = get_physaddr((uint64_t)user_pd) | 0x7;
+    user_pd[pd_idx] = get_physaddr((uint64_t)user_pt) | 0x7;
+    user_pt[pt_idx] = alloc_page() | 0x7;
+
+    map_page(user_pt[0] & ~0xfff, task_code, 0x7);
+    memset(task_code, 0, 0x1000);
+    memcpy(task_code, task_func, 1024);
+    task->rsp = (uint64_t *)((uint64_t)task_code + 2048);
+    *(--task->rsp) = (uint64_t)task_exit;
+    *(--task->rsp) = (uint64_t)UDATA_SELECTOR;
+    *(--task->rsp) = (uint64_t)((uint64_t)task_code + 2040);
+    *(--task->rsp) = (uint64_t)0x202;
+    *(--task->rsp) = (uint64_t)UCODE_SELECTOR;
+    *(--task->rsp) = (uint64_t)task_code;
+    *(--task->rsp) = (uint64_t)switch_to_user;
+
+    task->rsp = (uint64_t *)((uint64_t)task->rsp - sizeof(struct context));
+    context = (struct context *)task->rsp;
+    context->r15 = 0;
+    context->r14 = 0;
+    context->r13 = 0;
+    context->r12 = 0;
+    context->r11 = 0;
+    context->r10 = 0;
+    context->r9 = 0;
+    context->r8 = 0;
+    context->rax = 0;
+    context->rbx = 0;
+    context->rcx = 0;
+    context->rdx = 0;
+    context->rdi = (uint64_t)args;
+    context->rsi = 0;
+    context->rflags = 0;
+
+    // copy kernel pml4
+    for (index = 256; index < 512; index++)
+    {
+        user_pml4[index] = ((volatile uint64_t *)(PML4_BASE << PAGE_SHIFT))[index];
+    }
+    unmap_page((uint64_t)user_pml4);
+    unmap_page((uint64_t)user_pdpt);
+    unmap_page((uint64_t)user_pd);
+    unmap_page((uint64_t)user_pt);
+    unmap_page((uint64_t)task_code);
+    return 0;
 }
 
 struct task_struct *task_create(void (*task_func)(void *), void *args, char *name, int flags)
@@ -25,106 +130,13 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
     if (task == NULL)
         return NULL;
 
-    // 构造任务栈
     if (flags & TASK_FLAGS_KERN)
     {
-        task->pml4 = read_cr3();
-        task->stack = (uint64_t *)kzalloc(TASK_STACK_SIZE_MAX);
-        if (task->stack == NULL)
-            return NULL;
-
-        task->rsp = (uint64_t *)((uint64_t)task->stack + TASK_STACK_SIZE_MAX);
-        *(--task->rsp) = (uint64_t)task_exit;
-        *(--task->rsp) = (uint64_t)task_func;
-
-        task->rsp0 = (uint64_t)0x0;
-        task->rsp = (uint64_t *)((uint64_t)task->rsp - sizeof(struct context));
-        context = (struct context *)task->rsp;
-        context->r15 = 0;
-        context->r14 = 0;
-        context->r13 = 0;
-        context->r12 = 0;
-        context->r11 = 0;
-        context->r10 = 0;
-        context->r9 = 0;
-        context->r8 = 0;
-        context->rax = 0;
-        context->rbx = 0;
-        context->rcx = 0;
-        context->rdx = 0;
-        context->rdi = (uint64_t)args;
-        context->rsi = 0;
-        context->rflags = 0x202;
+        __kerntask_create(task, task_func, args);
     }
     else if (flags & TASK_FLAGS_USER)
     {
-        uint64_t index;
-        uint64_t pml4_idx, pdpt_idx, pd_idx, pt_idx;
-        uint64_t *user_pml4 = (uint64_t *)0x0000700000000000;
-        uint64_t *user_pdpt = (uint64_t *)0x0000700000001000;
-        uint64_t *user_pd = (uint64_t *)0x0000700000002000;
-        uint64_t *user_pt = (uint64_t *)0x0000700000003000;
-        uint64_t *task_code = (uint64_t *)0x0000400000000000;
-
-        pml4_idx = ((uint64_t)task_code >> 39) & 0x1FF;
-        pdpt_idx = ((uint64_t)task_code >> 30) & 0x1FF;
-        pd_idx = ((uint64_t)task_code >> 21) & 0x1FF;
-        pt_idx = ((uint64_t)task_code >> 12) & 0x1FF;
-
-        // 因为kmalloc不能保证返回的地址4K对齐
-        // 所以这里使用手动分配页再映射的方式确保对齐
-        map_page(alloc_page(), (uint64_t)user_pml4, 0x7);
-        map_page(alloc_page(), (uint64_t)user_pdpt, 0x7);
-        map_page(alloc_page(), (uint64_t)user_pd, 0x7);
-        map_page(alloc_page(), (uint64_t)user_pt, 0x7);
-
-        task->rsp0 = (uint64_t)kzalloc(120 * 1024) + (120 * 1024);
-        task->pml4 = get_physaddr((uint64_t)user_pml4);
-        user_pml4[pml4_idx] = get_physaddr((uint64_t)user_pdpt) | 0x7;
-        user_pdpt[pdpt_idx] = get_physaddr((uint64_t)user_pd) | 0x7;
-        user_pd[pd_idx] = get_physaddr((uint64_t)user_pt) | 0x7;
-        user_pt[pt_idx] = alloc_page() | 0x7;
-
-        map_page(user_pt[0] & ~0xfff, task_code, 0x7);
-        memset(task_code, 0, 0x1000);
-        memcpy(task_code, task_func, 1024);
-        task->rsp = (uint64_t *)((uint64_t)task_code + 2048);
-        *(--task->rsp) = (uint64_t)task_exit;
-        *(--task->rsp) = (uint64_t)UDATA_SELECTOR;
-        *(--task->rsp) = (uint64_t)((uint64_t)task_code + 2040);
-        *(--task->rsp) = (uint64_t)0x202;
-        *(--task->rsp) = (uint64_t)UCODE_SELECTOR;
-        *(--task->rsp) = (uint64_t)task_code;
-        *(--task->rsp) = (uint64_t)switch_to_user;
-
-        task->rsp = (uint64_t *)((uint64_t)task->rsp - sizeof(struct context));
-        context = (struct context *)task->rsp;
-        context->r15 = 0;
-        context->r14 = 0;
-        context->r13 = 0;
-        context->r12 = 0;
-        context->r11 = 0;
-        context->r10 = 0;
-        context->r9 = 0;
-        context->r8 = 0;
-        context->rax = 0;
-        context->rbx = 0;
-        context->rcx = 0;
-        context->rdx = 0;
-        context->rdi = (uint64_t)args;
-        context->rsi = 0;
-        context->rflags = 0;
-
-        // copy kernel pml4
-        for (index = 256; index < 512; index++)
-        {
-            user_pml4[index] = ((volatile uint64_t *)(PML4_BASE << PAGE_SHIFT))[index];
-        }
-        unmap_page((uint64_t)user_pml4);
-        unmap_page((uint64_t)user_pdpt);
-        unmap_page((uint64_t)user_pd);
-        unmap_page((uint64_t)user_pt);
-        unmap_page((uint64_t)task_code);
+        __usertask_create(task, task_func, args);
     }
 
     task->flags = flags;
