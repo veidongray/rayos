@@ -16,24 +16,12 @@
 #include <syscall.h>
 #include <multiboot2.h>
 
-void user0(void *args)
-{
-    args = args;
-    while (1)
-        ;
-}
-
 void kernel_init(void *args)
 {
+    int fd;
+    char *data;
     args = args;
     task_create(vfs_task, NULL, "vfs_task", TASK_FLAGS_KERN);
-
-    extern bitmap_t page_alloc_bitmap;
-    printk("total mem: %llu, used %llu, used percent %llu%%\n",
-           get_total_mem(), bitmap_count_set(&page_alloc_bitmap) * 4096,
-           bitmap_usage_percent(&page_alloc_bitmap));
-
-    task_create(user0, 0, "user0", TASK_FLAGS_USER);
 
     creat("/stdin", 0);
     open("/stdin", 0);
@@ -42,16 +30,20 @@ void kernel_init(void *args)
     creat("/stderr", 0);
     open("/stderr", 0);
 
-    creat("/test", 0);
-    int fd = open("/test", 0);
-    printk("fd = %d\n", fd);
-    char *buf;
+    fd = open("/init", 0);
+    if (fd > 0)
+    {
+        data = kzalloc(1024);
+        read(fd, data, 16);
+        printk("/init running...\n");
+        task_create(data, 0, "init", TASK_FLAGS_USER);
+        kfree(data);
+    }
 
-    buf = kmalloc(1024);
-    write(fd, "wocaofulenimade", 16);
-    read(fd, buf, 10);
-    printk("%s\n", buf);
-    kfree(buf);
+    extern bitmap_t page_alloc_bitmap;
+    printk("total mem: %llu, used %llu, used percent %llu%%\n",
+           get_total_mem(), bitmap_count_set(&page_alloc_bitmap) * 4096,
+           bitmap_usage_percent(&page_alloc_bitmap));
 
     while (1)
     {

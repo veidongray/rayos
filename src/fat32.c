@@ -436,7 +436,7 @@ static inline int fat32_compare_callback(struct lookup_context *ctx)
     return -1;
 }
 
-static inline uint32_t fat32_alloc_cluster(void)
+static inline uint32_t __fat32_alloc_cluster(void)
 {
     int nr_fat;
     uint32_t i;
@@ -648,7 +648,7 @@ int fat32_create(const char *path)
         {
             // 如果簇末尾了
             // 分配一个新的
-            new_cluster = fat32_alloc_cluster();
+            new_cluster = __fat32_alloc_cluster();
             // 因为alloc更新了FAT表所以需要重新读取
             ahci_read(sata_dev->port, bpb->reserved_sector_count + (dir_cluster * sizeof(uint32_t) / bpb->bytes_per_sector), 1, fat_table);
             fat_table[(dir_cluster % bpb->bytes_per_sector % (bpb->bytes_per_sector / sizeof(uint32_t)))] = new_cluster;
@@ -728,19 +728,18 @@ done:
 int fat32_write_cluster(struct fat32_file *fp, const char *buf, size_t size)
 {
     uint32_t cluster;
-    char *buff;
     uint8_t *clusbuff;
     uint32_t *fat_table;
     int entries_per_cluster;
     struct fat32_dir_entry *entry;
 
+    clusbuff = kzalloc(fp->fs.bpb->bytes_per_sector * fp->fs.bpb->sectors_per_cluster);
+    fat_table = kzalloc(fp->fs.bpb->fat_size_32 * fp->fs.bpb->bytes_per_sector);
     entries_per_cluster = (fp->fs.bpb->bytes_per_sector * fp->fs.bpb->sectors_per_cluster) / 32;
-    if (fp->size == 0)
+    if (((fp->fs.entry.sfn_entry.first_cluster_hi << 16) + fp->fs.entry.sfn_entry.first_cluster_lo) == 0)
     {
         // 第一次写入，需要先找可用簇
-        clusbuff = kzalloc(fp->fs.bpb->bytes_per_sector * fp->fs.bpb->sectors_per_cluster);
-        fat_table = kzalloc(fp->fs.bpb->fat_size_32 * fp->fs.bpb->bytes_per_sector);
-        cluster = fat32_alloc_cluster();
+        cluster = __fat32_alloc_cluster();
         fp->fs.entry.sfn_entry.first_cluster_hi = (cluster & 0xffff0000) >> 16;
         fp->fs.entry.sfn_entry.first_cluster_lo = cluster & 0x0000ffff;
 
@@ -748,6 +747,7 @@ int fat32_write_cluster(struct fat32_file *fp, const char *buf, size_t size)
         cluster = (fp->fs.parent_entry.sfn_entry.first_cluster_hi << 16) + fp->fs.parent_entry.sfn_entry.first_cluster_lo;
         while (!FAT32_EOC(cluster))
         {
+            // 查找对应的项的簇
             ahci_read(fp->fs.sata_dev->port, cluster_to_lba(fp->fs.bpb, cluster), fp->fs.bpb->sectors_per_cluster, clusbuff);
             entry = clusbuff;
 
@@ -765,21 +765,51 @@ int fat32_write_cluster(struct fat32_file *fp, const char *buf, size_t size)
             ahci_read(fp->fs.sata_dev->port, fp->fs.bpb->reserved_sector_count + (cluster * sizeof(uint32_t) / fp->fs.bpb->bytes_per_sector), 1, fat_table);
             cluster = fat_table[(cluster % fp->fs.bpb->bytes_per_sector % (fp->fs.bpb->bytes_per_sector / sizeof(uint32_t)))];
         }
-
-    done:
-        kfree(clusbuff);
-        kfree(fat_table);
     }
 
-    buff = kmalloc(size);
-    memcpy(buff, buf, size);
-    for (char *b = buff; b < (buff + size); b += fp->fs.bpb->bytes_per_sector)
+done:
+    cluster = (fp->fs.entry.sfn_entry.first_cluster_hi << 16) + fp->fs.entry.sfn_entry.first_cluster_lo;
+    uint32_t bytes_per_cluster = fp->fs.bpb->bytes_per_sector * fp->fs.bpb->sectors_per_cluster;
+    uint32_t new_cluster;
+    for (char *b = buf; b < (buf + size); b += (fp->fs.bpb->bytes_per_sector * fp->fs.bpb->sectors_per_cluster))
     {
+        // 一次写入一个簇
         ahci_write(fp->fs.sata_dev->port,
-                   cluster_to_lba(fp->fs.bpb, (fp->fs.entry.sfn_entry.first_cluster_hi << 16) + fp->fs.entry.sfn_entry.first_cluster_lo),
-                   1, b);
+                   cluster_to_lba(fp->fs.bpb, cluster),
+                   fp->fs.bpb->sectors_per_cluster, b);
+        // 下一簇
+        ahci_read(fp->fs.sata_dev->port, fp->fs.bpb->reserved_sector_count + (cluster * sizeof(uint32_t) / fp->fs.bpb->bytes_per_sector), 1, fat_table);
+        if (FAT32_EOC(fat_table[(cluster % fp->fs.bpb->bytes_per_sector % (fp->fs.bpb->bytes_per_sector / sizeof(uint32_t)))]))
+        {
+            // 如果簇末尾了
+            // 分配一个新的
+            new_cluster = __fat32_alloc_cluster();
+            // 因为alloc更新了FAT表所以需要重新读取
+            ahci_read(fp->fs.sata_dev->port, fp->fs.bpb->reserved_sector_count + (cluster * sizeof(uint32_t) / fp->fs.bpb->bytes_per_sector), 1, fat_table);
+            fat_table[(cluster % fp->fs.bpb->bytes_per_sector % (fp->fs.bpb->bytes_per_sector / sizeof(uint32_t)))] = new_cluster;
+
+            // 写回FAT
+            for (int i = 0; i < fp->fs.bpb->num_fats; i++)
+            {
+                ahci_write(fp->fs.sata_dev->port,
+                           fp->fs.bpb->reserved_sector_count + (fp->fs.bpb->fat_size_32 * i) + (cluster * sizeof(uint32_t) / fp->fs.bpb->bytes_per_sector),
+                           1, fat_table);
+            }
+            cluster = new_cluster;
+
+            // 清空新的簇
+            memset(clusbuff, 0, bytes_per_cluster);
+            ahci_write(fp->fs.sata_dev->port, cluster_to_lba(fp->fs.bpb, cluster), fp->fs.bpb->sectors_per_cluster, clusbuff);
+        }
+        else
+        {
+            // 直接从fat读取下一个
+            cluster = fat_table[(cluster % fp->fs.bpb->bytes_per_sector % (fp->fs.bpb->bytes_per_sector / sizeof(uint32_t)))];
+        }
     }
-    kfree(buff);
+    kfree(clusbuff);
+    kfree(fat_table);
+    return 0;
 }
 
 /**

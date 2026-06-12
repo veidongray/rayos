@@ -240,16 +240,6 @@ void ahci_init(uintptr_t ahci_base)
                     sata_dev->hba = hba;
                     sata_dev->port_no = i;
                     sata_dev->port = &hba->ports[i];
-
-                    // fat32_create("/write_test");
-                    // fat32_readdir("/");
-                    // char *buf = kzalloc(100);
-                    // int fd = fat32_open("/write_test");
-                    // fat32_write(fd, "aaaaaaaKKKKKKKfdhjsklahf", 40);
-                    // fat32_read(fd, buf, 128);
-                    // printf("%s", buf);
-                    // fat32_close(fd);
-                    // kfree(buf);
                 }
                 else
                 {

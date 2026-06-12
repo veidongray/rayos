@@ -29,7 +29,7 @@ export INCDIR
 export CFLAGS
 export LDFLAGS
 
-.PHONY: build iso qemu qemudbg qemugdb clean rebuild disk-build disk-clean clean-all
+.PHONY: build iso qemu qemudbg qemugdb clean rebuild build-disk clean-disk clean-all
 
 build:
 	$(MAKE) -C src/lib/printf built-in.o
@@ -39,30 +39,33 @@ build:
 	$(LD) $(LDFLAGS) -T linker.ld -o vmrayos $(BUILT-IN)
 	find src -name "*.o" ! -name "built-in.o" -type f -exec rm -f {} +
 
-disk-build:
+build-disk:
 	dd if=/dev/zero of=disk.img bs=1M count=128
 	mkfs.fat -F 32 disk.img
+	sudo mount disk.img /mnt
+	sudo cp src/user/init /mnt
+	sudo umount /mnt
 
-disk-clean:
+clean-disk:
 	$(RM) disk.img
 
 iso: build
 	cp vmrayos iso/boot/
 	grub-mkrescue -o $(ISO) iso/
 
-qemu: iso
+qemu: iso build-disk
 	$(QEMU) $(QEMU_FLAGS)
 
-qemudbg: iso
+qemudbg: iso build-disk
 	$(QEMU) $(QEMU_FLAGS) $(QEMU_DBG_FLAGS)
 
-qemugdb: iso
+qemugdb: iso build-disk
 	$(QEMU) $(QEMU_FLAGS) $(QEMU_DBG_FLAGS) -S -s
 
 clean:
 	find . -type f \( -name "*.o" -o -name "*.log" -o -name "*.iso" \) -exec rm -f {} +
 	$(RM) *.iso vmrayos iso/boot/vmrayos *.log
 
-clean-all: clean disk-clean
+clean-all: clean clean-disk
 
-rebuild: clean build
+rebuild: clean-all build
