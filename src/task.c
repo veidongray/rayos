@@ -1,6 +1,7 @@
 #include <mm.h>
 #include <x86.h>
 #include <int.h>
+#include <elf.h>
 #include <gdt.h>
 #include <task.h>
 #include <page.h>
@@ -11,7 +12,7 @@
 static struct task_struct *current = NULL;
 static queue_t task_readyqueue;
 
-static inline void task_manager_init(void)
+void task_manager_init(void)
 {
     QUEUE_INIT(&task_readyqueue);
 }

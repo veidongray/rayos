@@ -8,7 +8,7 @@
 #define TASK_FLAGS_USER (1 << 0)
 #define TASK_FLAGS_KERN (1 << 1)
 
-#define TASK_STACK_SIZE_MAX (128 * 1024)
+#define TASK_STACK_SIZE_MAX (1024 * 1024)
 
 enum task_status
 {

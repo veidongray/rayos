@@ -3,6 +3,7 @@
 #include <vfs.h>
 #include <pci.h>
 #include <int.h>
+#include <elf.h>
 #include <gdt.h>
 #include <pic.h>
 #include <acpi.h>
@@ -33,9 +34,29 @@ void kernel_init(void *args)
     if (fd > 0)
     {
         data = kzalloc(1024);
-        read(fd, data, 16);
+        read(fd, data, EI_NIDENT);
+        if (data[4] == ELFCLASS32)
+        {
+            printk("ELF32\n");
+            struct elf32_ehdr *elf32_ehdr;
+            read(fd, data, sizeof(struct elf32_ehdr));
+            elf32_ehdr = data;
+            printk("Program header %u\n", elf32_ehdr->e_phnum);
+        }
+        else if (data[4] == ELFCLASS64)
+        {
+            printk("ELF64\n");
+            struct elf64_ehdr *elf64_ehdr;
+            read(fd, data, sizeof(struct elf64_ehdr));
+            elf64_ehdr = data;
+            printk("Program header %u\n", elf64_ehdr->e_phnum);
+        }
+        else
+        {
+            printk("ELF NONE\n");
+        }
         printk("/init running...\n");
-        task_create(data, 0, "init", TASK_FLAGS_USER);
+        // task_create(data, 0, "init", TASK_FLAGS_USER);
         kfree(data);
     }
 

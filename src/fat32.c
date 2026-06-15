@@ -721,7 +721,6 @@ int fat32_read_cluster(struct fat32_file *fp, char *buf, size_t size)
 done:
     kfree(cluster_buf);
     kfree(fat_table);
-    kfree(bpb);
     return 0;
 }
 
