@@ -2,11 +2,12 @@
 #include <x86.h>
 #include <int.h>
 #include <elf.h>
+#include <vfs.h>
 #include <gdt.h>
 #include <task.h>
 #include <page.h>
 #include <queue.h>
-#include <lib/printf/printf.h>
+#include <printk.h>
 #include <lib/string/string.h>
 
 static struct task_struct *current = NULL;
@@ -17,7 +18,7 @@ void task_manager_init(void)
     QUEUE_INIT(&task_readyqueue);
 }
 
-static inline int __kerntask_create(struct task_struct *task, void (*task_func)(void *), void *args)
+static inline int __kerntask_create(struct task_struct *task, thread_func_t thread_func, void *args)
 {
     struct context *context;
     task->pml4 = read_cr3();
@@ -27,7 +28,7 @@ static inline int __kerntask_create(struct task_struct *task, void (*task_func)(
 
     task->rsp = (uint64_t *)((uint64_t)task->stack + TASK_STACK_SIZE_MAX);
     *(--task->rsp) = (uint64_t)task_exit;
-    *(--task->rsp) = (uint64_t)task_func;
+    *(--task->rsp) = (uint64_t)thread_func;
 
     task->rsp0 = (uint64_t)0x0;
     task->rsp = (uint64_t *)((uint64_t)task->rsp - sizeof(struct context));
@@ -51,7 +52,7 @@ static inline int __kerntask_create(struct task_struct *task, void (*task_func)(
     return 0;
 }
 
-static inline int __usertask_create(struct task_struct *task, void (*task_func)(void *), void *args)
+static inline int __usertask_create(struct task_struct *task, void *start, void *entry, size_t len, void *args)
 {
     uint64_t index;
     uint64_t pml4_idx, pdpt_idx, pd_idx, pt_idx;
@@ -59,31 +60,32 @@ static inline int __usertask_create(struct task_struct *task, void (*task_func)(
     uint64_t *user_pdpt = (uint64_t *)0x0000700000001000;
     uint64_t *user_pd = (uint64_t *)0x0000700000002000;
     uint64_t *user_pt = (uint64_t *)0x0000700000003000;
-    uint64_t *task_code = (uint64_t *)0x0000400000000000;
+    uint64_t *task_code = (uint64_t *)entry;
     struct context *context;
 
-    pml4_idx = ((uint64_t)task_code >> 39) & 0x1FF;
-    pdpt_idx = ((uint64_t)task_code >> 30) & 0x1FF;
-    pd_idx = ((uint64_t)task_code >> 21) & 0x1FF;
-    pt_idx = ((uint64_t)task_code >> 12) & 0x1FF;
+    pml4_idx = ((uint64_t)start >> 39) & 0x1FF;
+    pdpt_idx = ((uint64_t)start >> 30) & 0x1FF;
+    pd_idx = ((uint64_t)start >> 21) & 0x1FF;
+    pt_idx = ((uint64_t)start >> 12) & 0x1FF;
 
     // 因为kmalloc不能保证返回的地址4K对齐
     // 所以这里使用手动分配页再映射的方式确保对齐
     map_page(alloc_page(), (uint64_t)user_pml4, 0x7);
     map_page(alloc_page(), (uint64_t)user_pdpt, 0x7);
     map_page(alloc_page(), (uint64_t)user_pd, 0x7);
-    map_page(alloc_page(), (uint64_t)user_pt, 0x7);
+    map_page_range(alloc_pages(0), (uint64_t)user_pt, 0x7, 1);
 
-    task->rsp0 = (uint64_t)kzalloc(120 * 1024) + (120 * 1024);
+    task->rsp0 = (uint64_t)kzalloc(512 * 1024) + (512 * 1024);
     task->pml4 = get_physaddr((uint64_t)user_pml4);
     user_pml4[pml4_idx] = get_physaddr((uint64_t)user_pdpt) | 0x7;
     user_pdpt[pdpt_idx] = get_physaddr((uint64_t)user_pd) | 0x7;
     user_pd[pd_idx] = get_physaddr((uint64_t)user_pt) | 0x7;
-    user_pt[pt_idx] = alloc_page() | 0x7;
+    for (size_t i = 0; i < len; i++)
+    {
+        user_pt[pt_idx + i] = get_physaddr((uint64_t)start) | 0x7;
+        start = (void *)((uint64_t)start + 0x1000);
+    }
 
-    map_page(user_pt[0] & ~0xfff, (uint64_t)task_code, 0x7);
-    memset(task_code, 0, 0x1000);
-    memcpy(task_code, task_func, 1024);
     task->rsp = (uint64_t *)((uint64_t)task_code + 2048);
     *(--task->rsp) = (uint64_t)task_exit;
     *(--task->rsp) = (uint64_t)UDATA_SELECTOR;
@@ -120,11 +122,10 @@ static inline int __usertask_create(struct task_struct *task, void (*task_func)(
     unmap_page((uint64_t)user_pdpt);
     unmap_page((uint64_t)user_pd);
     unmap_page((uint64_t)user_pt);
-    unmap_page((uint64_t)task_code);
     return 0;
 }
 
-struct task_struct *task_create(void (*task_func)(void *), void *args, char *name, int flags)
+struct task_struct *run_thread(thread_func_t thread_func, void *args, char *name)
 {
     struct task_struct *task;
 
@@ -132,16 +133,9 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
     if (task == NULL)
         return NULL;
 
-    if (flags & TASK_FLAGS_KERN)
-    {
-        __kerntask_create(task, task_func, args);
-    }
-    else if (flags & TASK_FLAGS_USER)
-    {
-        __usertask_create(task, task_func, args);
-    }
+    __kerntask_create(task, thread_func, args);
 
-    task->flags = flags;
+    task->flags = TASK_FLAGS_KERN;
     task->status = TASK_READY;
     memset(task->name, 0x0, 32);
     memcpy(task->name, name, strlen(name));
@@ -156,6 +150,88 @@ struct task_struct *task_create(void (*task_func)(void *), void *args, char *nam
     queue_enqueue(&task_readyqueue, &task->list);
 
     return task;
+}
+
+int run_process(const char *pathname)
+{
+    int fd;
+    int len = 0;
+    char *elf;
+    struct stat sb;
+    struct task_struct *task;
+
+    fd = sys_open(pathname);
+    if (fd > 0)
+    {
+        task = (struct task_struct *)kzalloc(sizeof(struct task_struct));
+        sys_stat(pathname, &sb);
+        elf = kzalloc(sb.st_size);
+        sys_read(fd, elf, sb.st_size);
+        if (elf[4] == ELFCLASS32)
+        {
+            // Do nothing.
+            sys_close(fd);
+            kfree(elf);
+            return -1;
+        }
+        else if (elf[4] == ELFCLASS64)
+        {
+            struct elf64_ehdr *ehdr;
+            sys_read(fd, elf, sizeof(struct elf64_ehdr));
+            ehdr = (struct elf64_ehdr *)elf;
+
+            /**
+             * 临时映射ELF需要的内存地址进行操作
+             */
+            struct elf64_phdr *phdr = (void *)((uint8_t *)elf + ehdr->e_phoff);
+            for (int i = 0; i < ehdr->e_phnum; i++)
+            {
+                if (phdr->p_type == PT_LOAD)
+                {
+                    len += map_page_range(alloc_pages(size_to_order((phdr->p_memsz >> PAGE_SHIFT) + 1)), phdr->p_vaddr, 0x7, (phdr->p_memsz >> PAGE_SHIFT) + 1);
+                    memcpy((void *)phdr->p_vaddr, (const void *)((uint64_t)elf + phdr->p_offset), phdr->p_filesz);
+                }
+                phdr++;
+            }
+            __usertask_create(task, (void *)((struct elf64_phdr *)((uint8_t *)elf + ehdr->e_phoff))->p_vaddr, (void *)ehdr->e_entry, len, 0);
+
+            task->flags = TASK_FLAGS_USER;
+            task->status = TASK_READY;
+            memset(task->name, 0x0, 32);
+            memcpy(task->name, "name", strlen("name"));
+
+            queue_enqueue(&task_readyqueue, &task->list);
+
+            /**
+             * 取消临时映射
+             * 让内核页表保持干净
+             */
+            phdr = (void *)((uint8_t *)elf + ehdr->e_phoff);
+            for (int i = 0; i < ehdr->e_phnum; i++)
+            {
+                if (phdr->p_type == PT_LOAD)
+                {
+                    unmap_page_range(phdr->p_vaddr, (phdr->p_memsz >> PAGE_SHIFT) + 1);
+                }
+                phdr++;
+            }
+        }
+        else
+        {
+            sys_close(fd);
+            kfree(elf);
+            printk("ELF NONE\n");
+            return -1;
+        }
+    }
+    else
+    {
+        sys_close(fd);
+        return -1;
+    }
+    sys_close(fd);
+    kfree(elf);
+    return 0;
 }
 
 void task_exit(void)

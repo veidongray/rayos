@@ -15,50 +15,24 @@
 #include <bitmap.h>
 #include <printk.h>
 #include <syscall.h>
+#include <sys/stat.h>
 #include <multiboot2.h>
+#include <lib/string/string.h>
 
 void kernel_init(void *args)
 {
-    int fd;
-    char *data;
+    char buf[32];
     args = args;
 
-    creat("/stdin", 0);
-    open("/stdin", 0);
-    creat("/stdout", 0);
-    open("/stdout", 0);
-    creat("/stderr", 0);
-    open("/stderr", 0);
+    sys_create("/stdin");
+    sys_open("/stdin");
+    sys_create("/stdout");
+    sys_open("/stdout");
+    sys_create("/stderr");
+    sys_open("/stderr");
 
-    fd = open("/init", 0);
-    if (fd > 0)
-    {
-        data = kzalloc(1024);
-        read(fd, data, EI_NIDENT);
-        if (data[4] == ELFCLASS32)
-        {
-            printk("ELF32\n");
-            struct elf32_ehdr *elf32_ehdr;
-            read(fd, data, sizeof(struct elf32_ehdr));
-            elf32_ehdr = (struct elf32_ehdr *)data;
-            printk("Program header %u\n", elf32_ehdr->e_phnum);
-        }
-        else if (data[4] == ELFCLASS64)
-        {
-            printk("ELF64\n");
-            struct elf64_ehdr *elf64_ehdr;
-            read(fd, data, sizeof(struct elf64_ehdr));
-            elf64_ehdr = (struct elf64_ehdr *)data;
-            printk("Program header %u\n", elf64_ehdr->e_phnum);
-        }
-        else
-        {
-            printk("ELF NONE\n");
-        }
-        printk("/init running...\n");
-        // task_create(data, 0, "init", TASK_FLAGS_USER);
-        kfree(data);
-    }
+    printk("/init running...\n");
+    run_process("/init");
 
     extern bitmap_t page_alloc_bitmap;
     printk("total mem: %llu, used %llu, used percent %llu%%\n",
@@ -68,6 +42,11 @@ void kernel_init(void *args)
     while (1)
     {
         // Do nothing.
+        for (int i = 0; i < 0xfffffff; i++)
+            ;
+        memset(buf, 0, 32);
+        sys_read(1, buf, 18);
+        printk("%s\n", buf);
     }
 }
 
@@ -83,7 +62,7 @@ void start_kernel(void)
     pci_init();
     task_manager_init();
 
-    task_create(kernel_init, NULL, "kernel_init", TASK_FLAGS_KERN);
+    run_thread(kernel_init, NULL, "kernel_init");
     while (1)
     {
         asm volatile("hlt");

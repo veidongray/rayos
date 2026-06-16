@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <sys/stat.h>
 
 enum num_syscall
 {
@@ -10,7 +11,8 @@ enum num_syscall
     SYS_CLOSE,
     SYS_READ,
     SYS_WRITE,
-    SYS_CREATE
+    SYS_CREATE,
+    SYS_STAT
 };
 
 int vfs_init(void);
@@ -20,5 +22,6 @@ int sys_close(int fd);
 int sys_read(int fd, char *buf, size_t size);
 int sys_write(int fd, const char *buf, size_t size);
 int sys_create(const char *pathname);
+int sys_stat(const char *pathname, struct stat *_sb);
 
 #endif // VFS_H

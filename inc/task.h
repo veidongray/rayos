@@ -4,6 +4,7 @@
 #include <list.h>
 #include <queue.h>
 #include <stdint.h>
+#include <sys/stat.h>
 
 #define TASK_FLAGS_USER (1 << 0)
 #define TASK_FLAGS_KERN (1 << 1)
@@ -38,6 +39,8 @@ struct context
     uint64_t rflags;
 } __attribute__((packed));
 
+typedef void (*thread_func_t)(void *);
+
 void task_exit(void);
 void scheduler(void);
 uint64_t read_cr3(void);
@@ -48,6 +51,7 @@ queue_t *get_task_readyqueue(void);
 extern void switch_to(uint64_t *rsp); // from switch_to.S
 struct task_struct *get_current(void);
 extern void context_switch(uint64_t **cur_rsp, uint64_t **next_rsp); // from switch_to.S
-struct task_struct *task_create(void (*task_func)(void *), void *args, char *name, int flags);
+struct task_struct *run_thread(thread_func_t thread_func, void *args, char *name);
+int run_process(const char *pathname);
 
 #endif // TASK_H

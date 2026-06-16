@@ -501,16 +501,27 @@ static inline int fat32_make_sfn_entry(struct fat32_dir_entry *entry, const char
 
 static inline int fat32_make_lfn_entry(struct fat32_dir_entry *entry, const char *fn, uint8_t order)
 {
+    int nr;
     uint16_t name[6];
 
-    memcpy(name, entry->lfn_entry.name1, 5 << 1);
     ascii_to_utf16(fn, name, 5);
+    for (nr = 0; nr < 5; nr++)
+    {
+        entry->lfn_entry.name1[nr] = name[nr];
+    }
 
-    memcpy(name, entry->lfn_entry.name2, 6 << 1);
     ascii_to_utf16(fn + 5, name, 6);
+    for (nr = 0; nr < 6; nr++)
+    {
+        entry->lfn_entry.name2[nr] = name[nr];
+    }
 
-    memcpy(name, entry->lfn_entry.name3, 2 << 1);
     ascii_to_utf16(fn + 11, name, 2);
+    for (nr = 0; nr < 2; nr++)
+    {
+        entry->lfn_entry.name3[nr] = name[nr];
+    }
+
     entry->lfn_entry.order = order;
     entry->lfn_entry.attr = ATTR_LONG_NAME;
     entry->lfn_entry.type = 0;
@@ -700,7 +711,7 @@ int fat32_read_cluster(struct fat32_file *fp, char *buf, size_t size)
 done:
     kfree(cluster_buf);
     kfree(fat_table);
-    return 0;
+    return size;
 }
 
 int fat32_write_cluster(struct fat32_file *fp, const char *buf, size_t size)
@@ -964,8 +975,7 @@ int fat32_read(int fd, char *buf, size_t size)
     {
         return -1;
     }
-    fat32_read_cluster(fp, buf, size);
-    return 0;
+    return fat32_read_cluster(fp, buf, size);
 }
 
 int fat32_write(int fd, const char *buf, size_t size)
@@ -976,8 +986,7 @@ int fat32_write(int fd, const char *buf, size_t size)
     {
         return -1;
     }
-    fat32_write_cluster(fp, buf, size);
-    return 0;
+    return fat32_write_cluster(fp, buf, size);
 }
 
 int fat32_open(const char *path)

@@ -153,6 +153,33 @@
      (ehdr).e_ident[EI_MAG2] == ELFMAG2 && \
      (ehdr).e_ident[EI_MAG3] == ELFMAG3)
 
+// --------------------
+// ELF Program Header Types
+// --------------------
+
+#define PT_NULL 0    // 未使用
+#define PT_LOAD 1    // 需要加载到内存（最重要）
+#define PT_DYNAMIC 2 // 动态链接信息
+#define PT_INTERP 3  // 解释器路径（如 /lib/ld.so）
+#define PT_NOTE 4    // 附加信息（build-id等）
+#define PT_SHLIB 5   // 保留（已废弃）
+#define PT_PHDR 6    // Program Header 自身在内存的位置
+#define PT_TLS 7     // Thread Local Storage
+
+// GNU 扩展
+#define PT_GNU_EH_FRAME 0x6474e550
+#define PT_GNU_STACK 0x6474e551
+#define PT_GNU_RELRO 0x6474e552
+#define PT_GNU_PROPERTY 0x6474e553
+
+// --------------------
+// ELF Segment Flags
+// --------------------
+
+#define PF_X 0x1 // 可执行
+#define PF_W 0x2 // 可写
+#define PF_R 0x4 // 可读
+
 struct elf32_ehdr
 {
     uint8_t e_ident[EI_NIDENT]; /* ELF 魔数与标识信息 */
@@ -187,6 +214,18 @@ struct elf64_ehdr
     uint16_t e_shentsize;       /* 单个 Section Header 大小 (64字节) */
     uint16_t e_shnum;           /* Section Header 数量 */
     uint16_t e_shstrndx;        /* Section Name String Table 索引 */
+};
+
+struct elf64_phdr
+{
+    uint32_t p_type;
+    uint32_t p_flags;
+    uint64_t p_offset;
+    uint64_t p_vaddr;
+    uint64_t p_paddr;
+    uint64_t p_filesz;
+    uint64_t p_memsz;
+    uint64_t p_align;
 };
 
 #endif // ELF_H
