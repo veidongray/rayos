@@ -2,7 +2,7 @@
 #include <page.h>
 #include <stdint.h>
 #include <printk.h>
-#include <lib/string/string.h>
+#include <string.h>
 
 /* ACPI MCFG 表指针（PCIe ECAM/MMIO 配置空间） */
 static struct acpi_mcfg *mcfg;

@@ -5,7 +5,7 @@
 #include <acpi.h>
 #include <ahci.h>
 #include <printk.h>
-#include <lib/string/string.h>
+#include <string.h>
 
 void pci_read_config_pio(uint32_t bus, uint32_t slot, uint32_t func, struct pci_config *pci_config)
 {

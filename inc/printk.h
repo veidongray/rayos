@@ -1,7 +1,7 @@
 #ifndef PRINTK_H
 #define PRINTK_H
 
-#include <lib/printf/printf.h>
+#include <printf.h>
 
 #define printk(fmt, ...)                                                 \
     do                                                                   \

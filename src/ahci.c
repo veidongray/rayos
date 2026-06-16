@@ -5,7 +5,7 @@
 #include <fat32.h>
 #include <align.h>
 #include <printk.h>
-#include <lib/string/string.h>
+#include <string.h>
 
 __attribute__((aligned(256))) static uint8_t fis_buffer[256];
 __attribute__((aligned(1024))) static struct ahci_cmd_list_entry cl_buffer[32]; // 32个Slot

@@ -17,11 +17,33 @@
 #include <syscall.h>
 #include <sys/stat.h>
 #include <multiboot2.h>
-#include <lib/string/string.h>
+#include <string.h>
+
+void console_thread(void *args)
+{
+    char *buf;
+    struct stat sb;
+
+    args = args;
+
+    while (1)
+    {
+        for (int i = 0; i < 0xffffff; i++)
+            ;
+        sys_stat("/stdout", &sb);
+        if (sb.st_size)
+        {
+            buf = kzalloc(sb.st_size);
+            memset(buf, 0, sb.st_size);
+            sys_read(STDOUT, buf, sb.st_size);
+            printk("%s\n", buf);
+            kfree(buf);
+        }
+    }
+}
 
 void kernel_init(void *args)
 {
-    char buf[32];
     args = args;
 
     sys_create("/stdin");
@@ -30,6 +52,8 @@ void kernel_init(void *args)
     sys_open("/stdout");
     sys_create("/stderr");
     sys_open("/stderr");
+
+    run_thread(console_thread, NULL, "console_thread");
 
     printk("/init running...\n");
     run_process("/init");
@@ -42,11 +66,6 @@ void kernel_init(void *args)
     while (1)
     {
         // Do nothing.
-        for (int i = 0; i < 0xfffffff; i++)
-            ;
-        memset(buf, 0, 32);
-        sys_read(1, buf, 18);
-        printk("%s\n", buf);
     }
 }
 

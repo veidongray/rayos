@@ -8,7 +8,7 @@
 #include <page.h>
 #include <queue.h>
 #include <printk.h>
-#include <lib/string/string.h>
+#include <string.h>
 
 static struct task_struct *current = NULL;
 static queue_t task_readyqueue;
@@ -118,6 +118,7 @@ static inline int __usertask_create(struct task_struct *task, void *start, void 
     {
         user_pml4[index] = ((volatile uint64_t *)(PML4_BASE << PAGE_SHIFT))[index];
     }
+    user_pml4[511] = get_physaddr((uint64_t)user_pml4) | 0x7;
     unmap_page((uint64_t)user_pml4);
     unmap_page((uint64_t)user_pdpt);
     unmap_page((uint64_t)user_pd);

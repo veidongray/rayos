@@ -3,6 +3,10 @@
 
 #include <sys/types.h>
 
+#define STDIN 0
+#define STDOUT 1
+#define STDERR 2
+
 int open(const char *pathname, int flags, ...);
 int close(int fd);
 ssize_t read(int fd, void *buf, size_t count);

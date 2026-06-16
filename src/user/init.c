@@ -2,7 +2,7 @@
 
 int main(void)
 {
-    write(1, "Hello! I'm User!\n", 18);
+    write(STDOUT, "Hello! I'm User!", 17);
 
     while (1)
         ;

@@ -4,7 +4,7 @@
 #include <fat32.h>
 #include <printk.h>
 #include <stdbool.h>
-#include <lib/string/string.h>
+#include <string.h>
 
 #define FAT32_EOC(x) ((x) >= 0x0FFFFFF8)
 #define FAT32_LFN_MAX_LEN 512

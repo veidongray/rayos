@@ -4,7 +4,7 @@
 #include <fat32.h>
 #include <printk.h>
 #include <sys/stat.h>
-#include <lib/string/string.h>
+#include <string.h>
 
 int vfs_init(void)
 {
@@ -26,31 +26,24 @@ int sys_open(const char *path)
 
 int sys_close(int fd)
 {
-    fat32_close(fd);
-    return 0;
+    return fat32_close(fd);
 }
 
 int sys_read(int fd, char *buf, size_t size)
 {
     int ret;
-    char *_buf = kzalloc(size);
 
-    ret = fat32_read(fd, _buf, size);
-    memcpy(buf, _buf, size);
+    ret = fat32_read(fd, buf, size);
 
-    kfree(_buf);
     return ret;
 }
 
 int sys_write(int fd, const char *buf, size_t size)
 {
     int ret;
-    char *_buf = kzalloc(size);
 
-    memcpy(_buf, buf, size);
-    ret = fat32_write(fd, _buf, size);
+    ret = fat32_write(fd, buf, size);
 
-    kfree(_buf);
     return ret;
 }
 

@@ -1,6 +1,6 @@
 BUILT-IN = src/asm/built-in.o src/built-in.o src/lib/printf/built-in.o src/lib/string/built-in.o
 
-INCDIR="$(CURDIR)/inc"
+INCDIR = -I $(CURDIR)/inc -I $(CURDIR)/inc/lib/string -I $(CURDIR)/inc/lib/printf
 CFLAGS = -m64 -fno-pic                      \
     -ffreestanding                          \
     -fno-builtin                            \
@@ -13,7 +13,7 @@ CFLAGS = -m64 -fno-pic                      \
 	-nostdlib 								\
     -std=gnu99                              \
 	-mcmodel=large							\
-    -I $(INCDIR)
+    $(INCDIR)
 
 LDFLAGS = -m elf_x86_64
 

@@ -34,7 +34,7 @@
 #include <stdint.h>
 
 #include <uart.h>
-#include <lib/printf/printf.h>
+#include <printf.h>
 
 // 'ntoa' conversion buffer size, this must be big enough to hold one converted
 // numeric number including padded zeros (dynamically created on stack)
