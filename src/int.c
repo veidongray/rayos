@@ -67,23 +67,23 @@ int isr_syscall_handler(struct context *ctx)
     switch (nr)
     {
     case SYS_OPEN:
-        ctx->rax = sys_open(ctx->rdi);
+        ctx->rax = sys_open((const char *)ctx->rdi);
         break;
 
     case SYS_CLOSE:
-        ctx->rax = sys_close(ctx->rdi);
+        ctx->rax = sys_close((int)ctx->rdi);
         break;
 
     case SYS_READ:
-        ctx->rax = sys_read(ctx->rdi, ctx->rsi, ctx->rdx);
+        ctx->rax = sys_read((int)ctx->rdi, (char *)ctx->rsi, (size_t)ctx->rdx);
         break;
 
     case SYS_WRITE:
-        ctx->rax = sys_write(ctx->rdi, ctx->rsi, ctx->rdx);
+        ctx->rax = sys_write((int)ctx->rdi, (const char *)ctx->rsi, (size_t)ctx->rdx);
         break;
 
     case SYS_CREATE:
-        ctx->rax = sys_create(ctx->rdi);
+        ctx->rax = sys_create((const char *)ctx->rdi);
         break;
 
     default:

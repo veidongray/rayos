@@ -1,6 +1,7 @@
 #ifndef FAT32_H
 #define FAT32_h
 
+#include <list.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -145,11 +146,48 @@ struct sata_device
     struct sata_controller_port_register *port;
 };
 
-int fat32_open(const char *path);
-int fat32_close(int fd);
+struct lookup_context
+{
+    char *lfn;
+    char *target;
+    struct fat32_dir_entry *entry;
+    struct fat32_dir_entry *result;
+};
+
+typedef int (*fat32_foreach_dirent_callback_t)(struct lookup_context *ctx);
+
+struct fat32_fs
+{
+    struct fat32_bpb *bpb;
+    struct sata_device *sata_dev;
+    struct fat32_dir_entry entry;
+    struct fat32_dir_entry parent_entry;
+};
+
+struct fat32_file
+{
+    int fd;
+    char *path;
+    size_t size;
+    struct fat32_fs fs;
+    struct list_head list;
+};
+
+int fat32_create(const char *path);
+int fat32_read_cluster(struct fat32_file *fp, char *buf, size_t size);
+int fat32_write_cluster(struct fat32_file *fp, const char *buf, size_t size);
+/**
+ * 根据指定的 cluster 在对应目录中查找
+ */
+int fat32_foreach_dirent(fat32_foreach_dirent_callback_t cb, uint32_t dir_cluster, const char *target, struct fat32_dir_entry *result);
+/**
+ * 拆解目录并遍历查找
+ */
+int fat32_lookup(const char *path, struct fat32_dir_entry *entry_result);
 int fat32_readdir(const char *path);
 int fat32_read(int fd, char *buf, size_t size);
-int fat32_write(int fd, char *buf, size_t size);
-int fat32_create(const char *path);
+int fat32_write(int fd, const char *buf, size_t size);
+int fat32_open(const char *path);
+int fat32_close(int fd);
 
 #endif // FAT32_H

@@ -4,10 +4,12 @@
 
 int vfs_init(void)
 {
+    return 0;
 }
 
 void vfs_task(void *arg)
 {
+    arg = arg;
     printk("VFS running...\n");
     while (1)
         ;

@@ -23,7 +23,7 @@ static inline int __kerntask_create(struct task_struct *task, void (*task_func)(
     task->pml4 = read_cr3();
     task->stack = (uint64_t *)kzalloc(TASK_STACK_SIZE_MAX);
     if (task->stack == NULL)
-        return NULL;
+        return -1;
 
     task->rsp = (uint64_t *)((uint64_t)task->stack + TASK_STACK_SIZE_MAX);
     *(--task->rsp) = (uint64_t)task_exit;
@@ -47,6 +47,8 @@ static inline int __kerntask_create(struct task_struct *task, void (*task_func)(
     context->rdi = (uint64_t)args;
     context->rsi = 0;
     context->rflags = 0x202;
+
+    return 0;
 }
 
 static inline int __usertask_create(struct task_struct *task, void (*task_func)(void *), void *args)
@@ -79,7 +81,7 @@ static inline int __usertask_create(struct task_struct *task, void (*task_func)(
     user_pd[pd_idx] = get_physaddr((uint64_t)user_pt) | 0x7;
     user_pt[pt_idx] = alloc_page() | 0x7;
 
-    map_page(user_pt[0] & ~0xfff, task_code, 0x7);
+    map_page(user_pt[0] & ~0xfff, (uint64_t)task_code, 0x7);
     memset(task_code, 0, 0x1000);
     memcpy(task_code, task_func, 1024);
     task->rsp = (uint64_t *)((uint64_t)task_code + 2048);
@@ -124,7 +126,6 @@ static inline int __usertask_create(struct task_struct *task, void (*task_func)(
 
 struct task_struct *task_create(void (*task_func)(void *), void *args, char *name, int flags)
 {
-    struct context *context;
     struct task_struct *task;
 
     task = (struct task_struct *)kzalloc(sizeof(struct task_struct));

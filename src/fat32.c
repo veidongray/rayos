@@ -8,33 +8,6 @@
 
 #define FAT32_EOC(x) ((x) >= 0x0FFFFFF8)
 #define FAT32_LFN_MAX_LEN 512
-
-struct lookup_context
-{
-    char *lfn;
-    char *target;
-    struct fat32_dir_entry *entry;
-    struct fat32_dir_entry *result;
-};
-
-typedef int (*fat32_foreach_dirent_callback_t)(struct lookup_context *ctx);
-
-struct fat32_fs
-{
-    struct fat32_bpb *bpb;
-    struct sata_device *sata_dev;
-    struct fat32_dir_entry entry;
-    struct fat32_dir_entry parent_entry;
-};
-
-struct fat32_file
-{
-    int fd;
-    char *path;
-    size_t size;
-    struct fat32_fs fs;
-    struct list_head list;
-};
 LIST_HEAD(g_fat32_file_list);
 
 static int g_fd_count = 0;
@@ -457,7 +430,7 @@ static inline uint32_t __fat32_alloc_cluster(void)
     fat_table = kzalloc(bpb->bytes_per_sector);
     entries_per_sector = bpb->bytes_per_sector / 32;
 
-    for (nr_fat = 0; nr_fat < bpb->fat_size_32; nr_fat++)
+    for (nr_fat = 0; (uint32_t)nr_fat < bpb->fat_size_32; nr_fat++)
     {
         ahci_read(port, bpb->reserved_sector_count + nr_fat, 1, fat_table);
         for (i = 0; i < entries_per_sector; i++)
@@ -515,12 +488,12 @@ static inline uint8_t fat32_lfn_checksum(const uint8_t sfn[11])
 static inline int fat32_make_sfn_entry(struct fat32_dir_entry *entry, const char *fn)
 {
     // 创建新的SFN
-    ascii_to_sfn(fn, entry->sfn_entry.name);
+    ascii_to_sfn(fn, (uint8_t *)entry->sfn_entry.name);
     entry->sfn_entry.attr = ATTR_ARCHIVE;
     entry->sfn_entry.file_size = 0;
     entry->sfn_entry.first_cluster_hi = 0;
     entry->sfn_entry.first_cluster_lo = 0;
-    entry->sfn_entry.write_date = 20260605;
+    entry->sfn_entry.write_date = 2026;
     entry->sfn_entry.write_time = 19923;
     entry->sfn_entry.last_access_date = 0;
     return 0;
@@ -528,9 +501,16 @@ static inline int fat32_make_sfn_entry(struct fat32_dir_entry *entry, const char
 
 static inline int fat32_make_lfn_entry(struct fat32_dir_entry *entry, const char *fn, uint8_t order)
 {
-    ascii_to_utf16(fn, entry->lfn_entry.name1, 5);
-    ascii_to_utf16(fn + 5, entry->lfn_entry.name2, 6);
-    ascii_to_utf16(fn + 11, entry->lfn_entry.name3, 2);
+    uint16_t name[6];
+
+    memcpy(name, entry->lfn_entry.name1, 5 << 1);
+    ascii_to_utf16(fn, name, 5);
+
+    memcpy(name, entry->lfn_entry.name2, 6 << 1);
+    ascii_to_utf16(fn + 5, name, 6);
+
+    memcpy(name, entry->lfn_entry.name3, 2 << 1);
+    ascii_to_utf16(fn + 11, name, 2);
     entry->lfn_entry.order = order;
     entry->lfn_entry.attr = ATTR_LONG_NAME;
     entry->lfn_entry.type = 0;
@@ -540,7 +520,6 @@ static inline int fat32_make_lfn_entry(struct fat32_dir_entry *entry, const char
 
 int fat32_create(const char *path)
 {
-    int nr_free_entries;
     int nr_total_entries;
     int nr_lfn;
     int count;
@@ -577,7 +556,7 @@ int fat32_create(const char *path)
     count = strlen(path) - 1;
 
     // 拿到要创建的文件名
-    while (dir_step = path_next(dir_step, fn))
+    while ((dir_step = path_next(dir_step, fn)) == NULL)
         ;
     fn_step = fn;
 
@@ -624,7 +603,7 @@ int fat32_create(const char *path)
         for (uint32_t i = 0; i < entries_per_cluster; i++, entry++)
         {
             // 空目录项，目录结束
-            if ((entry->sfn_entry.name[0] == SFN_NAME0_FREE) || (entry->sfn_entry.name[0] == SFN_NAME0_DELETED))
+            if (((uint8_t)entry->sfn_entry.name[0] == SFN_NAME0_FREE) || ((uint8_t)entry->sfn_entry.name[0] == SFN_NAME0_DELETED))
             {
                 if (fat32_need_lfn(fn) && (fn_step >= fn))
                 {
@@ -748,7 +727,7 @@ int fat32_write_cluster(struct fat32_file *fp, const char *buf, size_t size)
         {
             // 查找对应的项的簇
             ahci_read(fp->fs.sata_dev->port, cluster_to_lba(fp->fs.bpb, cluster), fp->fs.bpb->sectors_per_cluster, clusbuff);
-            entry = clusbuff;
+            entry = (struct fat32_dir_entry *)clusbuff;
 
             for (int i = 0; i < entries_per_cluster; i++, entry++)
             {
@@ -770,7 +749,7 @@ done:
     cluster = (fp->fs.entry.sfn_entry.first_cluster_hi << 16) + fp->fs.entry.sfn_entry.first_cluster_lo;
     uint32_t bytes_per_cluster = fp->fs.bpb->bytes_per_sector * fp->fs.bpb->sectors_per_cluster;
     uint32_t new_cluster;
-    for (char *b = buf; b < (buf + size); b += (fp->fs.bpb->bytes_per_sector * fp->fs.bpb->sectors_per_cluster))
+    for (char *b = (char *)buf; b < (buf + size); b += (fp->fs.bpb->bytes_per_sector * fp->fs.bpb->sectors_per_cluster))
     {
         // 一次写入一个簇
         ahci_write(fp->fs.sata_dev->port,
@@ -989,7 +968,7 @@ int fat32_read(int fd, char *buf, size_t size)
     return 0;
 }
 
-int fat32_write(int fd, char *buf, size_t size)
+int fat32_write(int fd, const char *buf, size_t size)
 {
     struct fat32_file *fp;
 
@@ -997,7 +976,7 @@ int fat32_write(int fd, char *buf, size_t size)
     {
         return -1;
     }
-    fat32_write_cluster(fp, buf, strlen(buf));
+    fat32_write_cluster(fp, buf, size);
     return 0;
 }
 

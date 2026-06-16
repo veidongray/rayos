@@ -40,7 +40,7 @@ void kernel_init(void *args)
             printk("ELF32\n");
             struct elf32_ehdr *elf32_ehdr;
             read(fd, data, sizeof(struct elf32_ehdr));
-            elf32_ehdr = data;
+            elf32_ehdr = (struct elf32_ehdr *)data;
             printk("Program header %u\n", elf32_ehdr->e_phnum);
         }
         else if (data[4] == ELFCLASS64)
@@ -48,7 +48,7 @@ void kernel_init(void *args)
             printk("ELF64\n");
             struct elf64_ehdr *elf64_ehdr;
             read(fd, data, sizeof(struct elf64_ehdr));
-            elf64_ehdr = data;
+            elf64_ehdr = (struct elf64_ehdr *)data;
             printk("Program header %u\n", elf64_ehdr->e_phnum);
         }
         else
