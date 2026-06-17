@@ -1,20 +1,16 @@
 #ifndef SYSCALL_H
 #define SYSCALL_H
 
-#include <stdint.h>
-#include <stddef.h>
+#include <sys/types.h>
 
-#define SYSCALL_WRITE 0x1
+#define STDIN 0
+#define STDOUT 1
+#define STDERR 2
 
-#define syscall(alist, retv) \
-    do                       \
-    {                        \
-        asm volatile(        \
-            "int $0x80"      \
-            : "=a"(retv)     \
-            : "a"(alist));   \
-    } while (0)
+int open(const char *pathname, int flags, ...);
+int close(int fd);
+ssize_t read(int fd, void *buf, size_t count);
+ssize_t write(int fd, const void *buf, size_t count);
+int creat(const char *pathname, mode_t mode);
 
-size_t sys_write(int fd, const char *buf, size_t len);
-
-#endif // SYSCALL_H
+#endif // SYSCCALL_H

@@ -12,8 +12,8 @@
             "MIMode": "gdb",
             "setupCommands": [
                 {
-                    "description": "Set architecture to i386",
-                    "text": "set architecture i386",
+                    "description": "Set architecture to i386:x86-64",
+                    "text": "set architecture i386:x86-64",
                     "ignoreFailures": false
                 }
             ],

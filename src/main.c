@@ -1,110 +1,89 @@
-#include "multiboot2.h"
-#include "tty.h"
-#include "gdt.h"
-#include "idt.h"
-#include "paging.h"
-#include "task.h"
-#include "pic_8259.h"
-#include <stdint.h>
-#include <stddef.h>
-#include "libc/string.h"
-#include "libc/stdlib.h"
-#include "panic.h"
-#include "mm.h"
-#include "printk.h"
-#include "syscall.h"
-#include "libc/stdio.h"
-#include "semaphore.h"
-#include "apic.h"
+#include <mm.h>
+#include <x86.h>
+#include <vfs.h>
+#include <pci.h>
+#include <int.h>
+#include <elf.h>
+#include <gdt.h>
+#include <pic.h>
+#include <acpi.h>
+#include <page.h>
+#include <task.h>
+#include <uart.h>
+#include <lapic.h>
+#include <mutex.h>
+#include <bitmap.h>
+#include <printk.h>
+#include <syscall.h>
+#include <sys/stat.h>
+#include <multiboot2.h>
+#include <string.h>
 
-static struct semaphore sem;
-
-void kernel_init000(void *arg)
+void console_thread(void *args)
 {
-    arg = arg;
-    semaphore_p(&sem);
+    char *buf;
+    struct stat sb;
+
+    args = args;
+
     while (1)
     {
-        printk("%s\n", current->name);
+        for (int i = 0; i < 0xffffff; i++)
+            ;
+        sys_stat("/stdout", &sb);
+        if (sb.st_size)
+        {
+            buf = kzalloc(sb.st_size);
+            memset(buf, 0, sb.st_size);
+            sys_read(STDOUT, buf, sb.st_size);
+            printk("%s\n", buf);
+            kfree(buf);
+        }
     }
 }
 
-void kernel_init111(void *arg)
+void kernel_init(void *args)
 {
-    arg = arg;
+    args = args;
+
+    sys_create("/stdin");
+    sys_open("/stdin");
+    sys_create("/stdout");
+    sys_open("/stdout");
+    sys_create("/stderr");
+    sys_open("/stderr");
+
+    run_thread(console_thread, NULL, "console_thread");
+
+    printk("/init running...\n");
+    run_process("/init");
+
+    extern bitmap_t page_alloc_bitmap;
+    printk("total mem: %llu, used %llu, used percent %llu%%\n",
+           get_total_mem(), bitmap_count_set(&page_alloc_bitmap) * 4096,
+           bitmap_usage_percent(&page_alloc_bitmap));
+
     while (1)
     {
-        semaphore_v(&sem);
-        printk("%s\n", current->name);
-    }
-}
-
-void user_func000(void *arg)
-{
-    arg = arg;
-    uint32_t retval;
-    uint32_t arg_list[6];
-    arg_list[0] = SYSCALL_WRITE;
-    arg_list[1] = STDOUT;
-    arg_list[2] = (uint32_t)arg;
-    arg_list[3] = 0x5;
-    arg_list[4] = 0x0;
-    arg_list[5] = 0x0;
-    while (1)
-    {
-        syscall(arg_list, retval);
-    }
-}
-
-void user_func111(void *arg)
-{
-    arg = arg;
-    uint32_t retval;
-    uint32_t arg_list[6];
-    arg_list[0] = SYSCALL_WRITE;
-    arg_list[1] = STDOUT;
-    arg_list[2] = (uint32_t)arg;
-    arg_list[3] = 0x5;
-    arg_list[4] = 0x0;
-    arg_list[5] = 0x0;
-    while (1)
-    {
-        syscall(arg_list, retval);
-    }
-}
-
-void kernel_init(void *arg)
-{
-    arg = arg;
-
-    semaphore_init(&sem, 0);
-    ktask_create(kernel_init000, 0, "KERNEL_TASK 0");
-    ktask_create(kernel_init111, 0, "KERNEL_TASK 1");
-    utask_create(user_func000, "USER_TASK 0\n", "user_func000");
-    utask_create(user_func111, "USER_TASK 1\n", "user_func111");
-    while (1)
-    {
-        printk("%s, total_tasks %u\n", current->name, total_tasks());
+        // Do nothing.
     }
 }
 
 void start_kernel(void)
 {
-    // step 1.
-    early_page_init();
     total_memory_init();
-    early_mm_init();
-
-    // step 2.
     gdt_init();
-    idt_init();
-    tty_init();
     page_init();
-    mm_init();
-    task_init();
-    apic_init();
+    int_init();
+    uart_init();
+    acpi_init();
+    lapic_init();
+    pci_init();
+    task_manager_init();
 
-    // Never return
-    ktask_create(kernel_init, 0, "kernel_init");
-    PANIC("PANIC");
+    run_thread(kernel_init, NULL, "kernel_init");
+    while (1)
+    {
+        asm volatile("hlt");
+    }
 }

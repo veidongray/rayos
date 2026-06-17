@@ -1,266 +1,281 @@
-#include "task.h"
-#include "idt.h"
-#include <stddef.h>
-#include "paging.h"
-#include "tty.h"
-#include "gdt.h"
-#include "libc/string.h"
-#include "panic.h"
-#include "libc/stdlib.h"
-#include "mm.h"
-#include "aligned.h"
-#include "spinlock.h"
-#include "list.h"
+#include <mm.h>
+#include <x86.h>
+#include <int.h>
+#include <elf.h>
+#include <vfs.h>
+#include <gdt.h>
+#include <task.h>
+#include <page.h>
+#include <queue.h>
+#include <printk.h>
+#include <string.h>
 
-INIT_TASK_CURRENT(current);
-LIST_HEAD(task_list);
-SPINLOCK_INIT(task_list_lock);
+static struct task_struct *current = NULL;
+static queue_t task_readyqueue;
 
-void task_init(void)
+void task_manager_init(void)
 {
-    // setup task_struct esp offset
-    // task_esp from switch_task.S
-    task_esp = offsetof(struct task_struct, esp);
-    spinlock_init(&task_list_lock);
+    QUEUE_INIT(&task_readyqueue);
 }
 
-static void task_exit(void)
+static inline int __kerntask_create(struct task_struct *task, thread_func_t thread_func, void *args)
 {
-    current->task_status = TASK_DEAD;
-    scheduler();
+    struct context *context;
+    task->pml4 = read_cr3();
+    task->stack = (uint64_t *)kzalloc(TASK_STACK_SIZE_MAX);
+    if (task->stack == NULL)
+        return -1;
+
+    task->rsp = (uint64_t *)((uint64_t)task->stack + TASK_STACK_SIZE_MAX);
+    *(--task->rsp) = (uint64_t)task_exit;
+    *(--task->rsp) = (uint64_t)thread_func;
+
+    task->rsp0 = (uint64_t)0x0;
+    task->rsp = (uint64_t *)((uint64_t)task->rsp - sizeof(struct context));
+    context = (struct context *)task->rsp;
+    context->r15 = 0;
+    context->r14 = 0;
+    context->r13 = 0;
+    context->r12 = 0;
+    context->r11 = 0;
+    context->r10 = 0;
+    context->r9 = 0;
+    context->r8 = 0;
+    context->rax = 0;
+    context->rbx = 0;
+    context->rcx = 0;
+    context->rdx = 0;
+    context->rdi = (uint64_t)args;
+    context->rsi = 0;
+    context->rflags = 0x202;
+
+    return 0;
 }
 
-struct task_struct *utask_create(void (*task_func)(void *), void *arg, char *name)
+static inline int __usertask_create(struct task_struct *task, void *start, void *entry, size_t len, void *args)
 {
-    uint32_t i;
-    uint32_t *stack, *stack_top, *task_code;
-    uint32_t *user_pagedir, *user_table;
+    uint64_t index;
+    uint64_t pml4_idx, pdpt_idx, pd_idx, pt_idx;
+    uint64_t *user_pml4 = (uint64_t *)0x0000700000000000;
+    uint64_t *user_pdpt = (uint64_t *)0x0000700000001000;
+    uint64_t *user_pd = (uint64_t *)0x0000700000002000;
+    uint64_t *user_pt = (uint64_t *)0x0000700000003000;
+    uint64_t *task_code = (uint64_t *)entry;
+    struct context *context;
+
+    pml4_idx = ((uint64_t)start >> 39) & 0x1FF;
+    pdpt_idx = ((uint64_t)start >> 30) & 0x1FF;
+    pd_idx = ((uint64_t)start >> 21) & 0x1FF;
+    pt_idx = ((uint64_t)start >> 12) & 0x1FF;
+
+    // 因为kmalloc不能保证返回的地址4K对齐
+    // 所以这里使用手动分配页再映射的方式确保对齐
+    map_page(alloc_page(), (uint64_t)user_pml4, 0x7);
+    map_page(alloc_page(), (uint64_t)user_pdpt, 0x7);
+    map_page(alloc_page(), (uint64_t)user_pd, 0x7);
+    map_page_range(alloc_pages(0), (uint64_t)user_pt, 0x7, 1);
+
+    task->rsp0 = (uint64_t)kzalloc(512 * 1024) + (512 * 1024);
+    task->pml4 = get_physaddr((uint64_t)user_pml4);
+    user_pml4[pml4_idx] = get_physaddr((uint64_t)user_pdpt) | 0x7;
+    user_pdpt[pdpt_idx] = get_physaddr((uint64_t)user_pd) | 0x7;
+    user_pd[pd_idx] = get_physaddr((uint64_t)user_pt) | 0x7;
+    for (size_t i = 0; i < len; i++)
+    {
+        user_pt[pt_idx + i] = get_physaddr((uint64_t)start) | 0x7;
+        start = (void *)((uint64_t)start + 0x1000);
+    }
+
+    task->rsp = (uint64_t *)((uint64_t)task_code + 2048);
+    *(--task->rsp) = (uint64_t)task_exit;
+    *(--task->rsp) = (uint64_t)UDATA_SELECTOR;
+    *(--task->rsp) = (uint64_t)((uint64_t)task_code + 2040);
+    *(--task->rsp) = (uint64_t)0x202;
+    *(--task->rsp) = (uint64_t)UCODE_SELECTOR;
+    *(--task->rsp) = (uint64_t)task_code;
+    *(--task->rsp) = (uint64_t)switch_to_user;
+
+    task->rsp = (uint64_t *)((uint64_t)task->rsp - sizeof(struct context));
+    context = (struct context *)task->rsp;
+    context->r15 = 0;
+    context->r14 = 0;
+    context->r13 = 0;
+    context->r12 = 0;
+    context->r11 = 0;
+    context->r10 = 0;
+    context->r9 = 0;
+    context->r8 = 0;
+    context->rax = 0;
+    context->rbx = 0;
+    context->rcx = 0;
+    context->rdx = 0;
+    context->rdi = (uint64_t)args;
+    context->rsi = 0;
+    context->rflags = 0;
+
+    // copy kernel pml4
+    for (index = 256; index < 512; index++)
+    {
+        user_pml4[index] = ((volatile uint64_t *)(PML4_BASE << PAGE_SHIFT))[index];
+    }
+    user_pml4[511] = get_physaddr((uint64_t)user_pml4) | 0x7;
+    unmap_page((uint64_t)user_pml4);
+    unmap_page((uint64_t)user_pdpt);
+    unmap_page((uint64_t)user_pd);
+    unmap_page((uint64_t)user_pt);
+    return 0;
+}
+
+struct task_struct *run_thread(thread_func_t thread_func, void *args, char *name)
+{
     struct task_struct *task;
 
-    // copy kernel page dir
-    user_pagedir = (uint32_t *)kmalloc_aligned(1024 * sizeof(uint32_t));
-    memset(user_pagedir, 0, 1024 * sizeof(uint32_t));
-    copy_kernel_pagedir(user_pagedir);
+    task = (struct task_struct *)kzalloc(sizeof(struct task_struct));
+    if (task == NULL)
+        return NULL;
 
-    // make user page table
-    // total 4MB space from 0x40000000 to 0x40400000
-    user_table = (uint32_t *)kmalloc_aligned(1024 * sizeof(uint32_t));
-    memset(user_table, 0, 1024 * sizeof(uint32_t));
-    for (i = 0; i < 1024; i++)
+    __kerntask_create(task, thread_func, args);
+
+    task->flags = TASK_FLAGS_KERN;
+    task->status = TASK_READY;
+    memset(task->name, 0x0, 32);
+    memcpy(task->name, name, strlen(name));
+
+    if (current == NULL)
     {
-        user_table[i] = ((uint32_t)alloc_page()->base & (~0xfffUL)) | 0x7UL;
+        current = task;
+        task->status = TASK_RUNNING;
+        switch_to(task->rsp);
     }
 
-    // user task start at 0x40000000
-    user_pagedir[256] = ((uint32_t)get_physaddr((uint32_t *)user_table) & (~0xfffUL)) | 0x7UL;
-    user_pagedir[1023] = (uint32_t)get_physaddr(user_pagedir) | 0x7UL;
+    queue_enqueue(&task_readyqueue, &task->list);
 
-    // copy task
-    // task code/data place in first 3MB
-    task_code = (uint32_t *)TASK_CODE_BEGIN;
-    if (map_page_range((uint32_t *)user_table[0], (uint32_t *)task_code, 0x7, 1024) < 0)
-    {
-        PANIC("MAP RANGE error\n");
-    }
-    memcpy(task_code, (uint8_t *)task_func, 3 * 1024 * 1024);
-
-    // make user stack
-    // task stack space place in last 1MB
-    stack = (uint32_t *)((uint32_t)task_code + 0x300000);
-    stack_top = (uint32_t *)((uint32_t)stack + 0x100000);
-    *(--stack_top) = (uint32_t)arg;
-    *(--stack_top) = (uint32_t)task_exit;
-    *(--stack_top) = UDATA_SELECTOR;
-    *(--stack_top) = (uint32_t)stack + 0x100000 - (2 * sizeof(uint32_t));
-    *(--stack_top) = 0x202;
-    *(--stack_top) = UCODE_SELECTOR;
-    *(--stack_top) = (uint32_t)task_code;
-    *(--stack_top) = (uint32_t)switch_to_user;
-    *(--stack_top) = 0x0;            // eax
-    *(--stack_top) = 0x0;            // ecx
-    *(--stack_top) = 0x0;            // edx
-    *(--stack_top) = 0x0;            // ebx
-    *(--stack_top) = 0x0;            // ebp
-    *(--stack_top) = 0x0;            // esi
-    *(--stack_top) = 0x0;            // edi
-    *(--stack_top) = UDATA_SELECTOR; // ds
-    *(--stack_top) = UDATA_SELECTOR; // es
-    *(--stack_top) = UDATA_SELECTOR; // fs
-    *(--stack_top) = UDATA_SELECTOR; // gs
-
-    // unmap task space
-    if (unmap_page_range(task_code, 1024) < 0)
-    {
-        PANIC("UNMAP RANGE error\n");
-    }
-
-    task = (struct task_struct *)kmalloc_aligned(sizeof(struct task_struct));
-    task->esp = (uint32_t)stack_top;
-    task->stack = stack;
-    task->tss_esp0 = (uint32_t)kmalloc_aligned(8192);
-    task->task_status = TASK_READY;
-    task->task_level = TASK_USER;
-    task->page_dir = (uint32_t)get_physaddr(user_pagedir);
-    strcpy(task->name, name);
-    spinlock_lock(&task_list_lock);
-    list_add(&task->list, &task_list);
-    spinlock_unlock(&task_list_lock);
     return task;
 }
 
-struct task_struct *ktask_create(void (*task_func)(void *), void *arg, char *name)
+int run_process(const char *pathname)
 {
-    uint32_t *stack;
-    uint32_t *stack_top;
-    struct task_struct *ktask;
+    int fd;
+    int len = 0;
+    char *elf;
+    struct stat sb;
+    struct task_struct *task;
 
-    // make task stack
-    stack = (uint32_t *)kmalloc_aligned(TASK_STACK_LEN);
-    memset(stack, 0x0, TASK_STACK_LEN);
-    stack_top = (uint32_t *)((uint32_t)stack + TASK_STACK_LEN);
-    *(--stack_top) = (uint32_t)arg;
-    *(--stack_top) = (uint32_t)task_exit; // setup return address to thread_exit
-    *(--stack_top) = (uint32_t)task_func;
-    *(--stack_top) = 0x0;            // eax
-    *(--stack_top) = 0x0;            // ecx
-    *(--stack_top) = 0x0;            // edx
-    *(--stack_top) = 0x0;            // ebx
-    *(--stack_top) = 0x0;            // ebp
-    *(--stack_top) = 0x0;            // esi
-    *(--stack_top) = 0x0;            // edi
-    *(--stack_top) = KDATA_SELECTOR; // ds
-    *(--stack_top) = KDATA_SELECTOR; // es
-    *(--stack_top) = KDATA_SELECTOR; // fs
-    *(--stack_top) = KDATA_SELECTOR; // gs
-
-    ktask = (struct task_struct *)kmalloc_aligned(sizeof(struct task_struct));
-
-    /*
-     * esp 成员变量用于保存当前任务的栈顶
-     * 在任务切换换出的时候会将切换时的栈保存到 esp 成员变量
-     * 在任务切换换入的时候会将 esp 成员变量的值写入%esp寄存器
-    */
-    ktask->esp = (uint32_t)stack_top;
-
-    /*
-     * stack 成员变量只是为了保存使用kmalloc创建的stack的地址
-     * 用于后续任务退出时进行free释放
-    */
-    ktask->stack = stack;
-
-    /*
-     * 内核态任务中断的时候并不涉及权限转换
-     * 所以并不需要从 tss 读取 esp0
-     * 这里设置成 0 就好
-    */
-    ktask->tss_esp0 = 0;
-    ktask->task_status = TASK_READY;
-    ktask->task_level = TASK_KERNEL;
-    strcpy(ktask->name, name);
-
-    /* 由于是内核任务
-     * 并且运行ktask_create()的时候可以确定运行在内核态
-     * 那么只需要获取当前的页目录表就行
-     * 所有的内核态任务都使用同一个页目录表
-    */
-    get_cr3(&ktask->page_dir);
-
-    // 将任务添加到任务队列中
-    spinlock_lock(&task_list_lock);
-    list_add(&ktask->list, &task_list);
-    spinlock_unlock(&task_list_lock);
-
-    /*
-     * 如果是系统中第一个任务
-     * 那么直接让 current 等于刚刚创建的 task
-     * 然后执行 switch_to 直接切换到刚刚创建的 task 中
-     * 不需要通过 context_switch
-     * 如果直接通过 context_switch 的话会导致 esp 无法切换成功
-     * 程序就会永远停在初始化代码上而不能进入第一个 task
-    */
-    if (current == NULL)
+    fd = sys_open(pathname);
+    if (fd > 0)
     {
-        // means first ktask
-        current = ktask;
-        current->task_status = TASK_RUNNING;
-        switch_to(current);
+        task = (struct task_struct *)kzalloc(sizeof(struct task_struct));
+        sys_stat(pathname, &sb);
+        elf = kzalloc(sb.st_size);
+        sys_read(fd, elf, sb.st_size);
+        if (elf[4] == ELFCLASS32)
+        {
+            // Do nothing.
+            sys_close(fd);
+            kfree(elf);
+            return -1;
+        }
+        else if (elf[4] == ELFCLASS64)
+        {
+            struct elf64_ehdr *ehdr;
+            sys_read(fd, elf, sizeof(struct elf64_ehdr));
+            ehdr = (struct elf64_ehdr *)elf;
+
+            /**
+             * 临时映射ELF需要的内存地址进行操作
+             */
+            struct elf64_phdr *phdr = (void *)((uint8_t *)elf + ehdr->e_phoff);
+            for (int i = 0; i < ehdr->e_phnum; i++)
+            {
+                if (phdr->p_type == PT_LOAD)
+                {
+                    len += map_page_range(alloc_pages(size_to_order((phdr->p_memsz >> PAGE_SHIFT) + 1)), phdr->p_vaddr, 0x7, (phdr->p_memsz >> PAGE_SHIFT) + 1);
+                    memcpy((void *)phdr->p_vaddr, (const void *)((uint64_t)elf + phdr->p_offset), phdr->p_filesz);
+                }
+                phdr++;
+            }
+            __usertask_create(task, (void *)((struct elf64_phdr *)((uint8_t *)elf + ehdr->e_phoff))->p_vaddr, (void *)ehdr->e_entry, len, 0);
+
+            task->flags = TASK_FLAGS_USER;
+            task->status = TASK_READY;
+            memset(task->name, 0x0, 32);
+            memcpy(task->name, "name", strlen("name"));
+
+            queue_enqueue(&task_readyqueue, &task->list);
+
+            /**
+             * 取消临时映射
+             * 让内核页表保持干净
+             */
+            phdr = (void *)((uint8_t *)elf + ehdr->e_phoff);
+            for (int i = 0; i < ehdr->e_phnum; i++)
+            {
+                if (phdr->p_type == PT_LOAD)
+                {
+                    unmap_page_range(phdr->p_vaddr, (phdr->p_memsz >> PAGE_SHIFT) + 1);
+                }
+                phdr++;
+            }
+        }
+        else
+        {
+            sys_close(fd);
+            kfree(elf);
+            printk("ELF NONE\n");
+            return -1;
+        }
     }
-    return ktask;
+    else
+    {
+        sys_close(fd);
+        return -1;
+    }
+    sys_close(fd);
+    kfree(elf);
+    return 0;
 }
 
-size_t total_tasks(void)
+void task_exit(void)
 {
-    uint32_t count = 0;
-    struct list_head *pos;
-    spinlock_lock(&task_list_lock);
-    list_for_each(pos, &task_list)
-    {
-        count++;
-    }
-    spinlock_unlock(&task_list_lock);
-    return count;
+    local_irq_disable();
+    current->status = TASK_EXIT;
+    scheduler();
 }
 
 void scheduler(void)
 {
-    struct task_struct *cur, *next;
+    struct task_struct *old_task, *new_task;
 
-    disable_irq();
-    if (current != NULL)
+    if (current)
     {
-        switch (current->task_status)
+        if (!queue_empty(&task_readyqueue))
         {
-        case TASK_RUNNING:
-            list_del(&current->list);
-            list_add_tail(&current->list, &task_list);
-            next = container_of(task_list.next, struct task_struct, list);
+            // 就绪队列不为空才进入任务切换
+            old_task = current;
+            new_task = container_of(queue_dequeue(&task_readyqueue), struct task_struct, list);
 
-            cur = current;
-            current = next;
-            // update task status
-            cur->task_status = TASK_READY;
-            next->task_status = TASK_RUNNING;
+            new_task->status = TASK_RUNNING;
+            if (old_task->status == TASK_RUNNING)
+            {
+                // 如果被切换任务是正常运行的TASK_RUNNIN状态才将其移到队列末尾
+                old_task->status = TASK_READY;
+                queue_enqueue(&task_readyqueue, &old_task->list);
+            }
 
-            update_tss_esp0(next->tss_esp0);
-            load_page_directory((uint32_t *)next->page_dir);
-            context_switch(cur, next);
-            break;
-
-        case TASK_BLOCKED:
-            next = container_of(task_list.next, struct task_struct, list);
-
-            cur = current;
-            current = next;
-            // update task status
-            next->task_status = TASK_RUNNING;
-
-            update_tss_esp0(next->tss_esp0);
-            load_page_directory((uint32_t *)next->page_dir);
-            context_switch(cur, next);
-            break;
-
-        case TASK_DEAD:
-            list_del(&current->list);
-            next = container_of(task_list.next, struct task_struct, list);
-
-            cur = current;
-            current = next;
-            // update task status
-            next->task_status = TASK_RUNNING;
-
-            kfree(current->stack);
-            kfree((uint32_t *)current->tss_esp0);
-            kfree(current);
-
-            update_tss_esp0(next->tss_esp0);
-            load_page_directory((uint32_t *)next->page_dir);
-            context_switch(cur, next);
-            break;
-
-        default:
-            // Do nothing
-            enable_irq();
-            break;
+            current = new_task;
+            write_cr3(new_task->pml4);
+            update_tss_rsp0(new_task->rsp0);
+            context_switch(&old_task->rsp, &new_task->rsp);
         }
     }
+}
+
+struct task_struct *get_current(void)
+{
+    return current;
+}
+
+queue_t *get_task_readyqueue(void)
+{
+    return &task_readyqueue;
 }

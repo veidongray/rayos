@@ -2,115 +2,158 @@
 .section .multiboot2
 .align 8
 _mboot:
-    .long 0xe85250d6                # magic
-    .long 0                         # architecture (0 = i386)
-    .long _end_mboot - _mboot         # total size
-    .long -(0xe85250d6 + 0 + (_end_mboot - _mboot))  # checksum
+    .long 0xe85250d6
+    .long 0
+    .long _end_mboot - _mboot
+    .long -(0xe85250d6 + 0 + (_end_mboot - _mboot))
 
-    # Request memory map information (required!)
-    .word 6                         # type = MULTIBOOT_HEADER_TAG_MMAP
-    .word 0                         # flags = 0
-    .long 8                         # size = 8 bytes
-
-    # End tag (mandatory)
-    .word 0                         # type = 0 (end tag)
-    .word 0                         # flags = 0
-    .long 8                         # size = 8 bytes
+    .word 6, 0, 8
+    .word 0, 0, 8
 _end_mboot:
 
-.code32		# to 32-bit mode
+.set VIRT_OFFSET, 0xffff800000000000
+.set NUM_PT, 64 # 128MB
 
-.set KERN_OFFSET, 0xC0100000
-.set VIRT_OFFSET, 0xC0000000
-
-.section .text
+# =====================================================================
+.code32 
+.section .text.head
 .global _start
 .type _start, @function
 _start:
-    # save multiboot info address and magic number for later use
-    # 因为 GRUB 将 info 和 magic 的地址分别放到 ebx 和 eax 中
-    # 这里先将两个寄存器的内容存到_mboot_info和_mboot_magic中
-    add $(VIRT_OFFSET), %ebx
-    mov %ebx, (_mboot_info - VIRT_OFFSET)
-    mov %eax, (_mboot_magic - VIRT_OFFSET)
-
-    # initial registers
-    xor %eax, %eax
-    mov %eax, %ebx
-    mov %eax, %ecx
-    mov %eax, %edx
-    mov %eax, %esi
-    mov %eax, %edi
+    cli
+    cld
     
-    # setup early page
-    # map kernel to 0xc0000000+
-    # 因为连接时已经连接到0xc0000000以上的地址
-    # 为了防止后面的符号访问出错
-    # 所以要先初始化一部分分页
-    # 保证在系统初始化的时候能够正常访问0xc0000000以上的地址
-    mov $(_boot_page_directory - VIRT_OFFSET), %eax
-    mov $(_boot_page_table - VIRT_OFFSET), %ebx
-    mov %ebx, (%eax)
-    orl $0x3, (%eax)
-    mov %ebx, 0xc00(%eax)
-    orl $0x3, 0xc00(%eax)
-    mov %eax, 0xffc(%eax)
-    orl $0x3, 0xffc(%eax)
+    # 保存 multiboot 信息（注意：此时仍在低端地址）
+    movl %ebx, (_mboot_info - VIRT_OFFSET)
+    movl %eax, (_mboot_magic - VIRT_OFFSET)
 
-    mov $1024, %ecx
-    xor %eax, %eax
-    orl $0x3, %eax
-    mov $(_boot_page_table - VIRT_OFFSET), %edi
-_fill_page_table:
-    mov %eax, (%edi)
-    add $0x1000, %eax
-    add $0x4, %edi
-    loop _fill_page_table
+    # 关闭分页（GRUB 可能已开启）
+    movl %cr0, %eax
+    andl $0x7FFFFFFF, %eax
+    movl %eax, %cr0
 
-    # load page diretory
-    mov $(_boot_page_directory - VIRT_OFFSET), %eax
-    mov %eax, %cr3
+    # =====================================================================
+    # 1. 创建 64-bit 页表（Higher-half 映射）
+    # =====================================================================
+    movl $(_boot_pml4 - VIRT_OFFSET), %edi
+    xorl %eax, %eax
+    movl $4096*4/4, %ecx          # 清空 16KB
+    rep stosl
 
-    # enable page
-    mov %cr0, %eax
-    or $0x80000000, %eax
-    mov %eax, %cr0
+    # PML4[0]   → PDPT（低端恒等映射，方便过渡）
+    # PML4[256] → PDPT（高端 higher-half）
+    movl $(_boot_pml4 - VIRT_OFFSET), %edi
+    movl $(_boot_pdpt - VIRT_OFFSET), %eax
+    orl  $0x3, %eax
 
-    # 这一步的跳转主要是为了刷新 CPU 指令缓存
-    ljmp $0x10, $startup_32
-startup_32:
-    # Set up the stack
-    mov $_kstack_top, %esp
-    jmp start_kernel
+    movl %eax, (%edi)            # PML4[0]
+    movl %eax, 256*8(%edi)        # PML4[256]
+    movl %edi, 511*8(%edi)          # PML4[511]
+    addl $0x3, 511*8(%edi)
+
+    # PDPT[0] → PD（低端 0~1GB）
+    movl $(_boot_pdpt - VIRT_OFFSET), %edi
+    movl $(_boot_pd - VIRT_OFFSET), %eax
+    orl  $0x3, %eax
+    movl %eax, (%edi)            # PDPT[0]
+
+    # PD[0] → PT0
+    movl $(_boot_pd - VIRT_OFFSET), %edi
+    movl $(_boot_pt - VIRT_OFFSET), %eax
+    orl  $0x3, %eax
+    movl $0x0, %edx
+    movl $NUM_PT, %ecx
+
+0:
+    movl %eax, (%edi, %edx, 8)
+    addl $0x1000, %eax
+    incl %edx
+    decl %ecx
+    jnz 0b
+
+    # Setup PT
+    movl $(_boot_pt - VIRT_OFFSET), %edi
+    movl $0x00000003, %eax          # Present + Writable
+    movl $(512 * NUM_PT), %ecx
+
+1:  movl %eax, (%edi)               # 低 32 位
+    movl $0, 4(%edi)                # 高 32 位清零
+    addl $0x1000, %eax
+    addl $8, %edi
+    decl %ecx
+    jnz 1b                          # 使用局部标签 + jnz 代替 loop
+
+    # =====================================================================
+    # 2. 进入长模式
+    # =====================================================================
+    movl $(_boot_pml4 - VIRT_OFFSET), %eax
+    movl %eax, %cr3
+
+    movl %cr4, %eax
+    orl  $(1 << 5), %eax          # PAE
+    movl %eax, %cr4
+
+    movl $0xC0000080, %ecx
+    rdmsr
+    orl  $(1 << 8), %eax          # LME
+    wrmsr
+
+    movl %cr0, %eax
+    orl  $0x80000000, %eax        # PG
+    movl %eax, %cr0
+
+    # 加载 64-bit GDT
+    movl $(_gdt64_ptr - VIRT_OFFSET), %eax
+    lgdt (%eax)
+
+    # 远跳转进入长模式
+    pushl $0x0008                    # 代码段选择子
+    pushl $_start64 - VIRT_OFFSET    # 64位目标地址（低32位足够，因为高位是0xffffffff，但这里用pushl）
+    lret                             # 执行远返回
+
+# =====================================================================
+.code64
+_start64:
+    movabsq $0x10, %rax
+    movw %ax, %ds
+    movw %ax, %es
+    movw %ax, %ss
+    movw %ax, %fs
+    movw %ax, %gs
+
+    # 现在可以安全使用高端地址了
+    movabsq $_kstack_top, %rsp
+    movabsq $start_kernel, %rax
+    call *%rax
+
+_loop:
     hlt
-    jmp startup_32
+    jmp _loop
 
+# =====================================================================
 .align 4096
 .section .data
+_boot_pml4: .space 4096
+_boot_pdpt: .space 4096
+_boot_pd:   .space 4096
+_boot_pt:   .space 4096 * NUM_PT
 
-# 这两个地址空间用来保存boot时的页配置
-# 因为 boot 后需要马上映射一部分地址到0xc0000000
-.global	_boot_page_directory
-_boot_page_directory:
-    .space 4096
-.global	_boot_page_table
-_boot_page_table:
-    .space 4096
+.align 8
+_gdt64:
+    .quad 0x0000000000000000
+    .quad 0x00af9a000000ffff   # 64-bit code
+    .quad 0x00cf92000000ffff   # 64-bit data
+_gdt64_end:
 
-# 用来存储 multiboot 信息的空间
+_gdt64_ptr:
+    .word _gdt64_end - _gdt64 - 1
+    .long _gdt64 - VIRT_OFFSET     # 32位阶段用物理地址
+
 .global _mboot_info
-_mboot_info:
-    .long 0
 .global _mboot_magic
-_mboot_magic:
-    .long 0
+_mboot_info: .long 0
+_mboot_magic: .long 0
 
-# 这个栈空间只会在第一个任务启动前使用
-# 也就是系统初始化的时候会使用
-# 第一个任务启动之后后面的任务都会使用自己的栈空间
-# 所以不需要太大
-.global _kstack
-_kstack:
-    .space 128 * 1024  # 128KB stack
+.align 4096
+_kstack: .space 128 * 1024
 _kstack_top:
-### kernel stack end ###

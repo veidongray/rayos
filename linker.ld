@@ -1,5 +1,5 @@
 ENTRY(_start)
-VIRT_OFFSET = 0xC0000000;
+VIRT_OFFSET = 0xffff800000000000;
 KERN_BASE = VIRT_OFFSET + 0x100000;
 SECTIONS
 {
@@ -11,6 +11,7 @@ SECTIONS
 
     .text ALIGN(4K) : AT(ADDR(.text) - VIRT_OFFSET) {
 	    *(.multiboot2)
+        *(.text.head)
 	    *(.text)
     }
 
