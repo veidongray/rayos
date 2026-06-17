@@ -1,4 +1,5 @@
 #include <pic.h>
+#include <int.h>
 #include <acpi.h>
 #include <page.h>
 #include <lapic.h>
@@ -18,13 +19,13 @@ void lapic_init(void)
 
     // setup APIC timer
     lapic_write(LAPIC_TICFG, 0x3);
-    lapic_write(LAPIC_LVT_TMR, 0x20000 | 32);
+    lapic_write(LAPIC_LVT_TMR, 0x20000 | X86_APIC_TIMER_VECTOR);
     lapic_write(LAPIC_TIC, ticks_per_10ms);
 
     lapic_write(LAPIC_LVT_LINT0, 0x10000); // Masked
     lapic_write(LAPIC_LVT_LINT1, 0x10000); // Masked
 
-    lapic_write(LAPIC_LVT_ERR, 33); // 错误中断向量号 33
+    lapic_write(LAPIC_LVT_ERR, X86_APIC_ERROR_VECTOR); // 错误中断向量号
 
     lapic_write(LAPIC_ESR, 0);
     lapic_write(LAPIC_ESR, 0); // 连续写两次是Intel手册建议的

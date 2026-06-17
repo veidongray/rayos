@@ -1,19 +1,24 @@
 #include <int.h>
 #include <pic.h>
+#include <gdt.h>
 #include <vfs.h>
 #include <task.h>
 #include <lapic.h>
 #include <printk.h>
 
-__attribute__((aligned(4096))) static idtr_t idtr;
-__attribute__((aligned(4096))) static idt_entry_t idt[256]; // Create an array of IDT entries; aligned for performance
+__attribute__((aligned(4096))) static idtr_t __idtr;
+__attribute__((aligned(4096))) static idt_entry_t __idt[256]; // Create an array of IDT entries; aligned for performance
 
-void isr_handler0(void);
+void isr_divide_error_handler(void);
 
-extern void isr_stub0(void);
+/**
+ * From isr_stubs.S
+ */
+extern void isr_divide_error_stub(void);
 extern void isr_default_stub(void);
 extern void lapic_timer_stub(void);
 extern void isr_syscall_stub(void);
+extern void isr_page_fault_stub(void);
 
 void int_init(void)
 {
@@ -23,32 +28,33 @@ void int_init(void)
     {
         idt_set_descriptor(vector, isr_default_stub, 0x8E);
     }
-    idt_set_descriptor(0, isr_stub0, 0x8E);
-    idt_set_descriptor(32, lapic_timer_stub, 0x8E);
-    idt_set_descriptor(0x80, isr_syscall_stub, 0xEE);
+    idt_set_descriptor(X86_EXCEPT_DIVIDE_ERROR, isr_divide_error_stub, 0x8E);
+    idt_set_descriptor(X86_EXCEPT_PAGE_FAULT, isr_page_fault_stub, 0x8E);
+    idt_set_descriptor(X86_APIC_TIMER_VECTOR, lapic_timer_stub, 0x8E);
+    idt_set_descriptor(X86_INT_SYSCALL, isr_syscall_stub, 0xEE);
 
-    idtr.base = (uint64_t)idt;
-    idtr.limit = sizeof(idt) - 1;
-    asm volatile("lidt %0" : : "m"(idtr));
+    __idtr.base = (uint64_t)__idt;
+    __idtr.limit = sizeof(__idt) - 1;
+    asm volatile("lidt %0" : : "m"(__idtr));
 
     pic_remap(0x20, 0x28);
     pic_timer_init();
 }
 
-void idt_set_descriptor(uint8_t vector, void *isr, uint8_t flags)
+void idt_set_descriptor(uint8_t __vector, void *__isr, uint8_t __flags)
 {
-    idt_entry_t *descriptor = &idt[vector];
+    idt_entry_t *descriptor = &__idt[__vector];
 
-    descriptor->isr_low = (uint64_t)isr & 0xFFFF;
-    descriptor->kernel_cs = 0x08;
+    descriptor->isr_low = (uint64_t)__isr & 0xFFFF;
+    descriptor->kernel_cs = KCODE_SELECTOR;
     descriptor->ist = 0;
-    descriptor->attributes = flags;
-    descriptor->isr_mid = ((uint64_t)isr >> 16) & 0xFFFF;
-    descriptor->isr_high = ((uint64_t)isr >> 32) & 0xFFFFFFFF;
+    descriptor->attributes = __flags;
+    descriptor->isr_mid = ((uint64_t)__isr >> 16) & 0xFFFF;
+    descriptor->isr_high = ((uint64_t)__isr >> 32) & 0xFFFFFFFF;
     descriptor->reserved = 0;
 }
 
-void isr_handler0(void)
+void isr_divide_error_handler(void)
 {
     lapic_send_eoi();
     // Do nothing
@@ -58,6 +64,11 @@ void lapic_timer_handler(void)
 {
     lapic_send_eoi();
     scheduler();
+}
+
+void isr_page_fault_handler(uint64_t __error, uint64_t *__pagefault_addr)
+{
+    printk("Page fault! %#llx, error code %#llx\n", __pagefault_addr, __error);
 }
 
 int isr_syscall_handler(struct context *ctx)

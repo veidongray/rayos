@@ -6,12 +6,12 @@
 isr_default_stub:
     jmp isr_default_stub
 
-.extern isr_handler0
-.global isr_stub0
-isr_stub0:
+.extern isr_divide_error_handler
+.global isr_divide_error_stub
+isr_divide_error_stub:
     PUSH_ALL
 
-    call isr_handler0
+    call isr_divide_error_handler
     
     POP_ALL
     iretq
@@ -40,4 +40,22 @@ isr_syscall_stub:
     call isr_syscall_handler
 
     POP_ALL
+    iretq
+
+.extern isr_page_fault_handler
+.global isr_page_fault_stub
+isr_page_fault_stub:
+    pushq %rbp
+    movq %rsp, %rbp
+    PUSH_ALL
+
+    movq 0x8(%rbp), %rdi
+    movq %cr2, %rsi
+    call isr_page_fault_handler
+
+    POP_ALL
+    leaveq
+
+    # 跳过 error code
+    addq $0x8, %rsp
     iretq
