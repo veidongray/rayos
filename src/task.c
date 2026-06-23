@@ -1,4 +1,5 @@
 #include <mm.h>
+#include <ff.h>
 #include <x86.h>
 #include <int.h>
 #include <elf.h>
@@ -161,8 +162,8 @@ int run_process(const char *pathname)
     struct stat sb;
     struct task_struct *task;
 
-    fd = sys_open(pathname);
-    if (fd > 0)
+    fd = sys_open(pathname, FA_READ);
+    if (fd >= 0)
     {
         task = (struct task_struct *)kzalloc(sizeof(struct task_struct));
         sys_stat(pathname, &sb);

@@ -1,4 +1,5 @@
 #include <mm.h>
+#include <ff.h>
 #include <x86.h>
 #include <vfs.h>
 #include <pci.h>
@@ -19,41 +20,9 @@
 #include <multiboot2.h>
 #include <string.h>
 
-void console_thread(void *args)
-{
-    char *buf;
-    struct stat sb;
-
-    args = args;
-
-    while (1)
-    {
-        for (int i = 0; i < 0xffffff; i++)
-            ;
-        sys_stat("/stdout", &sb);
-        if (sb.st_size)
-        {
-            buf = kzalloc(sb.st_size);
-            memset(buf, 0, sb.st_size);
-            sys_read(STDOUT, buf, sb.st_size);
-            printk("%s\n", buf);
-            kfree(buf);
-        }
-    }
-}
-
 void kernel_init(void *args)
 {
     args = args;
-
-    sys_create("/stdin");
-    sys_open("/stdin");
-    sys_create("/stdout");
-    sys_open("/stdout");
-    sys_create("/stderr");
-    sys_open("/stderr");
-
-    run_thread(console_thread, NULL, "console_thread");
 
     printk("/init running...\n");
     run_process("/init");
@@ -79,6 +48,7 @@ void start_kernel(void)
     acpi_init();
     lapic_init();
     pci_init();
+    vfs_init();
     task_manager_init();
 
     run_thread(kernel_init, NULL, "kernel_init");

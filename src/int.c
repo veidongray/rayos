@@ -69,6 +69,7 @@ void lapic_timer_handler(void)
 void isr_page_fault_handler(uint64_t __error, uint64_t *__pagefault_addr)
 {
     printk("Page fault! %#llx, error code %#llx\n", __pagefault_addr, __error);
+    asm volatile("hlt");
 }
 
 int isr_syscall_handler(struct context *ctx)
@@ -78,7 +79,7 @@ int isr_syscall_handler(struct context *ctx)
     switch (nr)
     {
     case SYS_OPEN:
-        ctx->rax = sys_open((const char *)ctx->rdi);
+        ctx->rax = sys_open((const char *)ctx->rdi, (__mode_t)ctx->rsi);
         break;
 
     case SYS_CLOSE:

@@ -6,12 +6,21 @@
 #include <align.h>
 #include <printk.h>
 #include <string.h>
+#include <block_device.h>
 
 __attribute__((aligned(256))) static uint8_t fis_buffer[256];
 __attribute__((aligned(1024))) static struct ahci_cmd_list_entry cl_buffer[32]; // 32个Slot
 __attribute__((aligned(4096))) static struct ahci_cmd_table cmd_table_buffer;   // 升级为页级命令表
 static struct sata_device *sata_dev;
 static struct hba_memory_registers *hba;
+struct ahci_priv
+{
+    int portno;
+    uint8_t *fis_buffer;
+    struct hba_memory_registers *hba;
+    struct ahci_cmd_list_entry *cl_buffer;
+    struct ahci_cmd_table *cmd_table_buffer;
+};
 
 struct sata_device *get_sata_device(void)
 {
@@ -128,11 +137,31 @@ int ahci_read(struct sata_controller_port_register *port, uint64_t lba, uint16_t
         target_buf_virt);
 }
 
+int blkdev_ahci_read(struct block_device *blkdev, uint64_t lba, uint32_t count, void *target_buf_virt)
+{
+    return ahci_dma_transfer(
+        0,
+        &((struct ahci_priv *)blkdev->priv)->hba->ports[((struct ahci_priv *)blkdev->priv)->portno],
+        lba,
+        count,
+        target_buf_virt);
+}
+
 int ahci_write(struct sata_controller_port_register *port, uint64_t lba, uint16_t count, void *target_buf_virt)
 {
     return ahci_dma_transfer(
         1,
         port,
+        lba,
+        count,
+        target_buf_virt);
+}
+
+int blkdev_ahci_write(struct block_device *blkdev, uint64_t lba, uint32_t count, void *target_buf_virt)
+{
+    return ahci_dma_transfer(
+        1,
+        &((struct ahci_priv *)blkdev->priv)->hba->ports[((struct ahci_priv *)blkdev->priv)->portno],
         lba,
         count,
         target_buf_virt);
@@ -156,6 +185,10 @@ sata_dev_t ahci_check_device_type(volatile uint32_t signature)
         return SATA_DEV_NONE;
     }
 }
+
+struct block_device_ops blkops = {
+    .read = blkdev_ahci_read,
+    .write = blkdev_ahci_write};
 
 void ahci_init(uintptr_t ahci_base)
 {
@@ -240,6 +273,18 @@ void ahci_init(uintptr_t ahci_base)
                     sata_dev->hba = hba;
                     sata_dev->port_no = i;
                     sata_dev->port = &hba->ports[i];
+
+                    struct ahci_priv *priv = (struct ahci_priv *)kzalloc(sizeof(struct ahci_priv));
+                    priv->cl_buffer = cl_buffer;
+                    priv->cmd_table_buffer = &cmd_table_buffer;
+                    priv->fis_buffer = fis_buffer;
+                    priv->hba = hba;
+                    priv->portno = i;
+                    struct block_device *blkdev = (struct block_device *)kzalloc(sizeof(struct block_device));
+                    sprintf(blkdev->info.name, "sata%d", i);
+                    blkdev->ops = &blkops;
+                    blkdev->priv = priv;
+                    blkdev_register(blkdev);
                 }
                 else
                 {
