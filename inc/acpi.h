@@ -248,6 +248,7 @@ struct acpi_madt_mp_wakeup
 
 uint64_t acpi_find_mcfg_pci_mmio_base(uint64_t offset);
 uint64_t acpi_find_madt_lapic_base(void);
+uint64_t acpi_find_madt_ioapic_base(void);
 struct acpi_rsdp *acpi_find_rsdp(void);
 void acpi_init(void);
 

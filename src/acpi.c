@@ -39,6 +39,35 @@ uint64_t acpi_find_madt_lapic_base(void)
 }
 
 /*
+ * 获取 IOAPIC（I/O APIC）物理地址
+ */
+uint64_t acpi_find_madt_ioapic_base(void)
+{
+    uint8_t *ptr = madt->entries;
+    uint8_t *end = (uint8_t *)madt + madt->header.length;
+
+    while (ptr < end)
+    {
+        uint8_t type = ptr[0];
+        uint8_t length = ptr[1];
+
+        if (length < 2 || ptr + length > end)
+            break;
+
+        switch (type)
+        {
+        case 1:
+            struct acpi_madt_io_apic *io_apic = (struct acpi_madt_io_apic *)ptr;
+            printk("MADT Found IOAPIC %#llx\n", io_apic->io_apic_addr);
+            return io_apic->io_apic_addr;
+        }
+
+        ptr += length;
+    }
+    return -1;
+}
+
+/*
  * 在 BIOS 预留区域搜索 RSDP（Root System Description Pointer）
  */
 struct acpi_rsdp *acpi_find_rsdp(void)
@@ -88,7 +117,7 @@ void acpi_init(void)
         /* 映射 RSDT */
         rsdt = (struct acpi_rsdt *)((uintptr_t)rsdp->rsdt_address + KERNEL_BASE);
         map_page((uint64_t)rsdp->rsdt_address, (uint64_t)rsdt, 0x1b);
-        
+
         printk("map rsdt_address %#llx -> %#llx\n", rsdp->rsdt_address, rsdt);
 
         /* 计算 RSDT 中表项数量 */
@@ -109,6 +138,8 @@ void acpi_init(void)
                 madt = (struct acpi_madt *)header;
                 printk("ACPI Found MADT %#llx\n", header);
                 printk("MADT LAPIC address %#llx\n", madt->local_apic_address);
+                printk("MADT lenght %u\n", madt->header.length);
+                acpi_find_madt_ioapic_base();
             }
 
             /* 查找 MCFG（PCIe ECAM表） */
