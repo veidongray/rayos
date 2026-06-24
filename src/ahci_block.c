@@ -197,7 +197,7 @@ void ahci_init(uintptr_t ahci_base)
 
     printk("AHCI base %#llx\n", ahci_base);
     hba = (struct hba_memory_registers *)((uint64_t)ahci_base + KERNEL_BASE);
-    map_page_range((uint64_t)ahci_base, (uint64_t)ahci_base + KERNEL_BASE, 0x1b, (sizeof(struct hba_memory_registers) >> PAGE_SHIFT) + 1);
+    map_page_range((uint64_t)ahci_base, (uint64_t)ahci_base + KERNEL_BASE, MAP_KERN_MMIO, (sizeof(struct hba_memory_registers) >> PAGE_SHIFT) + 1);
 
     // 全局重置与激活 AHCI
     hba->ghc.ghc |= (1U << 31);
@@ -281,10 +281,9 @@ void ahci_init(uintptr_t ahci_base)
                     priv->hba = hba;
                     priv->portno = i;
                     struct block_device *blkdev = (struct block_device *)kzalloc(sizeof(struct block_device));
-                    sprintf(blkdev->info.name, "sata%d", i);
-                    blkdev->ops = &blkops;
+                    sprintf(blkdev->info.bd_name, "sata%d", i);
                     blkdev->priv = priv;
-                    blkdev_register(blkdev);
+                    blkdev_register(blkdev, &blkops);
                 }
                 else
                 {

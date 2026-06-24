@@ -55,6 +55,12 @@ static inline uint64_t size_to_order(size_t size)
     return fls(pages - 1);
 }
 
+// number of pages -> order
+static inline uint64_t pages_to_order(size_t nr_pages)
+{
+    return size_to_order(nr_pages * PAGE_SIZE);
+}
+
 int unmap_page_range(uint64_t virtaddr, size_t len);
 int map_page_range(uint64_t physaddr, uint64_t virtaddr, uint64_t flags, size_t len);
 void page_init(void);

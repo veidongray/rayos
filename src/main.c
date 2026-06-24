@@ -49,6 +49,7 @@ void start_kernel(void)
     total_memory_init();
     gdt_init();
     page_init();
+    mm_init();
     int_init();
     uart_init();
     acpi_init();

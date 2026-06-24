@@ -3,9 +3,11 @@
 #include <vfs.h>
 #include <task.h>
 #include <fat32.h>
+#include <types.h>
 #include <printk.h>
-#include <sys/stat.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <block_device.h>
 
 static FATFS fs;
 static int __g_fd_count = 0;
@@ -13,6 +15,19 @@ LIST_HEAD(__list_vfs_file);
 
 int vfs_init(void)
 {
+    __u8 *buf;
+    struct block_device *bdev;
+
+    bdev = blkdev_get_by_name("sata0");
+    if (bdev)
+    {
+        printk("Found block device %s\n", bdev->info.bd_name);
+    }
+
+    buf = (__u8 *)kzalloc(2048);
+    bdev->ops->read(bdev, 0, 1, buf);
+    
+    kfree(buf);
     f_mount(&fs, "", 1);
     return 0;
 }

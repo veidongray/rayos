@@ -18,7 +18,7 @@ struct block_device_ops
 
 struct block_device_info
 {
-    char name[32];
+    char bd_name[32];
     int blkdev_id;
 };
 
@@ -27,11 +27,12 @@ struct block_device
     const struct block_device_ops *ops;
     struct block_device_info info;
     void *priv;
-    struct list_head list;
+    struct list_head bd_list;
 };
 
-int blkdev_register(struct block_device *blkdev);
+int blkdev_register(struct block_device *blkdev, struct block_device_ops *ops);
 void blkdev_unregister(struct block_device *blkdev);
 void blkdev_destroy(struct block_device *blkdev);
+struct block_device *blkdev_get_by_name(const char *name);
 
 #endif // BLOCK_DEVICE_H
