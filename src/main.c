@@ -15,6 +15,7 @@
 #include <mutex.h>
 #include <bitmap.h>
 #include <printk.h>
+#include <ioapic.h>
 #include <syscall.h>
 #include <sys/stat.h>
 #include <multiboot2.h>
@@ -22,6 +23,7 @@
 
 void kernel_init(void *args)
 {
+    char *buf;
     args = args;
 
     printk("/init running...\n");
@@ -32,9 +34,13 @@ void kernel_init(void *args)
            get_total_mem(), bitmap_count_set(&page_alloc_bitmap) * 4096,
            bitmap_usage_percent(&page_alloc_bitmap));
 
+    buf = kzalloc(UART_BUF_SIZE);
     while (1)
     {
         // Do nothing.
+        memset(buf, 0, UART_BUF_SIZE);
+        uart_putc('>');
+        uart_gets(buf);
     }
 }
 
@@ -47,6 +53,7 @@ void start_kernel(void)
     uart_init();
     acpi_init();
     lapic_init();
+    ioapic_init();
     pci_init();
     vfs_init();
     task_manager_init();

@@ -9,7 +9,7 @@ static uint32_t ticks_per_10ms = 0;
 void lapic_init(void)
 {
     // map 0xfee00000
-    map_page(LAPIC_BASE, KERNEL_BASE + acpi_find_madt_lapic_base(), 0x1b);
+    map_page(LAPIC_BASE, KERNEL_BASE + acpi_find_madt_lapic_base(), MAP_KERN_MMIO);
 
     lapic_calibrate();
     // mask PIC

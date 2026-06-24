@@ -71,19 +71,19 @@ static inline int __usertask_create(struct task_struct *task, void *start, void 
 
     // 因为kmalloc不能保证返回的地址4K对齐
     // 所以这里使用手动分配页再映射的方式确保对齐
-    map_page(alloc_page(), (uint64_t)user_pml4, 0x7);
-    map_page(alloc_page(), (uint64_t)user_pdpt, 0x7);
-    map_page(alloc_page(), (uint64_t)user_pd, 0x7);
-    map_page_range(alloc_pages(0), (uint64_t)user_pt, 0x7, 1);
+    map_page(alloc_page(), (uint64_t)user_pml4, MAP_USER_RW);
+    map_page(alloc_page(), (uint64_t)user_pdpt, MAP_USER_RW);
+    map_page(alloc_page(), (uint64_t)user_pd, MAP_USER_RW);
+    map_page_range(alloc_pages(0), (uint64_t)user_pt, MAP_USER_RW, 1);
 
     task->rsp0 = (uint64_t)kzalloc(512 * 1024) + (512 * 1024);
     task->pml4 = get_physaddr((uint64_t)user_pml4);
-    user_pml4[pml4_idx] = get_physaddr((uint64_t)user_pdpt) | 0x7;
-    user_pdpt[pdpt_idx] = get_physaddr((uint64_t)user_pd) | 0x7;
-    user_pd[pd_idx] = get_physaddr((uint64_t)user_pt) | 0x7;
+    user_pml4[pml4_idx] = get_physaddr((uint64_t)user_pdpt) | MAP_USER_RW;
+    user_pdpt[pdpt_idx] = get_physaddr((uint64_t)user_pd) | MAP_USER_RW;
+    user_pd[pd_idx] = get_physaddr((uint64_t)user_pt) | MAP_USER_RW;
     for (size_t i = 0; i < len; i++)
     {
-        user_pt[pt_idx + i] = get_physaddr((uint64_t)start) | 0x7;
+        user_pt[pt_idx + i] = get_physaddr((uint64_t)start) | MAP_USER_RW;
         start = (void *)((uint64_t)start + 0x1000);
     }
 
@@ -119,7 +119,7 @@ static inline int __usertask_create(struct task_struct *task, void *start, void 
     {
         user_pml4[index] = ((volatile uint64_t *)(PML4_BASE << PAGE_SHIFT))[index];
     }
-    user_pml4[511] = get_physaddr((uint64_t)user_pml4) | 0x7;
+    user_pml4[511] = get_physaddr((uint64_t)user_pml4) | MAP_USER_RW;
     unmap_page((uint64_t)user_pml4);
     unmap_page((uint64_t)user_pdpt);
     unmap_page((uint64_t)user_pd);

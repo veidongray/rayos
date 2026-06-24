@@ -1,5 +1,6 @@
 #include <acpi.h>
 #include <page.h>
+#include <types.h>
 #include <stdint.h>
 #include <printk.h>
 #include <string.h>
@@ -38,10 +39,10 @@ uint64_t acpi_find_madt_lapic_base(void)
     return madt->local_apic_address;
 }
 
-/*
- * 获取 IOAPIC（I/O APIC）物理地址
+/**
+ * 获取 IOAPIC 物理基地址 (MADT Type 1)
  */
-uint64_t acpi_find_madt_ioapic_base(void)
+uint32_t *__acpi_find_madt_ioapic_base(void)
 {
     uint8_t *ptr = madt->entries;
     uint8_t *end = (uint8_t *)madt + madt->header.length;
@@ -54,17 +55,63 @@ uint64_t acpi_find_madt_ioapic_base(void)
         if (length < 2 || ptr + length > end)
             break;
 
-        switch (type)
+        if (type == 1)
         {
-        case 1:
-            struct acpi_madt_io_apic *io_apic = (struct acpi_madt_io_apic *)ptr;
-            printk("MADT Found IOAPIC %#llx\n", io_apic->io_apic_addr);
+            struct acpi_madt_io_apic *io_apic =
+                (struct acpi_madt_io_apic *)ptr;
+            printk("MADT: IOAPIC id=%u addr=%#llx gsi_base=%u\n",
+                   io_apic->io_apic_id,
+                   io_apic->io_apic_addr,
+                   io_apic->global_system_interrupt_base);
             return io_apic->io_apic_addr;
         }
 
         ptr += length;
     }
-    return -1;
+
+    printk("MADT: WARNING - No IOAPIC entry found!\n");
+    return 0;
+}
+
+/**
+ * 根据传统 IRQ 号查找真实 GSI (MADT Type 2)
+ * 传统 ISA IRQ 号 (COM1=4, COM2=3, Timer=0, etc.)
+ * 对应的 GSI；若无 ISO 条目则返回 irq 本身(Identity Mapping)
+ */
+uint32_t __acpi_find_gsi_for_irq(uint8_t irq)
+{
+    uint8_t *ptr = madt->entries;
+    uint8_t *end = (uint8_t *)madt + madt->header.length;
+
+    while (ptr < end)
+    {
+        uint8_t type = ptr[0];
+        uint8_t length = ptr[1];
+
+        if (length < 2 || ptr + length > end)
+            break;
+
+        if (type == 2)
+        {
+            struct acpi_madt_iso *iso = (struct acpi_madt_iso *)ptr;
+            printk("MADT ISO: BusSrc=%u IRQSrc=%u -> GSI=%u Flags=%#x\n",
+                   iso->bus_source, iso->irq_source,
+                   iso->gsi, iso->flags);
+
+            if (iso->irq_source == irq)
+            {
+                printk("MADT: IRQ%u remapped to GSI %u\n", irq, iso->gsi);
+                return iso->gsi;
+            }
+        }
+
+        ptr += length;
+    }
+
+    /* 没有找到对应的 ISO to Identity Mapping */
+    printk("MADT: No ISO for IRQ%u, using identity mapping GSI=%u\n",
+           irq, irq);
+    return irq;
 }
 
 /*
@@ -110,13 +157,13 @@ void acpi_init(void)
         xsdt = (struct acpi_xsdt *)((uint64_t)rsdp->xsdt_address + KERNEL_BASE);
 
         /* 映射 XSDT 到虚拟地址空间 */
-        map_page((uint64_t)rsdp->xsdt_address, (uint64_t)xsdt, 0x1b);
+        map_page((uint64_t)rsdp->xsdt_address, (uint64_t)xsdt, MAP_KERN_MMIO);
     }
     else
     {
         /* 映射 RSDT */
         rsdt = (struct acpi_rsdt *)((uintptr_t)rsdp->rsdt_address + KERNEL_BASE);
-        map_page((uint64_t)rsdp->rsdt_address, (uint64_t)rsdt, 0x1b);
+        map_page((uint64_t)rsdp->rsdt_address, (uint64_t)rsdt, MAP_KERN_MMIO);
 
         printk("map rsdt_address %#llx -> %#llx\n", rsdp->rsdt_address, rsdt);
 
@@ -130,7 +177,7 @@ void acpi_init(void)
                 (struct acpi_sdt_header *)((uintptr_t)rsdt->entries[count] + KERNEL_BASE);
 
             /* 映射每一个 ACPI 表 */
-            map_page((uint64_t)rsdt->entries[count], (uint64_t)header, 0x1b);
+            map_page((uint64_t)rsdt->entries[count], (uint64_t)header, MAP_KERN_MMIO);
 
             /* 查找 MADT（APIC表） */
             if (!strncmp(header->signature, "APIC", 4))
@@ -139,7 +186,6 @@ void acpi_init(void)
                 printk("ACPI Found MADT %#llx\n", header);
                 printk("MADT LAPIC address %#llx\n", madt->local_apic_address);
                 printk("MADT lenght %u\n", madt->header.length);
-                acpi_find_madt_ioapic_base();
             }
 
             /* 查找 MCFG（PCIe ECAM表） */

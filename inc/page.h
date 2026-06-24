@@ -9,6 +9,25 @@
 #define PML4_BASE 0xFFFFFFFFFFFFFULL
 #define KERNEL_BASE 0xffff800000000000ULL
 
+/* 基础属性位 */
+#define PTE_PRESENT (1ULL << 0)  // 页面有效
+#define PTE_WRITABLE (1ULL << 1) // 可写
+#define PTE_USER (1ULL << 2)     // 用户态可访问
+#define PTE_PWT (1ULL << 3)      // Write-Through
+#define PTE_PCD (1ULL << 4)      // Cache Disable
+#define PTE_ACCESSED (1ULL << 5) // 已访问（CPU自动置位）
+#define PTE_DIRTY (1ULL << 6)    // 已修改（仅PT级，CPU自动置位）
+#define PTE_HUGE (1ULL << 7)     // 大页（PDPT=1G, PD=2M）
+#define PTE_GLOBAL (1ULL << 8)   // 全局页（跳过TLB刷新）
+#define PTE_NX (1ULL << 63)      // 禁止执行
+
+/* 常用组合标志 */
+#define MAP_KERN_RW (PTE_PRESENT | PTE_WRITABLE)
+#define MAP_KERN_RO (PTE_PRESENT)
+#define MAP_KERN_MMIO (PTE_PRESENT | PTE_WRITABLE | PTE_PCD | PTE_PWT)
+#define MAP_USER_RW (PTE_PRESENT | PTE_WRITABLE | PTE_USER)
+#define MAP_USER_RO (PTE_PRESENT | PTE_USER)
+
 #define order_to_pages(order) (0x1ULL << (order))
 
 // 找出一个非零数的最高位位置（1-based），等价于 fls
