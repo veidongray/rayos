@@ -1,3 +1,4 @@
+#include <ff.h>
 #include <mm.h>
 #include <vfs.h>
 #include <task.h>
@@ -6,63 +7,102 @@
 #include <sys/stat.h>
 #include <string.h>
 
+static FATFS fs;
+static int __g_fd_count = 0;
+LIST_HEAD(__list_vfs_file);
+
 int vfs_init(void)
 {
+    f_mount(&fs, "", 1);
     return 0;
 }
 
-void vfs_task(void *arg)
+int sys_open(const char *path, __mode_t mode)
 {
-    arg = arg;
-    printk("VFS running...\n");
-    while (1)
-        ;
-}
+    FIL *fp = (FIL *)kzalloc(sizeof(FIL));
+    struct vfs_file *file = (struct vfs_file *)kzalloc(sizeof(struct vfs_file));
 
-int sys_open(const char *path)
-{
-    return fat32_open(path);
+    f_open(fp, path, mode);
+    file->fd = __g_fd_count++;
+    file->priv = (void *)fp;
+
+    list_add_tail(&file->list, &__list_vfs_file);
+    return file->fd;
 }
 
 int sys_close(int fd)
 {
-    return fat32_close(fd);
+    struct list_head *pos;
+    struct vfs_file *file;
+
+    list_for_each(pos, &__list_vfs_file)
+    {
+        file = container_of(pos, struct vfs_file, list);
+        if (file->fd == fd)
+        {
+            list_del(&file->list);
+            f_close((FIL *)file->priv);
+            kfree(file->priv);
+            kfree(file);
+            return 0;
+        }
+    }
+    return -1;
 }
 
 int sys_read(int fd, char *buf, size_t size)
 {
     int ret;
+    struct list_head *pos;
+    struct vfs_file *file;
 
-    ret = fat32_read(fd, buf, size);
+    list_for_each(pos, &__list_vfs_file)
+    {
+        file = container_of(pos, struct vfs_file, list);
+        if (file->fd == fd)
+        {
+            f_read((FIL *)file->priv, buf, (UINT)size, (UINT *)&ret);
+            return ret;
+        }
+    }
 
-    return ret;
+    return -1;
 }
 
 int sys_write(int fd, const char *buf, size_t size)
 {
     int ret;
+    struct list_head *pos;
+    struct vfs_file *file;
 
-    ret = fat32_write(fd, buf, size);
+    list_for_each(pos, &__list_vfs_file)
+    {
+        file = container_of(pos, struct vfs_file, list);
+        if (file->fd == fd)
+        {
+            f_write((FIL *)file->priv, buf, (UINT)size, (UINT *)&ret);
+            return ret;
+        }
+    }
 
-    return ret;
+    return -1;
 }
 
 int sys_create(const char *pathname)
 {
-    fat32_create(pathname);
+    FIL fp;
+    f_open(&fp, pathname, FA_CREATE_NEW);
+    f_sync(&fp);
+    f_close(&fp);
     return 0;
 }
 
 int sys_stat(const char *pathname, struct stat *_sb)
 {
-    struct stat sb;
-    struct fat32_dir_entry entry;
+    FILINFO info;
 
-    fat32_lookup(pathname, &entry);
-
-    sb.st_size = entry.sfn_entry.file_size;
-
-    memcpy(_sb, &sb, sizeof(struct stat));
+    f_stat(pathname, &info);
+    _sb->st_size = info.fsize;
 
     return 0;
 }

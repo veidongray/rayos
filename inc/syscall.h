@@ -1,11 +1,9 @@
 #ifndef SYSCALL_H
 #define SYSCALL_H
 
+#include <ff.h>
+#include <vfs.h>
 #include <sys/types.h>
-
-#define STDIN 0
-#define STDOUT 1
-#define STDERR 2
 
 int open(const char *pathname, int flags, ...);
 int close(int fd);

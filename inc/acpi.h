@@ -92,7 +92,7 @@ struct acpi_madt_io_apic
     struct acpi_madt_entry_header header;
     uint8_t io_apic_id;                    // I/O APIC ID
     uint8_t reserved;                      // 保留
-    uint32_t io_apic_addr;                 // 物理基地址
+    uint32_t *io_apic_addr;                // 物理基地址
     uint32_t global_system_interrupt_base; // 该 GSI 的起始中断号
 } __attribute__((packed));
 
@@ -246,8 +246,21 @@ struct acpi_madt_mp_wakeup
     uint64_t mail_box_address;
 } __attribute__((packed));
 
+/* MADT Type 2: Interrupt Source Override */
+struct acpi_madt_iso
+{
+    uint8_t type;       // = 2
+    uint8_t length;     // = 10
+    uint8_t bus_source; // 通常为 0 (ISA)
+    uint8_t irq_source; // 原始 IRQ 号, e.g. 4 for COM1
+    uint32_t gsi;       // 重映射后的 Global System Interrupt
+    uint16_t flags;     // Polarity & Trigger Mode
+} __attribute__((packed));
+
 uint64_t acpi_find_mcfg_pci_mmio_base(uint64_t offset);
 uint64_t acpi_find_madt_lapic_base(void);
+uint32_t *__acpi_find_madt_ioapic_base(void);
+uint32_t __acpi_find_gsi_for_irq(uint8_t irq);
 struct acpi_rsdp *acpi_find_rsdp(void);
 void acpi_init(void);
 

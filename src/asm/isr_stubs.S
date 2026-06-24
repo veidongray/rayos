@@ -59,3 +59,13 @@ isr_page_fault_stub:
     # 跳过 error code
     addq $0x8, %rsp
     iretq
+
+.extern isr_com1_handler
+.global isr_com1_stub
+isr_com1_stub:
+    PUSH_ALL
+
+    call isr_com1_handler
+    
+    POP_ALL
+    iretq

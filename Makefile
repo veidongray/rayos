@@ -1,4 +1,4 @@
-BUILT-IN = src/asm/built-in.o src/built-in.o src/lib/printf/built-in.o src/lib/string/built-in.o
+BUILT-IN = src/asm/built-in.o src/built-in.o src/fs/built-in.o src/lib/printf/built-in.o src/lib/string/built-in.o
 
 INCDIR = -I $(CURDIR)/inc -I $(CURDIR)/inc/lib/string -I $(CURDIR)/inc/lib/printf
 CFLAGS = -m64 -fno-pic                      \
@@ -35,6 +35,7 @@ build:
 	$(MAKE) -C src/lib/printf built-in.o
 	$(MAKE) -C src/lib/string built-in.o
 	$(MAKE) -C src/asm built-in.o
+	$(MAKE) -C src/fs built-in.o
 	$(MAKE) -C src/user init
 	$(MAKE) -C src built-in.o
 	$(LD) $(LDFLAGS) -T linker.ld -o vmrayos $(BUILT-IN)

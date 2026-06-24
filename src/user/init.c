@@ -2,7 +2,7 @@
 
 int main(void)
 {
-    write(STDOUT, "Hello! I'm User!", 17);
+    creat("init.log", 0);
 
     while (1)
         ;

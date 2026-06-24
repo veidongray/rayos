@@ -1,5 +1,5 @@
 #include <gdt.h>
-#include <stdint.h>
+#include <types.h>
 #include <printf.h>
 
 // Each define here is for a specific flag in the descriptor.
@@ -61,14 +61,14 @@
                            SEG_LONG(0) | SEG_SIZE(1) | SEG_GRAN(1) | \
                            SEG_PRIV(3) | SEG_DATA_RDWR
 
-__attribute__((aligned(4096))) static uint64_t gdt[7];
+__attribute__((aligned(4096))) static __u64 gdt[7];
 __attribute__((aligned(4096))) static struct gdtr64 g;
 __attribute__((aligned(4096))) static struct tss_entry tss;
-static uint8_t kernel_stack[16384] __attribute__((aligned(16)));
+static __u8 kernel_stack[16384] __attribute__((aligned(16)));
 
-uint64_t create_descriptor(uint32_t base, uint32_t limit, uint16_t flag)
+__u64 create_descriptor(__u32 base, __u32 limit, uint16_t flag)
 {
-    uint64_t descriptor;
+    __u64 descriptor;
 
     // Create the high 32 bit segment
     descriptor = limit & 0x000F0000;         // set limit bits 19:16
@@ -89,7 +89,7 @@ uint64_t create_descriptor(uint32_t base, uint32_t limit, uint16_t flag)
 void gdt_init(void)
 {
     // 初始化 TSS
-    tss.rsp0 = (uint64_t)(kernel_stack + sizeof(kernel_stack)); // 有效栈顶
+    tss.rsp0 = (__u64)(kernel_stack + sizeof(kernel_stack)); // 有效栈顶
     tss.rsp1 = 0;
     tss.rsp2 = 0;
     tss.ist1 = 0;                              // 可选：为 NMI/Double Fault 设置 IST 栈
@@ -101,17 +101,17 @@ void gdt_init(void)
     gdt[3] = create_descriptor(0, 0xfffff, GDT_CODE64_PL3);
     gdt[4] = create_descriptor(0, 0xfffff, GDT_DATA64_PL3);
 
-    uint64_t tss_base = (uint64_t)&tss;
-    uint32_t tss_limit = sizeof(struct tss_entry) - 1;
+    __u64 tss_base = (__u64)&tss;
+    __u32 tss_limit = sizeof(struct tss_entry) - 1;
 
     // Low 64 bits
-    gdt[5] = ((uint64_t)(tss_limit & 0xFFFF)) | ((tss_base & 0xFFFFFFULL) << 16) | (0x89ULL << 40) | ((uint64_t)(tss_limit & 0xF0000) << 48);
+    gdt[5] = ((__u64)(tss_limit & 0xFFFF)) | ((tss_base & 0xFFFFFFULL) << 16) | (0x89ULL << 40) | ((__u64)(tss_limit & 0xF0000) << 48);
 
     // High 64 bits: base[63:32]
     gdt[6] = tss_base >> 32;
 
-    g.limit = sizeof(gdt) * sizeof(uint64_t) - 1; // 注意：这里应是字节数！
-    g.base = (uint64_t)gdt;
+    g.limit = sizeof(gdt) * sizeof(__u64) - 1; // 注意：这里应是字节数！
+    g.base = (__u64)gdt;
 
     asm volatile("lgdt %0" ::"m"(g));
 
@@ -124,14 +124,14 @@ void gdt_init(void)
         "movw %%ax, %%gs\n\t"
         "movw %%ax, %%ss"
         :
-        : "r"((uint64_t)KDATA_SELECTOR)
+        : "r"((__u64)KDATA_SELECTOR)
         : "rax");
 
     // 加载 TSS
     asm volatile("ltr %%ax" ::"a"(TSS_SELECTOR));
 }
 
-void update_tss_rsp0(uint64_t rsp0)
+void update_tss_rsp0(__u64 rsp0)
 {
     tss.rsp0 = rsp0;
 }
