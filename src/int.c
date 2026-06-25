@@ -7,6 +7,7 @@
 #include <types.h>
 #include <lapic.h>
 #include <printk.h>
+#include <syscalls.h>
 
 __attribute__((aligned(4096))) static idtr_t __idtr;
 __attribute__((aligned(4096))) static idt_entry_t __idt[256]; // Create an array of IDT entries; aligned for performance

@@ -1,4 +1,4 @@
-#include <syscall.h>
+#include <libc.h>
 
 int main(void)
 {

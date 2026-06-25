@@ -1,7 +1,6 @@
-#include <vfs.h>
+#include <libc.h>
 #include <stdint.h>
 #include <stddef.h>
-#include <syscall.h>
 
 static inline int syscall(uint64_t nr,
                           uint64_t a1,

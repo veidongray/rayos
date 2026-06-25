@@ -18,7 +18,6 @@
 #include <printk.h>
 #include <ioapic.h>
 #include <string.h>
-#include <syscall.h>
 #include <sys/stat.h>
 #include <multiboot2.h>
 
@@ -57,9 +56,9 @@ void start_kernel(void)
     lapic_init();
     ioapic_init();
     pci_init();
+    do_initcalls();
     vfs_init();
     task_init();
-    do_initcalls();
 
     run_thread(kernel_init, NULL, "kernel_init");
 

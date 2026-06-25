@@ -11,7 +11,7 @@ BUILT-IN = 	src/asm/built-in.o			\
 
 # 头文件搜索路径。
 # 将内核公共头文件目录以及字符串/打印库头文件目录加入编译器搜索路径。
-INCDIR = -I $(CURDIR)/inc -I $(CURDIR)/inc/lib
+INCDIR = -I $(CURDIR)/inc -I $(CURDIR)/inc/lib -I $(CURDIR)/inc/user
 
 # 用于构建 freestanding 内核的编译选项。
 # 这些参数会关闭大部分标准库依赖和栈保护机制，适合裸机/内核环境。

@@ -9,6 +9,9 @@
 
 #define FS_NAME_MAX 255
 
+/* file_system_type flags*/
+#define FS_NODEV (1 << 0)
+
 struct inode;
 struct dentry;
 struct file;
@@ -48,6 +51,8 @@ struct super_block
 {
     uint32_t s_magic;     // 文件系统魔数
     uint32_t s_blocksize; // 逻辑块大小
+
+    struct file_system_type *s_type; // mount时指向对应的文件系统
 
     struct dentry *s_root; // 根目录项（挂载后设置）
 
@@ -93,6 +98,7 @@ struct file
 struct file_system_type
 {
     const char *name;
+    int nm_len;
     int fs_flags;
     struct list_head fs_list;
     struct dentry *(*mount)(struct file_system_type *fs_type, int flags,
@@ -102,5 +108,10 @@ struct file_system_type
 
 int register_filesystem(struct file_system_type *fs);
 void unregister_filesystem(struct file_system_type *fs);
+struct file_system_type *fs_get_by_name(const char *name);
+struct dentry *mount_nodev(struct file_system_type *fs_type,
+                           int flags, void *data,
+                           int (*fill_super)(struct super_block *, void *, int));
+int super_block_add(struct super_block *sb);
 
 #endif // FS_H

@@ -10,6 +10,7 @@
 #include <queue.h>
 #include <printk.h>
 #include <string.h>
+#include <syscalls.h>
 
 static struct task_struct *current = NULL;
 static queue_t task_readyqueue;

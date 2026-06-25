@@ -1,34 +1,6 @@
-/*
- * ┌──────────────────────────────────────────────────────┐
- * │                  super_block                         │
- * │  (文件系统全局信息: 类型、块大小、操作函数集)           │
- * │                                                      │
- * │   s_root ──────────► dentry (根目录 "/")              │
- * │                          │                           │
- * │                     d_child / d_subdirs              │
- * │                          │                           │
- * │                          ▼                           │
- * │                      dentry ("home")                 │
- * │                     /        \                       │
- * │              d_child          d_child                │
- * │               /                   \                  │
- * │              ▼                     ▼                 │
- * │         dentry ("user")       dentry ("etc")         │
- * │              │                     │                 │
- * │              │ d_inode             │ d_inode         │
- * │              ▼                     ▼                 │
- * │           inode                 inode                │
- * │      (用户目录元数据)          (etc目录元数据)          │
- * │              ▲                     ▲                 │
- * │              │ f_inode             │                 │
- * │              │                     │                 │
- * │           file ◄──(open)───────────┘                 │
- * │    (fd, offset, f_op)                                │
- * └──────────────────────────────────────────────────────┘
- */
-
 #include <fs.h>
 #include <mm.h>
+#include <vfs.h>
 #include <init.h>
 #include <string.h>
 #include <printk.h>
@@ -146,7 +118,7 @@ static struct dentry_operations tmpfs_dentry_ops = {
     .d_compare = tmpfs_compare,
 };
 
-static int tmpfs_fill_super(struct super_block *sb)
+static int tmpfs_fill_super(struct super_block *sb, void *data, int flags)
 {
     struct dentry *root;
     struct inode *root_inode;
@@ -182,6 +154,7 @@ static int tmpfs_fill_super(struct super_block *sb)
     list_add_tail(&root->d_child, &root->d_subdirs);
 
     sb->s_root = root;
+    super_block_add(sb);
 
     return 0;
 }
@@ -189,14 +162,19 @@ static int tmpfs_fill_super(struct super_block *sb)
 static struct dentry *tmpfs_mount(struct file_system_type *fs_type, int flags,
                                   const char *dev_name, void *data)
 {
-    return NULL;
+    return mount_nodev(fs_type, flags, data, tmpfs_fill_super);
+}
+
+static void tmpfs_kill_sb(struct super_block *sb)
+{
+    // Do nothings.
 }
 
 struct file_system_type tmpfs_type = {
     .name = "tmpfs",
-    .fs_flags = 0,
-    .mount = NULL,
-    .kill_sb = NULL,
+    .fs_flags = FS_NODEV,
+    .mount = tmpfs_mount,
+    .kill_sb = tmpfs_kill_sb,
 };
 
 static int tmpfs_init(void)

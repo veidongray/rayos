@@ -1,6 +1,7 @@
 #ifndef VFS_H
 #define VFS_H
 
+#include <fs.h>
 #include <list.h>
 #include <types.h>
 #include <stdint.h>
@@ -32,11 +33,6 @@ struct vfs_file
 };
 
 int vfs_init(void);
-int sys_open(const char *path, mode_t mode);
-int sys_close(int fd);
-int sys_read(int fd, char *buf, size_t size);
-int sys_write(int fd, const char *buf, size_t size);
-int sys_create(const char *pathname);
-int sys_stat(const char *pathname, struct stat *_sb);
-
+int vfs_mount(char *dev_name, char *dir_name, char *fstype,
+             unsigned long flags, void *data);
 #endif // VFS_H
