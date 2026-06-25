@@ -15,6 +15,7 @@ struct vmap_area
 
 void *kmalloc(size_t size);
 void *kzalloc(size_t size);
+void *krealloc(void *ptr, size_t new_size);
 void kfree(void *virtaddr);
 void mm_init(void);
 

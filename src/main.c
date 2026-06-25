@@ -7,6 +7,7 @@
 #include <elf.h>
 #include <gdt.h>
 #include <pic.h>
+#include <init.h>
 #include <acpi.h>
 #include <page.h>
 #include <task.h>
@@ -16,10 +17,10 @@
 #include <bitmap.h>
 #include <printk.h>
 #include <ioapic.h>
+#include <string.h>
 #include <syscall.h>
 #include <sys/stat.h>
 #include <multiboot2.h>
-#include <string.h>
 
 void kernel_init(void *args)
 {
@@ -57,9 +58,11 @@ void start_kernel(void)
     ioapic_init();
     pci_init();
     vfs_init();
-    task_manager_init();
+    task_init();
+    do_initcalls();
 
     run_thread(kernel_init, NULL, "kernel_init");
+
     while (1)
     {
         asm volatile("hlt");

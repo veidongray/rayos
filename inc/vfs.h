@@ -2,6 +2,7 @@
 #define VFS_H
 
 #include <list.h>
+#include <types.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <sys/stat.h>
@@ -31,7 +32,7 @@ struct vfs_file
 };
 
 int vfs_init(void);
-int sys_open(const char *path, __mode_t mode);
+int sys_open(const char *path, mode_t mode);
 int sys_close(int fd);
 int sys_read(int fd, char *buf, size_t size);
 int sys_write(int fd, const char *buf, size_t size);

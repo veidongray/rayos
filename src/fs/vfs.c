@@ -6,7 +6,9 @@
 #include <types.h>
 #include <printk.h>
 #include <string.h>
+#include <atomic.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <block_device.h>
 
 static FATFS fs;
@@ -15,24 +17,11 @@ LIST_HEAD(__list_vfs_file);
 
 int vfs_init(void)
 {
-    __u8 *buf;
-    struct block_device *bdev;
-
-    bdev = blkdev_get_by_name("sata0");
-    if (bdev)
-    {
-        printk("Found block device %s\n", bdev->info.bd_name);
-    }
-
-    buf = (__u8 *)kzalloc(2048);
-    bdev->ops->read(bdev, 0, 1, buf);
-    
-    kfree(buf);
     f_mount(&fs, "", 1);
     return 0;
 }
 
-int sys_open(const char *path, __mode_t mode)
+int sys_open(const char *path, mode_t mode)
 {
     FIL *fp = (FIL *)kzalloc(sizeof(FIL));
     struct vfs_file *file = (struct vfs_file *)kzalloc(sizeof(struct vfs_file));

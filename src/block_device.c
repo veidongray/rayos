@@ -25,15 +25,13 @@ void blkdev_destroy(struct block_device *blkdev)
 
 struct block_device *blkdev_get_by_name(const char *name)
 {
-    struct list_head *pos;
     struct block_device *bdev;
 
     if (!name || list_empty(&blkdev_list))
         return NULL;
 
-    list_for_each(pos, &blkdev_list)
+    list_for_each_entry(bdev, &blkdev_list, bd_list)
     {
-        bdev = container_of(pos, struct block_device, bd_list);
         if (strcmp(name, bdev->info.bd_name) == 0)
             return bdev;
     }

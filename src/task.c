@@ -14,7 +14,7 @@
 static struct task_struct *current = NULL;
 static queue_t task_readyqueue;
 
-void task_manager_init(void)
+void task_init(void)
 {
     QUEUE_INIT(&task_readyqueue);
 }
