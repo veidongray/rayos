@@ -1,8 +1,5 @@
+#include <types.h>
 #include <string.h>
-
-// ------------------------
-// 内存操作
-// ------------------------
 
 void *memcpy(void *dest, const void *src, size_t n)
 {
@@ -56,10 +53,6 @@ int memcmp(const void *s1, const void *s2, size_t n)
     }
     return 0;
 }
-
-// ------------------------
-// 字符串操作
-// ------------------------
 
 size_t strlen(const char *s)
 {

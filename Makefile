@@ -6,13 +6,12 @@
 BUILT-IN = 	src/asm/built-in.o			\
 			src/built-in.o				\
 			src/fs/built-in.o			\
-			src/lib/printf/built-in.o	\
-			src/lib/string/built-in.o	\
+			src/lib/built-in.o			\
 			src/mm/built-in.o
 
 # 头文件搜索路径。
 # 将内核公共头文件目录以及字符串/打印库头文件目录加入编译器搜索路径。
-INCDIR = -I $(CURDIR)/inc -I $(CURDIR)/inc/lib/string -I $(CURDIR)/inc/lib/printf
+INCDIR = -I $(CURDIR)/inc -I $(CURDIR)/inc/lib
 
 # 用于构建 freestanding 内核的编译选项。
 # 这些参数会关闭大部分标准库依赖和栈保护机制，适合裸机/内核环境。
@@ -60,8 +59,7 @@ export LDFLAGS
 
 # 编译整个内核及其依赖模块，并生成最终可启动镜像。
 build:
-	$(MAKE) -C src/lib/printf built-in.o
-	$(MAKE) -C src/lib/string built-in.o
+	$(MAKE) -C src/lib built-in.o
 	$(MAKE) -C src/asm built-in.o
 	$(MAKE) -C src/fs built-in.o
 	$(MAKE) -C src/mm built-in.o
