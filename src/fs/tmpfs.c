@@ -13,13 +13,13 @@ static struct inode *tmpfs_alloc_inode(struct super_block *sb)
     if (!inode)
         return NULL;
 
-    printk("tmpfs_alloc_inode\n");
+    printk("tmpfs_alloc_inode");
     return inode;
 }
 
 static void tmpfs_destroy_inode(struct inode *inod)
 {
-    printk("tmpfs_destroy_inode\n");
+    printk("tmpfs_destroy_inode");
     kfree(inod);
 }
 
@@ -31,31 +31,31 @@ static struct super_operations tmpfs_super_ops = {
 /* Inode operations */
 static struct dentry *tmpfs_lookup(struct inode *dir, struct dentry *dentry)
 {
-    printk("tmpfs_lookup\n");
+    printk("tmpfs_lookup");
     return NULL;
 }
 
 static int tmpfs_create(struct inode *dir, struct dentry *dentry, mode_t mode)
 {
-    printk("tmpfs_create\n");
+    printk("tmpfs_create");
     return 0;
 }
 
 static int tmpfs_mkdir(struct inode *dir, struct dentry *dentry, mode_t mode)
 {
-    printk("tmpfs_mkdir\n");
+    printk("tmpfs_mkdir");
     return 0;
 }
 
 static int tmpfs_unlink(struct inode *dir, struct dentry *dentry)
 {
-    printk("tmpfs_unlink\n");
+    printk("tmpfs_unlink");
     return 0;
 }
 
 static int tmpfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
-    printk("tmpfs_rmdir\n");
+    printk("tmpfs_rmdir");
     return 0;
 }
 
@@ -68,38 +68,45 @@ static struct inode_operations tmpfs_inode_ops = {
 };
 
 /* File operations */
+static int tmpfs_open(struct inode *inod, struct file *filp)
+{
+    printk("tmpfs_open");
+    return 0;
+}
+
 static ssize_t tmpfs_read(struct file *filp, char *buf, size_t count, __loff_t *ppos)
 {
-    printk("tmpfs_read\n");
+    printk("tmpfs_read");
     return 0;
 }
 
 static ssize_t tmpfs_write(struct file *filp, const char *buf, size_t count, __loff_t *ppos)
 {
-    printk("tmpfs_write\n");
+    printk("tmpfs_write");
     return 0;
 }
 
 static __loff_t tmpfs_llseek(struct file *filp, __loff_t offset, int whence)
 {
-    printk("tmpfs_llseek\n");
+    printk("tmpfs_llseek");
     return 0;
 }
 
 static int tmpfs_readdir(struct file *filp, void *dirent,
                          int (*filldir)(void *, const char *, int, __loff_t, ino_t))
 {
-    printk("tmpfs_readdir\n");
+    printk("tmpfs_readdir");
     return 0;
 }
 
 static int tmpfs_release(struct file *filp)
 {
-    printk("tmpfs_release\n");
+    printk("tmpfs_release");
     return 0;
 }
 
 static struct file_operations tmpfs_file_ops = {
+    .open = tmpfs_open,
     .read = tmpfs_read,
     .readdir = tmpfs_readdir,
     .llseek = tmpfs_llseek,
@@ -110,7 +117,7 @@ static struct file_operations tmpfs_file_ops = {
 /* Dentry operations */
 static int tmpfs_compare(const struct dentry *dentry, const char *name, int len)
 {
-    printk("tmpfs_compare\n");
+    printk("tmpfs_compare");
     return 0;
 }
 
@@ -179,14 +186,14 @@ struct file_system_type tmpfs_type = {
 
 static int tmpfs_init(void)
 {
-    printk("tmpfs_init\n");
+    printk("tmpfs_init");
     return register_filesystem(&tmpfs_type);
 }
 module_init(tmpfs_init);
 
 static void tmpfs_exit(void)
 {
-    printk("tmpfs_exit\n");
+    printk("tmpfs_exit");
     unregister_filesystem(&tmpfs_type);
 }
 module_exit(tmpfs_exit);

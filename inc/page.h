@@ -74,4 +74,7 @@ uint64_t get_physaddr(uint64_t virtaddr);
 #define unmap_page(virtaddr) unmap_page_range(virtaddr, 1)
 #define map_page(physaddr, virtaddr, flags) map_page_range(physaddr, virtaddr, flags, 1)
 
+size_t memused(void);
+size_t memused_percent(void);
+
 #endif // PAGE_H

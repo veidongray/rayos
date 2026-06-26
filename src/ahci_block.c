@@ -195,7 +195,7 @@ void ahci_init(uintptr_t ahci_base)
     size_t nr_ports;
     uint32_t port_implements;
 
-    printk("AHCI base %#llx\n", ahci_base);
+    printk("AHCI base %#llx", ahci_base);
     hba = (struct hba_memory_registers *)((uint64_t)ahci_base + KERNEL_BASE);
     map_page_range((uint64_t)ahci_base, (uint64_t)ahci_base + KERNEL_BASE, MAP_KERN_MMIO, (sizeof(struct hba_memory_registers) >> PAGE_SHIFT) + 1);
 
@@ -208,8 +208,8 @@ void ahci_init(uintptr_t ahci_base)
 
     nr_ports = (hba->ghc.cap & 0x1f) + 1;
     port_implements = hba->ghc.pi;
-    printk("AHCI nr_ports %u\n", nr_ports);
-    printk("AHCI port_implements %lx\n", port_implements);
+    printk("AHCI nr_ports %u", nr_ports);
+    printk("AHCI port_implements %lx", port_implements);
 
     for (size_t i = 0; i < nr_ports; i++)
     {
@@ -227,7 +227,7 @@ void ahci_init(uintptr_t ahci_base)
             sata_dev_t dev_type = ahci_check_device_type(hba->ports[i].PxSIG);
             if (dev_type == SATA_DEV_SATA)
             {
-                printk("[Port %d] -> Found SATA Hard Disk (HDD/SSD).\n", i);
+                printk("[Port %d] -> Found SATA Hard Disk (HDD/SSD).", i);
 
                 // 停止端口的 DMA 状态机
                 hba->ports[i].PxCMD &= ~(1U << 0);
@@ -287,16 +287,16 @@ void ahci_init(uintptr_t ahci_base)
                 }
                 else
                 {
-                    printk("[Port %d] -> DMA Engine failed to start!\n", i);
+                    printk("[Port %d] -> DMA Engine failed to start!", i);
                 }
             }
             else if (dev_type == SATA_DEV_SATAPI)
             {
-                printk("[Port %d] -> Found SATAPI CD-ROM. Ignore for now.\n", i);
+                printk("[Port %d] -> Found SATAPI CD-ROM. Ignore for now.", i);
             }
             else
             {
-                printk("[Port %d] -> No valid SATA device or device busy (SIG: 0x%08X).\n", i, hba->ports[i].PxSIG);
+                printk("[Port %d] -> No valid SATA device or device busy (SIG: 0x%08X).", i, hba->ports[i].PxSIG);
             }
         }
     }

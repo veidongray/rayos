@@ -71,7 +71,7 @@ void lapic_timer_handler(void)
 
 void isr_page_fault_handler(__u64 __error, __u64 *__pagefault_addr)
 {
-    printk("Page fault! %#llx, error code %#llx\n", __pagefault_addr, __error);
+    printk("Page fault! %#llx, error code %#llx", __pagefault_addr, __error);
     asm volatile("hlt");
 }
 

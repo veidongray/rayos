@@ -34,6 +34,7 @@ struct inode_operations
 
 struct file_operations
 {
+    int (*open) (struct inode *, struct file *);
     ssize_t (*read)(struct file *filp, char *buf, size_t count, __loff_t *ppos);
     ssize_t (*write)(struct file *filp, const char *buf, size_t count, __loff_t *ppos);
     __loff_t (*llseek)(struct file *filp, __loff_t offset, int whence);
@@ -89,10 +90,16 @@ struct dentry
     const struct dentry_operations *d_ops;
 };
 
+struct path
+{
+    struct dentry *dentry;
+};
+
 struct file
 {
     struct dentry *f_dentry; // 关联的目录项
-    void *private_data;      // 驱动/FS私有运行时数据
+    const struct path *f_path;
+    void *private_data; // 驱动/FS私有运行时数据
 };
 
 struct file_system_type

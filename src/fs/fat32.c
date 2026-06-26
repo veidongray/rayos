@@ -371,23 +371,23 @@ static inline int fat32_print_callback(struct lookup_context *ctx)
 
     if (fat32_is_dot(ctx->entry))
     {
-        printk("<d> %u %s\n", ctx->entry->sfn_entry.file_size, ".");
+        printk("<d> %u %s", ctx->entry->sfn_entry.file_size, ".");
         return 1;
     }
     if (fat32_is_dotdot(ctx->entry))
     {
-        printk("<d> %u %s\n", ctx->entry->sfn_entry.file_size, "..");
+        printk("<d> %u %s", ctx->entry->sfn_entry.file_size, "..");
         return 2;
     }
     if ((uint8_t)ctx->entry->sfn_entry.name[0] != 0xE5)
     {
         if (ctx->entry->sfn_entry.attr & 0x10)
         {
-            printk("<d> %u %s\n", ctx->entry->sfn_entry.file_size, ctx->lfn);
+            printk("<d> %u %s", ctx->entry->sfn_entry.file_size, ctx->lfn);
         }
         else
         {
-            printk("<-> %u %s\n", ctx->entry->sfn_entry.file_size, ctx->lfn);
+            printk("<-> %u %s", ctx->entry->sfn_entry.file_size, ctx->lfn);
         }
     }
     return strlen(ctx->lfn);
@@ -949,7 +949,7 @@ int fat32_readdir(const char *path)
         ret = fat32_lookup(path, &entry);
         if (ret < 0)
         {
-            printk("'%s': No such file or directory\n", path);
+            printk("'%s': No such file or directory", path);
             return -1;
         }
         if (entry.sfn_entry.attr & 0x10)
@@ -960,7 +960,7 @@ int fat32_readdir(const char *path)
         }
         else
         {
-            printk("%s is file\n", path);
+            printk("%s is file", path);
             return -1;
         }
     }
@@ -1004,12 +1004,12 @@ int fat32_open(const char *path)
     ret = fat32_lookup(path, &entry);
     if (ret < 0)
     {
-        printk("'%s': No such file or directory\n", path);
+        printk("'%s': No such file or directory", path);
         return ret;
     }
     else if (entry.sfn_entry.attr & 0x10)
     {
-        printk("%s is directory\n", path);
+        printk("%s is directory", path);
     }
     else
     {

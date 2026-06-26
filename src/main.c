@@ -26,13 +26,8 @@ void kernel_init(void *args)
     char *buf;
     args = args;
 
-    printk("/init running...\n");
+    pr_info("/init running...");
     run_process("/init");
-
-    extern bitmap_t page_alloc_bitmap;
-    printk("total mem: %llu, used %llu, used percent %llu%%\n",
-           get_total_mem(), bitmap_count_set(&page_alloc_bitmap) * 4096,
-           bitmap_usage_percent(&page_alloc_bitmap));
 
     buf = kzalloc(UART_BUF_SIZE);
     while (1)
@@ -41,6 +36,11 @@ void kernel_init(void *args)
         memset(buf, 0, UART_BUF_SIZE);
         uart_putc('>');
         uart_gets(buf);
+        if (!strncmp(buf, "meminfo", 7))
+        {
+            pr_info("total mem: %llu, used %llu, used percent %llu%%",
+                    get_total_mem(), memused(), memused_percent());
+        }
     }
 }
 

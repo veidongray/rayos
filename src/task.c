@@ -223,7 +223,7 @@ int run_process(const char *pathname)
         {
             sys_close(fd);
             kfree(elf);
-            printk("ELF NONE\n");
+            printk("ELF NONE");
             return -1;
         }
     }

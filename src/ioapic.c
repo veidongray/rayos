@@ -73,16 +73,16 @@ void ioapic_init(void)
     __u32 curr_lapic_id;
 
     curr_lapic_id = __get_current_apic_id();
-    printk("CPUID Current APIC ID %d\n", curr_lapic_id);
+    printk("CPUID Current APIC ID %d", curr_lapic_id);
 
     ioapic_base = __acpi_find_madt_ioapic_base();
-    printk("IOAPIC base %#llx map to %#llx\n", ioapic_base, (__u8 *)ioapic_base + KERNEL_BASE);
+    printk("IOAPIC base %#llx map to %#llx", ioapic_base, (__u8 *)ioapic_base + KERNEL_BASE);
     map_page((__u64)ioapic_base, (__u64)ioapic_base + KERNEL_BASE, MAP_KERN_MMIO);
     ioapic_base = (__u32 *)((__u8 *)ioapic_base + KERNEL_BASE);
 
     __u32 ver = ioapic_read(IOAPIC_REG_VER);
     __u8 max_entry = (ver >> 16) & 0xff;
-    printk("IOAPIC ver %u, max entries %u\n", ver & 0xff, max_entry);
+    printk("IOAPIC ver %u, max entries %u", ver & 0xff, max_entry);
 
     /**
      * Mask All Entry
@@ -96,6 +96,6 @@ void ioapic_init(void)
      * 映射 COM1 中断
      */
     __u32 com1_gsi = __acpi_find_gsi_for_irq(4);
-    printk("COM1 real GSI = %u\n", com1_gsi);
+    printk("COM1 real GSI = %u", com1_gsi);
     ioapic_enable_irq(com1_gsi, X86_IRQ_COM1, curr_lapic_id, RTE_EDGE_TRIGGERED | RTE_ACTIVE_HIGH);
 }

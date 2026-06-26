@@ -59,7 +59,7 @@ uint32_t *__acpi_find_madt_ioapic_base(void)
         {
             struct acpi_madt_io_apic *io_apic =
                 (struct acpi_madt_io_apic *)ptr;
-            printk("MADT: IOAPIC id=%u addr=%#llx gsi_base=%u\n",
+            printk("MADT: IOAPIC id=%u addr=%#llx gsi_base=%u",
                    io_apic->io_apic_id,
                    io_apic->io_apic_addr,
                    io_apic->global_system_interrupt_base);
@@ -69,7 +69,7 @@ uint32_t *__acpi_find_madt_ioapic_base(void)
         ptr += length;
     }
 
-    printk("MADT: WARNING - No IOAPIC entry found!\n");
+    printk("MADT: WARNING - No IOAPIC entry found!");
     return 0;
 }
 
@@ -94,13 +94,13 @@ uint32_t __acpi_find_gsi_for_irq(uint8_t irq)
         if (type == 2)
         {
             struct acpi_madt_iso *iso = (struct acpi_madt_iso *)ptr;
-            printk("MADT ISO: BusSrc=%u IRQSrc=%u -> GSI=%u Flags=%#x\n",
+            printk("MADT ISO: BusSrc=%u IRQSrc=%u -> GSI=%u Flags=%#x",
                    iso->bus_source, iso->irq_source,
                    iso->gsi, iso->flags);
 
             if (iso->irq_source == irq)
             {
-                printk("MADT: IRQ%u remapped to GSI %u\n", irq, iso->gsi);
+                printk("MADT: IRQ%u remapped to GSI %u", irq, iso->gsi);
                 return iso->gsi;
             }
         }
@@ -109,7 +109,7 @@ uint32_t __acpi_find_gsi_for_irq(uint8_t irq)
     }
 
     /* 没有找到对应的 ISO to Identity Mapping */
-    printk("MADT: No ISO for IRQ%u, using identity mapping GSI=%u\n",
+    printk("MADT: No ISO for IRQ%u, using identity mapping GSI=%u",
            irq, irq);
     return irq;
 }
@@ -152,7 +152,7 @@ void acpi_init(void)
     /* ACPI 2.0+ 使用 XSDT */
     if (rsdp->revision >= 2)
     {
-        printk("rsdp->xsdt_address %#llx\n", rsdp->xsdt_address);
+        printk("rsdp->xsdt_address %#llx", rsdp->xsdt_address);
 
         xsdt = (struct acpi_xsdt *)((uint64_t)rsdp->xsdt_address + KERNEL_BASE);
 
@@ -165,7 +165,7 @@ void acpi_init(void)
         rsdt = (struct acpi_rsdt *)((uintptr_t)rsdp->rsdt_address + KERNEL_BASE);
         map_page((uint64_t)rsdp->rsdt_address, (uint64_t)rsdt, MAP_KERN_MMIO);
 
-        printk("map rsdt_address %#llx -> %#llx\n", rsdp->rsdt_address, rsdt);
+        printk("map rsdt_address %#llx -> %#llx", rsdp->rsdt_address, rsdt);
 
         /* 计算 RSDT 中表项数量 */
         uint32_t nr_rsdt_entry = (rsdt->header.length - sizeof(struct acpi_sdt_header)) >> 2;
@@ -183,19 +183,19 @@ void acpi_init(void)
             if (!strncmp(header->signature, "APIC", 4))
             {
                 madt = (struct acpi_madt *)header;
-                printk("ACPI Found MADT %#llx\n", header);
-                printk("MADT LAPIC address %#llx\n", madt->local_apic_address);
-                printk("MADT lenght %u\n", madt->header.length);
+                printk("ACPI Found MADT %#llx", header);
+                printk("MADT LAPIC address %#llx", madt->local_apic_address);
+                printk("MADT lenght %u", madt->header.length);
             }
 
             /* 查找 MCFG（PCIe ECAM表） */
             if (!strncmp(header->signature, "MCFG", 4))
             {
                 mcfg = (struct acpi_mcfg *)header;
-                printk("ACPI Found MCFG %#llx\n", mcfg);
-                printk("MCFG base address %#llx\n", mcfg->entries[0].base_address);
-                printk("MCFG lenght %u\n", mcfg->header.length);
-                printk("MCFG number of tables %u\n",
+                printk("ACPI Found MCFG %#llx", mcfg);
+                printk("MCFG base address %#llx", mcfg->entries[0].base_address);
+                printk("MCFG lenght %u", mcfg->header.length);
+                printk("MCFG number of tables %u",
                        (mcfg->header.length - sizeof(struct acpi_sdt_header) - 8) / 16);
             }
         }

@@ -76,15 +76,15 @@ void pci_probe(void)
                     struct pci_config *ahci = (struct pci_config *)kmalloc(sizeof(struct pci_config));
 
                     memcpy(ahci, &pc, sizeof(struct pci_config));
-                    printk("AHCI Device Found %x:%x\n", ahci->header.vendor_id, ahci->header.device_id);
-                    printk("AHCI bar5 %#llx\n", ahci->type0.bar[5]);
-                    printk("AHCI interrupt line %u\n", ahci->type0.interrupt_line);
-                    printk("AHCI interrupt pin %u\n", ahci->type0.interrupt_pin);
+                    printk("AHCI Device Found %x:%x", ahci->header.vendor_id, ahci->header.device_id);
+                    printk("AHCI bar5 %#llx", ahci->type0.bar[5]);
+                    printk("AHCI interrupt line %u", ahci->type0.interrupt_line);
+                    printk("AHCI interrupt pin %u", ahci->type0.interrupt_pin);
                     ahci_init((uintptr_t)ahci->type0.bar[5]);
                 }
                 if ((pc.header.vendor_id != 0xffff) && (pc.header.vendor_id != 0x0000))
                 {
-                    printk("PCI %04llx:%04llx, HeaderType %02llx\n", pc.header.vendor_id, pc.header.device_id, pc.header.header_type);
+                    printk("PCI %04llx:%04llx, HeaderType %02llx", pc.header.vendor_id, pc.header.device_id, pc.header.header_type);
                 }
             }
         }

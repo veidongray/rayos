@@ -1,7 +1,8 @@
 #include <page.h>
-#include <bitmap.h>
 #include <align.h>
+#include <types.h>
 #include <printk.h>
+#include <bitmap.h>
 #include <multiboot2.h>
 
 #define BOOTMAP_LEN 0x1000000 // 128MB
@@ -10,6 +11,16 @@ bitmap_t page_alloc_bitmap;
 static uint64_t *page_bitmap_data;
 extern uint64_t _kernel_phys_end_aligned[];
 extern uint64_t _kernel_virt_end_aligned[];
+
+size_t memused(void)
+{
+    return bitmap_count_set(&page_alloc_bitmap) * 4096;
+}
+
+size_t memused_percent(void)
+{
+    return bitmap_usage_percent(&page_alloc_bitmap);
+}
 
 void page_init(void)
 {

@@ -32,7 +32,22 @@ struct vfs_file
     struct list_head list;
 };
 
+struct vfsmount
+{
+    struct super_block *sb;
+    struct dentry *root_dentry;
+};
+
+struct mount
+{
+    struct vfsmount mnt;
+    struct list_head mnt_list;
+};
+
 int vfs_init(void);
 int vfs_mount(char *dev_name, char *dir_name, char *fstype,
-             unsigned long flags, void *data);
+              unsigned long flags, void *data);
+int vfs_open(const struct path *path, struct file *file);
+struct file *dentry_open(struct path *path, int flags);
+struct super_block *find_sb_mount_by_name(const char *name);
 #endif // VFS_H
