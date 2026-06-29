@@ -9,43 +9,60 @@
 
 #define FS_NAME_MAX 255
 
+struct file;
 struct inode;
 struct dentry;
-struct file;
-struct superblock;
+struct super_block;
+struct file_system_type;
 
 struct super_operations
 {
-    struct inode *(*alloc_inode)(struct superblock *);
-    void (*destroy_inode)(struct inode *);
+    struct inode *(*alloc_inode)(struct super_block *);
 };
 
 struct inode_operations
 {
+    int (*lookup)(struct inode *dir, struct dentry *dentry);
 };
 
 struct file_operations
 {
+    int (*open)(struct inode *dir, struct file *filp);
 };
 
 struct dentry_operations
 {
+    int (*d_compare)(const struct dentry *dentry, const char *cmp_name);
 };
 
-struct superblock
+struct super_block
 {
+    struct dentry *s_root;
+    struct super_operations *s_ops;
+    struct file_system_type *s_type;
 };
 
 struct inode
 {
+    unsigned long i_ino;
+    struct super_block *i_sb;
+    struct inode_operations *i_ops;
 };
 
 struct dentry
 {
+    char *d_name;
+    struct dentry *d_parent;
+    struct super_block *i_sb;
+    struct list_head d_child;
+    struct list_head d_subdirs;
+    struct dentry_operations *d_ops;
 };
 
 struct file
 {
+    struct inode *f_inode;
+    struct file_operations *f_ops;
 };
 
 struct file_system_type
@@ -58,7 +75,7 @@ struct file_system_type
 struct mount
 {
     struct dentry *root;
-    struct superblock *sb;
+    struct super_block *sb;
     struct file_system_type *fs_type;
 
     struct list_head mnt_list;
@@ -68,4 +85,4 @@ int register_filesystem(struct file_system_type *fs);
 void unregister_filesystem(struct file_system_type *fs);
 struct file_system_type *fs_get_by_name(const char *name);
 
-#endif // FS_H
+#endif /* FS_H */
