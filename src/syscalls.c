@@ -18,15 +18,6 @@ int sys_open(const char *path, mode_t mode)
     file->priv = (void *)fp;
 
     list_add_tail(&file->list, &__list_vfs_file);
-
-    struct path __path;
-    struct file *__file;
-    struct super_block *sb;
-
-    sb = find_sb_mount_by_name("/");
-    __path.dentry = sb->s_root;
-    __file = dentry_open(&__path, 0);
-    vfs_open(&__path, __file);
     return file->fd;
 }
 
