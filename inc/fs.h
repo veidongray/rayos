@@ -17,7 +17,7 @@ struct file_system_type;
 
 struct super_operations
 {
-    struct inode *(*alloc_inode)(struct super_block *);
+    struct inode *(*alloc_inode)(struct super_block *sb);
 };
 
 struct inode_operations
