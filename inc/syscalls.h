@@ -4,6 +4,23 @@
 #include <types.h>
 #include <sys/types.h>
 
+enum num_stdfd
+{
+    STDIN,
+    STDOUT,
+    STDERR
+};
+
+enum num_syscall
+{
+    SYS_OPEN,
+    SYS_CLOSE,
+    SYS_READ,
+    SYS_WRITE,
+    SYS_CREATE,
+    SYS_STAT
+};
+
 int sys_open(const char *path, mode_t mode);
 int sys_close(int fd);
 int sys_read(int fd, char *buf, size_t size);

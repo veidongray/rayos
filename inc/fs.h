@@ -55,6 +55,15 @@ struct file_system_type
     struct list_head fs_list;
 };
 
+struct mount
+{
+    struct dentry *root;
+    struct superblock *sb;
+    struct file_system_type *fs_type;
+
+    struct list_head mnt_list;
+};
+
 int register_filesystem(struct file_system_type *fs);
 void unregister_filesystem(struct file_system_type *fs);
 struct file_system_type *fs_get_by_name(const char *name);
