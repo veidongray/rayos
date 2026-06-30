@@ -37,6 +37,8 @@ struct dentry_operations
 
 struct super_block
 {
+    void *s_fs_info;
+
     struct dentry *s_root;
     struct super_operations *s_ops;
     struct file_system_type *s_type;
@@ -52,11 +54,15 @@ struct inode
 struct dentry
 {
     char *d_name;
-    int d_namelen;
+    unsigned int d_namelen;
+
+    struct inode *d_inode;
     struct dentry *d_parent;
-    struct super_block *i_sb;
+    struct super_block *d_sb;
+
     struct list_head d_child;
     struct list_head d_subdirs;
+
     struct dentry_operations *d_ops;
 };
 

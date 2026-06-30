@@ -5,22 +5,45 @@
 #include <string.h>
 #include <printk.h>
 
-static int ino = 0;
+struct tmpfs_sb_info
+{
+    unsigned long next_ino;
+    struct list_head inode_list; /* 全局 inode 索引链表 */
+};
 
 struct tmpfs_inode_info
 {
     struct inode vfs_inode;
-    struct list_head list_subdirs;   // 该项中所有节点的列表头
-    struct tmpfs_inode_info *parent; // 指向父节点
+    struct list_head inode_link;   /* 挂到 sb_info->inode_list */
+    struct list_head list_subdirs; /* 目录子项链表头 */
+    struct tmpfs_inode_info *parent;
 };
 
 struct tmpfs_dirent
 {
-    int ino;
-    int name_len;
+    unsigned long ino;
+    unsigned int name_len;
     char name[FS_NAME_MAX + 1];
-    struct list_head sibling; // 连接到 tmpfs_inode_info::list_subdirs
+    struct list_head sibling;
 };
+
+static struct tmpfs_sb_info ts_info;
+
+static struct inode *tmpfs_iget(struct super_block *sb, unsigned long ino)
+{
+    struct tmpfs_sb_info *ts_info = (struct tmpfs_sb_info *)sb->s_fs_info;
+    struct tmpfs_inode_info *ti_info;
+
+    list_for_each_entry(ti_info, &ts_info->inode_list, inode_link)
+    {
+        if (ti_info->vfs_inode.i_ino == ino)
+        {
+            return &ti_info->vfs_inode;
+        }
+    }
+
+    return NULL;
+}
 
 /**
  * @brief VFS lookup 回调：根据文件名在目录中查找并绑定 inode
@@ -35,7 +58,7 @@ struct tmpfs_dirent
  * @param dentry  VFS 预分配的空壳 dentry，d_name 包含待查找的文件名
  * @return struct dentry * 非空指针表示查找成功，NULL表示查找失败
  */
-struct dentry *tmpfs_lookup(struct inode *dir, struct dentry *dentry)
+static struct dentry *tmpfs_lookup(struct inode *dir, struct dentry *dentry)
 {
     struct inode *inode;
     struct tmpfs_dirent *de;
@@ -47,13 +70,19 @@ struct dentry *tmpfs_lookup(struct inode *dir, struct dentry *dentry)
     {
         if ((de->name_len == dentry->d_namelen) && (!memcmp(de->name, dentry->d_name, de->name_len)))
         {
-            // Do something
+            inode = tmpfs_iget(dir->i_sb, de->ino);
+            if (!inode)
+            {
+                return NULL;
+            }
+            dentry->d_inode = inode;
+            return dentry;
         }
     }
     return NULL;
 }
 
-struct inode_operations iops = {
+static struct inode_operations inode_ops = {
     .lookup = tmpfs_lookup,
 };
 
@@ -67,7 +96,7 @@ struct inode_operations iops = {
  * @param sb 该文件系统对应的 super_block
  * @return struct inode* 成功返回新分配的 inode 指针，失败返回 NULL
  */
-struct inode *tmpfs_alloc_inode(struct super_block *sb)
+static struct inode *tmpfs_alloc_inode(struct super_block *sb)
 {
     struct inode *inode;
     struct tmpfs_inode_info *ti_info;
@@ -77,18 +106,28 @@ struct inode *tmpfs_alloc_inode(struct super_block *sb)
     {
         return NULL;
     }
+
     ti_info->parent = NULL;
+
+    /* 初始化子目录项列表头 */
     INIT_LIST_HEAD(&ti_info->list_subdirs);
 
+    /* 将新的 inode 加入全局 inode 列表 */
+    list_add_tail(&ti_info->inode_link, &ts_info.inode_list);
+
     inode = &ti_info->vfs_inode;
-    inode->i_ino = ino++;
-    inode->i_ops = &iops;
+    inode->i_ino = ts_info.next_ino++;
+    inode->i_ops = &inode_ops;
     inode->i_sb = sb;
 
     return inode;
 }
 
-struct file_system_type tmpfs_type = {
+static struct super_operations sb_ops = {
+    .alloc_inode = tmpfs_alloc_inode,
+};
+
+static struct file_system_type tmpfs_type = {
     .name = "tmpfs",
 };
 

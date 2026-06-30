@@ -82,7 +82,7 @@ void do_initcalls(void)
     for (fn = __initcall_start, count = 0; fn < __initcall_end; fn++, count++)
     {
         int ret = (*fn)();
-        printk("do_initcalls: executing number of %lu initcall in %s level",
+        printk("do_initcalls: %lu initcall in %s level",
                count, calls_level_names[get_initcall_level((initcall_t)fn)]);
 
         if (ret != 0)
@@ -100,7 +100,7 @@ void do_exitcalls(void)
     /* 正向遍历即可，因为链接脚本已经倒序排列 */
     for (fn = __exitcall_start, count = 0; fn < __exitcall_end; fn++, count++)
     {
-        printk("do_exitcalls: executing number of %lu exitcall in %s level",
+        printk("do_exitcalls: %lu exitcall in %s level",
                count, calls_level_names[get_exitcall_level((exitcall_t)fn)]);
         (*fn)();
     }
