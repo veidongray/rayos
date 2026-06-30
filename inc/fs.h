@@ -22,7 +22,7 @@ struct super_operations
 
 struct inode_operations
 {
-    int (*lookup)(struct inode *dir, struct dentry *dentry);
+    struct dentry *(*lookup)(struct inode *dir, struct dentry *dentry);
 };
 
 struct file_operations
@@ -52,6 +52,7 @@ struct inode
 struct dentry
 {
     char *d_name;
+    int d_namelen;
     struct dentry *d_parent;
     struct super_block *i_sb;
     struct list_head d_child;
