@@ -27,7 +27,7 @@ struct inode_operations
 
 struct file_operations
 {
-    int (*open)(struct inode *dir, struct file *filp);
+    int (*open)(struct inode *inode, struct file *filp);
 };
 
 struct dentry_operations
@@ -48,6 +48,7 @@ struct inode
 {
     unsigned long i_ino;
     struct super_block *i_sb;
+    struct file_operations *i_fops;
     struct inode_operations *i_ops;
 };
 
@@ -68,6 +69,9 @@ struct dentry
 
 struct file
 {
+    char *f_name;
+    unsigned long f_namelen;
+
     struct inode *f_inode;
     struct file_operations *f_ops;
 };
@@ -76,6 +80,9 @@ struct file_system_type
 {
     const char *name;
     int nm_len;
+
+    struct dentry *(*mount)(struct file_system_type *fstype, int flags,
+                            const char *dev_name, void *data);
     struct list_head fs_list;
 };
 

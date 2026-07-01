@@ -127,8 +127,77 @@ static struct super_operations sb_ops = {
     .alloc_inode = tmpfs_alloc_inode,
 };
 
+int tmpfs_open(struct inode *inode, struct file *filp)
+{
+    filp->f_inode = inode;
+    filp->f_ops = inode->i_fops;
+    return 0;
+}
+
+static struct file_operations file_ops = {
+    .open = tmpfs_open,
+};
+
+/**
+ * @brief 填充一个 super block
+ *
+ * 每个文件系统都有自己的 fill_super 函数
+ * VFS 层通过创建空的 sb 变量传递到 fill_super 进行文件系统级配置
+ *
+ * @param sb VFS 创建的空 super block 变量
+ * @param data
+ * @param flags
+ * @return int
+ */
+static int fill_super(struct super_block *sb, void *data, int flags)
+{
+    ts_info.next_ino = 2;
+    INIT_LIST_HEAD(&ts_info.inode_list);
+    sb->s_fs_info = (void *)&ts_info;
+    return 0;
+}
+
+/**
+ * @brief 挂载一个无设备的文件系统
+ *
+ * 这个函数属于 VFS 层，与具体的文件系统实现无关
+ * 只通过调用具体文件系统的 fill_super 实现 sb 的初始化
+ *
+ * @param fs_type
+ * @param flags
+ * @param data
+ * @param fill_super
+ * @return struct dentry*
+ */
+static struct dentry *mount_nodev(struct file_system_type *fs_type,
+                                  int flags, void *data,
+                                  int (*fill_super)(struct super_block *, void *, int))
+{
+    struct super_block *sb;
+
+    sb = (struct super_block *)kzalloc(sizeof(struct super_block));
+    fill_super(sb, NULL, 0);
+    return sb->s_root;
+}
+
+/**
+ * @brief 调用对应的 VFS 层的 mount 函数
+ *
+ * @param fstype
+ * @param flags
+ * @param dev_name
+ * @param data
+ * @return struct dentry*
+ */
+static struct dentry *tmpfs_mount(struct file_system_type *fstype, int flags,
+                                  const char *dev_name, void *data)
+{
+    return mount_nodev(fstype, flags, NULL, fill_super);
+}
+
 static struct file_system_type tmpfs_type = {
     .name = "tmpfs",
+    .mount = tmpfs_mount,
 };
 
 static int tmpfs_init(void)
