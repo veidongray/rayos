@@ -32,6 +32,7 @@ def format_file(file: Path, clang_format: str, check_only: bool) -> tuple[str, s
     else:
         cmd = [clang_format, "--style", CLANG_FORMAT_STYLE, "-i", str(file)]
 
+    print(f"Formatting {file}")
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         return str(file), None
@@ -73,7 +74,7 @@ def main():
     if args.check and failed:
         print(f"\nFailed ({len(failed)}):")
         for f, err in sorted(failed):
-            print(f"  {f}")
+            print(f"  {f}  {err}")
         sys.exit(1)
     elif args.check:
         print(f"All {len(files)} files passed")

@@ -28,12 +28,9 @@ def print_report(results: list[CheckResult]) -> None:
     missing = [r for r in results if not r.found]
     found = [r for r in results if r.found]
 
-    print(f"\n{BOLD}=== Dependency Check ==={RESET}")
-    print(f"Total: {len(results)} | Passed: {len(found)} | Missing: {len(missing)}\n")
-
     for r in results:
         if r.found:
-            # print(f"  {GREEN}[OK]{RESET}      {r.name:<20} -> {r.path}")
+            print(f"  {GREEN}[OK]{RESET}      {r.name:<20} -> {r.path}")
             pass
         else:
             print(f"  {RED}[MISSING]{RESET} {r.name:<20} -> not found")
