@@ -55,10 +55,18 @@ export CFLAGS
 export LDFLAGS
 
 # 声明伪目标，避免与实际文件名冲突。
-.PHONY: build iso qemu qemudbg qemugdb clean rebuild builddisk cleandisk cleanall format
+.PHONY: build iso qemu qemudbg qemugdb clean rebuild builddisk cleandisk cleanall format check-deps
 
-# 编译整个内核及其依赖模块，并生成最终可启动镜像。
-build:
+## help
+help:
+	python3 tools/make_help.py
+
+## 检查软件依赖
+check-deps:
+	python3 tools/check-deps.py
+
+## 编译整个内核及其依赖模块，并生成最终可启动镜像。
+build: check-deps
 	$(MAKE) -C src/lib built-in.o
 	$(MAKE) -C src/asm built-in.o
 	$(MAKE) -C src/fs built-in.o
@@ -68,7 +76,7 @@ build:
 	$(LD) $(LDFLAGS) -T linker.ld -o vmrayos $(BUILT-IN)
 	find src -name "*.o" ! -name "built-in.o" -type f -exec rm -f {} +
 
-# 创建一个 FAT32 格式的磁盘镜像，并将用户态初始化程序复制进去。
+## 创建一个 FAT32 格式的磁盘镜像，并将用户态初始化程序复制进去。
 builddisk:
 	dd if=/dev/zero of=disk.img bs=1M count=128
 	mkfs.fat -F 32 disk.img
@@ -76,38 +84,39 @@ builddisk:
 	sudo cp src/user/init /mnt
 	sudo umount /mnt
 
-# 删除构建生成的磁盘镜像。
+## 删除构建生成的磁盘镜像。
 cleandisk:
 	$(RM) disk.img
 
-# 生成可引导的 GRUB ISO 镜像。
+## 生成可引导的 GRUB ISO 镜像。
 iso: build
 	cp vmrayos iso/boot/
 	grub-mkrescue -o $(ISO) iso/
 
-# 启动 QEMU 运行系统镜像。
+## 启动 QEMU 运行系统镜像。
 qemu: iso builddisk
 	$(QEMU) $(QEMU_FLAGS)
 
-# 启动 QEMU 并输出详细调试日志。
+## 启动 QEMU 并输出详细调试日志。
 qemudbg: iso builddisk
 	$(QEMU) $(QEMU_FLAGS) $(QEMU_DBG_FLAGS)
 
-# 启动 QEMU 并等待 GDB 连接。
+## 启动 QEMU 并等待 GDB 连接。
 qemugdb: iso builddisk
 	$(QEMU) $(QEMU_FLAGS) $(QEMU_DBG_FLAGS) -S -s
 
-# 清理编译产物、日志和生成的 ISO 文件。
+## 清理编译产物、日志和生成的 ISO 文件。
 clean:
 	find . -type f \( -name "*.o" -o -name "*.log" -o -name "*.iso" \) -exec rm -f {} +
 	$(RM) *.iso vmrayos iso/boot/vmrayos *.log
 
-# 清理所有构建产物，并进一步清理用户态构建结果。
+## 清理所有构建产物，并进一步清理用户态构建结果。
 cleanall: clean cleandisk
 	$(MAKE) -C src/user clean
 
-# 从干净状态重新构建整个项目。
+## 从干净状态重新构建整个项目。
 rebuild: cleanall build
 
+## 进行所有C/C++源码的格式化
 format:
 	python3 tools/format.py

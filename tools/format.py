@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import shutil
 import argparse
 import os
 import subprocess
@@ -87,5 +88,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if shutil.which("clang-format") is not None:
+        main()
+    else:
+        print("Can't find 'clang-format', you can to install used 'apt install clang-format'")
+    
     

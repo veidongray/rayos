@@ -43,10 +43,19 @@
 #include <types.h>
 #include <vfs.h>
 
-static FATFS fs;
-
 int vfs_init(void)
 {
-	f_mount(&fs, "", 1);
+	/**
+	 * @brief cmdline
+	 *
+	 * 后期加入 cmdline 支持
+	 *
+	 */
+	const char *root_path = "/";
+	const char *root_fstype = "fatfs";
+
+	struct file_system_type *fstype;
+	fstype = fs_get_by_name(root_fstype);
+	fstype->fs_ops->mount(fstype, root_path);
 	return 0;
 }

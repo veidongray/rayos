@@ -1,6 +1,7 @@
 #ifndef SYSCALLS_H
 #define SYSCALLS_H
 
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <types.h>
 

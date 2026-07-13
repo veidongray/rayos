@@ -40,9 +40,7 @@ typedef void (*thread_func_t)(void *);
 
 void task_exit(void);
 void scheduler(void);
-uint64_t read_cr3(void);
 void task_init(void);
-void write_cr3(uint64_t pml4addr);
 extern void switch_to_user(void); // from switch_to.S
 queue_t *get_task_readyqueue(void);
 extern void switch_to(uint64_t *rsp); // from switch_to.S
