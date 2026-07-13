@@ -9,9 +9,10 @@ typedef int (*initcall_t)(void);
  * __section__()   : 指定 ELF section
  * __aligned__()   : 保证指针对齐（x86_64 下为 8 字节）
  */
-#define __define_initcall(fn, level)            \
-    static initcall_t __initcall_##fn##_##level \
-        __attribute__((used, section(".initcall." #level), aligned(sizeof(void *)))) = fn
+#define __define_initcall(fn, level)                                           \
+	static initcall_t __initcall_##fn##_##level                            \
+	        __attribute__((used, section(".initcall." #level),             \
+	                       aligned(sizeof(void *)))) = fn
 
 /* 分级宏，数字越小越先执行 */
 #define pure_initcall(fn) __define_initcall(fn, 0)
@@ -28,9 +29,10 @@ typedef int (*initcall_t)(void);
 
 typedef void (*exitcall_t)(void);
 
-#define __define_exitcall(fn, level)            \
-    static exitcall_t __exitcall_##fn##_##level \
-        __attribute__((used, section(".exitcall." #level), aligned(sizeof(void *)))) = fn
+#define __define_exitcall(fn, level)                                           \
+	static exitcall_t __exitcall_##fn##_##level                            \
+	        __attribute__((used, section(".exitcall." #level),             \
+	                       aligned(sizeof(void *)))) = fn
 
 #define pure_exitcall(fn) __define_exitcall(fn, 0)
 #define core_exitcall(fn) __define_exitcall(fn, 1)

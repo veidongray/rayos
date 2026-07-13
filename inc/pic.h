@@ -15,7 +15,8 @@
 #define TIMER_FREQ 100
 #define PIT_DIVISOR (1193182 / TIMER_FREQ) // ≈ 11931
 
-// The interrupt vector corresponding to IRQ0 (must be consistent with pic_remap(0x20, ...))
+// The interrupt vector corresponding to IRQ0 (must be consistent with
+// pic_remap(0x20, ...))
 #define IRQ0_VECTOR 0x20
 
 #define IRQ0_VECTOR 0x20 // PIT (Programmable Interval Timer)

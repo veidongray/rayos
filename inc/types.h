@@ -1,8 +1,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 typedef uint8_t __u8;
 typedef uint16_t __u16;

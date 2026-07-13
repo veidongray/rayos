@@ -6,17 +6,16 @@
 #define PR_DEBUG 1
 
 #if PR_DEBUG
-#define printk(fmt, ...)                                                      \
-    do                                                                        \
-    {                                                                         \
-        printf("[%s:%d]: " fmt "\n", __FILE__, (int)__LINE__, ##__VA_ARGS__); \
-    } while (0)
+#define printk(fmt, ...)                                                       \
+	do {                                                                   \
+		printf("[%s:%d]: " fmt "\n", __FILE__, (int)__LINE__,          \
+		       ##__VA_ARGS__);                                         \
+	} while (0)
 #else
-#define printk(fmt, ...)                 \
-    do                                   \
-    {                                    \
-        printf(fmt "\n", ##__VA_ARGS__); \
-    } while (0)
+#define printk(fmt, ...)                                                       \
+	do {                                                                   \
+		printf(fmt "\n", ##__VA_ARGS__);                               \
+	} while (0)
 #endif
 
 /* pr_xxx */

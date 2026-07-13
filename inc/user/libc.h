@@ -2,9 +2,9 @@
 #define LIBC_H
 
 #include <ff.h>
-#include <vfs.h>
-#include <syscalls.h>
 #include <sys/types.h>
+#include <syscalls.h>
+#include <vfs.h>
 
 int open(const char *pathname, int flags, ...);
 int close(int fd);

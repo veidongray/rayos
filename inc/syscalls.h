@@ -1,24 +1,18 @@
 #ifndef SYSCALLS_H
 #define SYSCALLS_H
 
-#include <types.h>
 #include <sys/types.h>
+#include <types.h>
 
-enum num_stdfd
-{
-    STDIN,
-    STDOUT,
-    STDERR
-};
+enum num_stdfd { STDIN, STDOUT, STDERR };
 
-enum num_syscall
-{
-    SYS_OPEN,
-    SYS_CLOSE,
-    SYS_READ,
-    SYS_WRITE,
-    SYS_CREATE,
-    SYS_STAT
+enum num_syscall {
+	SYS_OPEN,
+	SYS_CLOSE,
+	SYS_READ,
+	SYS_WRITE,
+	SYS_CREATE,
+	SYS_STAT
 };
 
 int sys_open(const char *path, mode_t mode);

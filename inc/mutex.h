@@ -1,21 +1,16 @@
 #ifndef MUTEX_H
 #define MUTEX_H
 
+#include <atomic.h>
 #include <list.h>
 #include <queue.h>
-#include <atomic.h>
 #include <spinlock.h>
 
-enum mutex_status
-{
-    MUTEX_LOCKED,
-    MUTEX_UNLOCK
-};
+enum mutex_status { MUTEX_LOCKED, MUTEX_UNLOCK };
 
-struct mutex
-{
-    queue_t wait_queue;
-    atomic_int_t locked;
+struct mutex {
+	queue_t wait_queue;
+	atomic_int_t locked;
 };
 
 typedef struct mutex mutex_t;

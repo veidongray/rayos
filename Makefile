@@ -55,7 +55,7 @@ export CFLAGS
 export LDFLAGS
 
 # 声明伪目标，避免与实际文件名冲突。
-.PHONY: build iso qemu qemudbg qemugdb clean rebuild builddisk cleandisk cleanall
+.PHONY: build iso qemu qemudbg qemugdb clean rebuild builddisk cleandisk cleanall format
 
 # 编译整个内核及其依赖模块，并生成最终可启动镜像。
 build:
@@ -108,3 +108,6 @@ cleanall: clean cleandisk
 
 # 从干净状态重新构建整个项目。
 rebuild: cleanall build
+
+format:
+	python3 tools/format.py

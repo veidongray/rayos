@@ -27,26 +27,26 @@
  * └──────────────────────────────────────────────────────┘
  */
 
+#include <atomic.h>
+#include <block_device.h>
+#include <fat32.h>
 #include <ff.h>
 #include <fs.h>
+#include <mempool.h>
 #include <mm.h>
-#include <vfs.h>
-#include <task.h>
 #include <page.h>
-#include <fat32.h>
-#include <types.h>
 #include <printk.h>
 #include <string.h>
-#include <atomic.h>
-#include <mempool.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <block_device.h>
+#include <task.h>
+#include <types.h>
+#include <vfs.h>
 
 static FATFS fs;
 
 int vfs_init(void)
 {
-    f_mount(&fs, "", 1);
-    return 0;
+	f_mount(&fs, "", 1);
+	return 0;
 }

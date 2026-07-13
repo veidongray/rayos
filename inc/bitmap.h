@@ -1,13 +1,12 @@
 #ifndef BITMAP_H
 #define BITMAP_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
-typedef struct
-{
-    size_t size;   // 总位数
-    uint64_t *map; // 位图数组指针
+typedef struct {
+	size_t size;   // 总位数
+	uint64_t *map; // 位图数组指针
 } bitmap_t;
 
 // 初始化位图

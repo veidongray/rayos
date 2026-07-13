@@ -1,8 +1,8 @@
 #ifndef LAPIC_H
 #define LAPIC_H
 
-#include <page.h>
 #include <acpi.h>
+#include <page.h>
 #include <stdint.h>
 
 #define LAPIC_BASE 0xFEE00000
@@ -26,13 +26,16 @@
 // 读写内存映射寄存器的辅助函数
 static inline uint32_t lapic_read(uint32_t reg)
 {
-    // 先将 64 位基地址与 32 位偏移量相加，得到完整的 64 位虚拟地址，再强转为指针
-    return *(volatile uint32_t *)((uintptr_t)(KERNEL_BASE + LAPIC_BASE + reg));
+	// 先将 64 位基地址与 32 位偏移量相加，得到完整的 64
+	// 位虚拟地址，再强转为指针
+	return *(volatile uint32_t *)((uintptr_t)(KERNEL_BASE + LAPIC_BASE +
+	                                          reg));
 }
 
 static inline void lapic_write(uint32_t reg, uint32_t data)
 {
-    *(volatile uint32_t *)((uintptr_t)(KERNEL_BASE + LAPIC_BASE + reg)) = data;
+	*(volatile uint32_t *)((uintptr_t)(KERNEL_BASE + LAPIC_BASE + reg)) =
+	        data;
 }
 
 void lapic_init(void);
