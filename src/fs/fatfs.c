@@ -32,7 +32,7 @@ static struct dentry *fatfs_lookup(const char *path)
 		fd = kzalloc(sizeof(struct fatfs_dentry));
 
 		fd->name = (char *)path;
-		fd->nmlen = strlen(path) + 1;
+		fd->nmlen = strlen(path);
 		fd->name[fd->nmlen] = '\0';
 
 		de->private_data = fd;
@@ -266,7 +266,7 @@ static void fatfs_sync(struct dentry *dentry)
 {
 	FIL *fp = (FIL *)((struct fatfs_dentry *)dentry->private_data)->data;
 	if (fp) {
-		while (f_sync(fp) == FR_OK)
+		while (f_sync(fp) != FR_OK)
 			;
 	}
 }

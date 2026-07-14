@@ -3,9 +3,12 @@
 
 int main(void)
 {
-	int fd = open("/init", FA_CREATE_NEW | FA_READ | FA_WRITE);
-	write(fd, "fffffffffffffffffffffffuck", 27);
-	sync();
+	int fd = open("/init", FA_READ | FA_WRITE);
+	if (fd >= 0)
+	{
+		write(fd, "fffffffffffffffffffffffuck", 27);
+		sync();
+	}
 
 	while (1)
 		;
