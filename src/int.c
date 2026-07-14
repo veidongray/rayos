@@ -110,8 +110,8 @@ int isr_syscall_handler(struct context *ctx)
 		                     (size_t)ctx->rdx);
 		break;
 
-	case SYS_CREATE:
-		ctx->rax = sys_create((const char *)ctx->rdi);
+	case SYS_SYNC:
+		sys_sync();
 		break;
 
 	default:

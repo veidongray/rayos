@@ -51,11 +51,4 @@ ssize_t write(int fd, const void *buf, size_t count)
 	return ret;
 }
 
-int creat(const char *pathname, mode_t mode)
-{
-	int ret;
-
-	ret = syscall(SYS_CREATE, (uint64_t)pathname, mode, 0, 0);
-
-	return ret;
-}
+void sync(void) { syscall(SYS_SYNC, 0, 0, 0, 0); }

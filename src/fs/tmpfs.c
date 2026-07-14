@@ -4,6 +4,7 @@
 #include <mount.h>
 #include <printk.h>
 #include <string.h>
+#include <vfs_errno.h>
 
 /* 简易错误码定义，替代标准 errno */
 enum tmpfs_err {
@@ -277,12 +278,13 @@ static int tmpfs_mkdir(const char *path)
 }
 
 /* 获取节点属性 */
-static int tmpfs_stat(const char *path, struct stat *st)
+static int tmpfs_stat(struct dentry *dentry, struct stat *st)
 {
 	if (!st)
 		return TMPFS_ERR_INVAL;
 
-	struct tmpfs_dentry *de = tmpfs_lookup(path);
+	struct tmpfs_dentry *t = (struct tmpfs_dentry *)dentry->private_data;
+	struct tmpfs_dentry *de = tmpfs_lookup(t->name);
 	if (!de)
 		return TMPFS_ERR_NOENT;
 
@@ -373,7 +375,7 @@ static int tmpfs_open(struct dentry *dentry, mode_t mode)
 	mode = mode;
 	t = tmpfs_lookup(td->name);
 	if (t == NULL) {
-		return -1;
+		return -ENOENT;
 	}
 	return 0;
 }

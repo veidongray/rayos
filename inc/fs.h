@@ -13,7 +13,21 @@
 struct file_system_type;
 
 struct dentry {
+	int pathlen;
+	char *pathname;
 	void *private_data;
+
+	struct list_head list;
+};
+
+struct file {
+	__u32 fd;
+	int pathlen;
+	char *pathname;
+
+	struct list_head list;
+
+	void *priv;
 };
 
 struct file_system_operations {
@@ -28,7 +42,8 @@ struct file_system_operations {
 	ssize_t (*read)(struct dentry *dentry, void *buf, size_t len);
 	ssize_t (*write)(struct dentry *dentry, const void *buf, size_t len);
 	int (*readdir)(const char *path);
-	int (*stat)(const char *path, struct stat *st);
+	int (*stat)(struct dentry *dentry, struct stat *st);
+	void (*sync)(struct dentry *dentry);
 };
 
 struct file_system_type {

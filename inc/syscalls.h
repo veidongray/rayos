@@ -12,15 +12,15 @@ enum num_syscall {
 	SYS_CLOSE,
 	SYS_READ,
 	SYS_WRITE,
-	SYS_CREATE,
-	SYS_STAT
+	SYS_STAT,
+	SYS_SYNC
 };
 
 int sys_open(const char *path, mode_t mode);
 int sys_close(int fd);
 int sys_read(int fd, char *buf, size_t size);
 int sys_write(int fd, const char *buf, size_t size);
-int sys_create(const char *pathname);
-int sys_stat(const char *pathname, struct stat *_sb);
+int sys_stat(const char *pathname, struct stat *st);
+void sys_sync(void);
 
 #endif // SYSCALLS_H

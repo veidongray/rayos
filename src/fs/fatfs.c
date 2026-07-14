@@ -115,6 +115,8 @@ static ssize_t fatfs_write(struct dentry *dentry, const void *buf, size_t len)
 
 	fp = fd->data;
 	f_write(fp, buf, (UINT)len, &ret);
+	while (f_sync(fp) == FR_OK)
+		;
 	return ret;
 }
 
@@ -216,14 +218,15 @@ static int fatfs_mkdir(const char *path)
 }
 
 /* 获取节点属性 */
-static int fatfs_stat(const char *path, struct stat *st)
+static int fatfs_stat(struct dentry *dentry, struct stat *st)
 {
 	FILINFO fno;
-	FRESULT res = f_stat(path, &fno);
+	struct fatfs_dentry *fd = (struct fatfs_dentry *)dentry->private_data;
+	FRESULT res = f_stat(fd->name, &fno);
 
 	if (res == FR_OK) {
 		if (fno.fattrib & AM_DIR) {
-			pr_info("%s is dir", path);
+			pr_info("%s is dir", fd->name);
 		} else {
 			st->st_size = fno.fsize;
 		}
@@ -259,6 +262,15 @@ static int fatfs_rename(const char *oldpath, const char *newpath)
 	return res;
 }
 
+static void fatfs_sync(struct dentry *dentry)
+{
+	FIL *fp = (FIL *)((struct fatfs_dentry *)dentry->private_data)->data;
+	if (fp) {
+		while (f_sync(fp) == FR_OK)
+			;
+	}
+}
+
 static int fatfs_mount(struct file_system_type *fstype, const char *path)
 {
 	pr_info("Mount fatfs to %s", path);
@@ -279,6 +291,7 @@ static struct file_system_operations fs_ops = {
         .write = fatfs_write,
         .readdir = fatfs_readdir,
         .stat = fatfs_stat,
+        .sync = fatfs_sync,
 };
 
 static struct file_system_type fatfs_type = {

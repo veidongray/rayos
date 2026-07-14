@@ -1,99 +1,96 @@
 #include <ff.h>
 #include <mm.h>
 #include <printk.h>
+#include <string.h>
 #include <sys/types.h>
 #include <syscalls.h>
 #include <vfs.h>
 
-static int __g_fd_count = 0;
-LIST_HEAD(__list_vfs_file);
+static __u32 fd_count = 0;
+static LIST_HEAD(file_list);
 
 int sys_open(const char *path, mode_t mode)
 {
-	FIL *fp = (FIL *)kzalloc(sizeof(FIL));
-	struct vfs_file *file =
-	        (struct vfs_file *)kzalloc(sizeof(struct vfs_file));
+	int ret;
+	struct file *filp;
 
-	f_open(fp, path, mode);
-	file->fd = __g_fd_count++;
-	file->priv = (void *)fp;
+	ret = vfs_open(path, mode);
+	if (ret < 0) {
+		return ret;
+	}
 
-	list_add_tail(&file->list, &__list_vfs_file);
-	return file->fd;
+	filp = kzalloc(sizeof(struct file));
+	if (!filp) {
+		vfs_close(path);
+		return -ENOMEM;
+	}
+
+	filp->fd = fd_count++;
+	filp->pathname = (char *)path;
+	filp->pathlen = strlen(path);
+	list_add_tail(&filp->list, &file_list);
+
+	return filp->fd;
 }
 
 int sys_close(int fd)
 {
-	struct list_head *pos;
-	struct vfs_file *file;
+	int ret;
+	struct file *filp;
 
-	list_for_each(pos, &__list_vfs_file)
+	list_for_each_entry(filp, &file_list, list)
 	{
-		file = container_of(pos, struct vfs_file, list);
-		if (file->fd == fd) {
-			list_del(&file->list);
-			f_close((FIL *)file->priv);
-			kfree(file->priv);
-			kfree(file);
-			return 0;
+		if (filp->fd == (__u32)fd) {
+			ret = vfs_close(filp->pathname);
+			return ret;
 		}
 	}
-	return -1;
+
+	return -ENOENT;
 }
 
 int sys_read(int fd, char *buf, size_t size)
 {
 	int ret;
-	struct list_head *pos;
-	struct vfs_file *file;
+	struct file *filp;
 
-	list_for_each(pos, &__list_vfs_file)
+	list_for_each_entry(filp, &file_list, list)
 	{
-		file = container_of(pos, struct vfs_file, list);
-		if (file->fd == fd) {
-			f_read((FIL *)file->priv, buf, (UINT)size,
-			       (UINT *)&ret);
+		if (filp->fd == (__u32)fd) {
+			ret = vfs_read(filp->pathname, buf, size);
 			return ret;
 		}
 	}
 
-	return -1;
+	return -ENOENT;
 }
 
 int sys_write(int fd, const char *buf, size_t size)
 {
 	int ret;
-	struct list_head *pos;
-	struct vfs_file *file;
+	struct file *filp;
 
-	list_for_each(pos, &__list_vfs_file)
+	list_for_each_entry(filp, &file_list, list)
 	{
-		file = container_of(pos, struct vfs_file, list);
-		if (file->fd == fd) {
-			f_write((FIL *)file->priv, buf, (UINT)size,
-			        (UINT *)&ret);
+		if (filp->fd == (__u32)fd) {
+			ret = vfs_write(filp->pathname, buf, size);
 			return ret;
 		}
 	}
 
-	return -1;
+	return -ENOENT;
 }
 
-int sys_create(const char *pathname)
+int sys_stat(const char *pathname, struct stat *st)
 {
-	FIL fp;
-	f_open(&fp, pathname, FA_CREATE_NEW);
-	f_sync(&fp);
-	f_close(&fp);
-	return 0;
+	return vfs_stat(pathname, st);
 }
 
-int sys_stat(const char *pathname, struct stat *_sb)
+void sys_sync(void)
 {
-	FILINFO info;
-
-	f_stat(pathname, &info);
-	_sb->st_size = info.fsize;
-
-	return 0;
+	struct file *filp;
+	list_for_each_entry(filp, &file_list, list)
+	{
+		vfs_sync(filp->pathname);
+	}
 }
