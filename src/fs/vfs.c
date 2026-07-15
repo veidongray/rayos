@@ -29,6 +29,7 @@
 
 #include <ff.h>
 #include <fs.h>
+#include <mm.h>
 #include <mount.h>
 #include <printk.h>
 #include <string.h>
@@ -53,67 +54,86 @@ void vfs_init(void)
 	fstype->fs_ops->mount(fstype, root_path);
 }
 
-int vfs_open(const char *path, mode_t mode)
+int vfs_open(struct file *filp, const char *path, mode_t mode)
 {
-	int ret = -1;
-	struct mount *mnt;
-	struct dentry *dentry;
-	struct file_system_type *type;
-
-	mnt = mount_get_by_name(path);
-	if (mnt == NULL) {
-		return ret;
-	}
-	type = mnt->mnt_fstype;
-
-	if (type->fs_ops->lookup) {
-		dentry = type->fs_ops->lookup(path + strlen(mnt->mnt_path));
-		if (!dentry) {
-			return ret;
-		}
-	} else {
+	struct mount *mount = mount_get_by_name(path);
+	if (!mount) {
 		return -ENODEV;
 	}
 
+	char *fs_path =
+	        (char *)path + strlen(mount->mnt_path); // 文件系统内部的路径
+	struct file_system_type *type = mount->mnt_fstype;
+
+	/*
+	 * 尝试查找 dentry 列表确定是否已经存在 dentry
+	 * 已经存在直接设置 filp->dentry = dentry 并返回
+	 */
+	struct dentry *dentry;
+	list_for_each_entry(dentry, &dentry_list, list)
+	{
+		if (!strcmp(dentry->pathname, path)) {
+			filp->dentry = dentry;
+			atomic_fetch_add(&dentry->d_ref, 1);
+			return 0;
+		}
+	}
+
+	// 没找到就创建新的 dentry
+	dentry = kzalloc(sizeof(struct dentry));
+	if (!dentry) {
+		return -ENOMEM;
+	}
+
+	filp->dentry = dentry;
+	if (type->fs_ops->lookup) {
+		if (!type->fs_ops->lookup(filp->dentry, fs_path)) {
+			kfree(dentry);
+			return -ENOENT;
+		}
+	} else {
+		kfree(dentry);
+		return -ENODEV;
+	}
+
+	type->fs_ops->open(filp, mode);
+
+	// 填充 dentry 剩余部分
 	dentry->pathname = (char *)path;
-	dentry->pathlen = strlen(path);
+	dentry->pathlen = strlen(dentry->pathname) + 1; // 加上末尾 '\0' 的长度
+	dentry->mnt = mount;
+	atomic_store(&dentry->d_ref, 1);
 	list_add_tail(&dentry->list, &dentry_list);
 
-	if (type->fs_ops->open) {
-		ret = type->fs_ops->open(dentry, mode);
-		return ret;
-	} else {
-		return -ENODEV;
-	}
+	return 0;
 }
 
-int vfs_close(const char *path)
+int vfs_close(struct file *filp)
 {
-	int ret = -1;
-	struct mount *mnt;
-	struct file_system_type *type;
-
-	mnt = mount_get_by_name(path);
-	if (mnt == NULL) {
-		return ret;
-	}
-	type = mnt->mnt_fstype;
-
 	struct dentry *pos;
+	struct dentry *dentry = filp->dentry;
+	struct mount *mount = mount_get_by_name(dentry->pathname);
+	if (!mount) {
+		return -ENODEV;
+	}
+	struct file_system_type *type = mount->mnt_fstype;
+
+	// 尝试在 dentry 列表中查找
 	list_for_each_entry(pos, &dentry_list, list)
 	{
-		if (!strcmp(path, pos->pathname)) {
-			if (type->fs_ops->release) {
-				ret = type->fs_ops->release(pos);
-				if (ret >= 0) {
-					list_del(&pos->list);
-				}
-				return ret;
+		if (!strcmp(pos->pathname, dentry->pathname)) {
+			atomic_fetch_sub(&dentry->d_ref, 1);
+			if (!atomic_load(&dentry->d_ref)) {
+				type->fs_ops->release(filp);
+				list_del(&dentry->list);
+				kfree(dentry->pathname);
+				kfree(dentry);
 			}
-			return -ENODEV;
+			return 0;
 		}
 	}
-	return -ENOENT;
+
+	return -ESTALE;
 }
 
 int vfs_read(const char *path, void *buf, size_t len)

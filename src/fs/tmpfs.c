@@ -367,8 +367,9 @@ static int tmpfs_rename(const char *oldpath, const char *newpath)
 	return TMPFS_OK;
 }
 
-static int tmpfs_open(struct dentry *dentry, mode_t mode)
+static int tmpfs_open(struct file *filp, mode_t mode)
 {
+	struct dentry *dentry = filp->dentry;
 	struct tmpfs_dentry *t;
 	struct tmpfs_dentry *td = (struct tmpfs_dentry *)dentry->private_data;
 
@@ -380,9 +381,9 @@ static int tmpfs_open(struct dentry *dentry, mode_t mode)
 	return 0;
 }
 
-static int tmpfs_release(struct dentry *dentry)
+static int tmpfs_release(struct file *filp)
 {
-	dentry = dentry;
+	filp = filp;
 	return 0;
 }
 

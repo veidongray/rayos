@@ -14,20 +14,27 @@ int sys_open(const char *path, mode_t mode)
 	int ret;
 	struct file *filp;
 
-	ret = vfs_open(path, mode);
-	if (ret < 0) {
-		return ret;
-	}
-
+	// 创建空 file
 	filp = kzalloc(sizeof(struct file));
 	if (!filp) {
-		vfs_close(path);
+		pr_err("MEM");
 		return -ENOMEM;
 	}
 
+	char *pathbuff = kzalloc(strlen(path) + 1);
+	if (!pathbuff) {
+		kfree(filp);
+		return -ENOMEM;
+	}
+	strcpy(pathbuff, path);
+
+	ret = vfs_open(filp, pathbuff, mode);
+	if (ret < 0) {
+		kfree(filp);
+		return ret;
+	}
+
 	filp->fd = fd_count++;
-	filp->pathname = (char *)path;
-	filp->pathlen = strlen(path);
 	list_add_tail(&filp->list, &file_list);
 
 	return filp->fd;
@@ -35,18 +42,22 @@ int sys_open(const char *path, mode_t mode)
 
 int sys_close(int fd)
 {
-	int ret;
 	struct file *filp;
-
 	list_for_each_entry(filp, &file_list, list)
 	{
+		// 查找是否有对应的 filp
 		if (filp->fd == (__u32)fd) {
-			ret = vfs_close(filp->pathname);
-			return ret;
+			int ret = vfs_close(filp);
+			if (ret < 0) {
+				return ret;
+			}
+			list_del(&filp->list);
+			kfree(filp);
+			return 0;
 		}
 	}
 
-	return -ENOENT;
+	return -EBADF;
 }
 
 int sys_read(int fd, char *buf, size_t size)
@@ -57,7 +68,7 @@ int sys_read(int fd, char *buf, size_t size)
 	list_for_each_entry(filp, &file_list, list)
 	{
 		if (filp->fd == (__u32)fd) {
-			ret = vfs_read(filp->pathname, buf, size);
+			ret = vfs_read(filp->dentry->pathname, buf, size);
 			return ret;
 		}
 	}
@@ -73,7 +84,7 @@ int sys_write(int fd, const char *buf, size_t size)
 	list_for_each_entry(filp, &file_list, list)
 	{
 		if (filp->fd == (__u32)fd) {
-			ret = vfs_write(filp->pathname, buf, size);
+			ret = vfs_write(filp->dentry->pathname, buf, size);
 			return ret;
 		}
 	}
@@ -91,6 +102,6 @@ void sys_sync(void)
 	struct file *filp;
 	list_for_each_entry(filp, &file_list, list)
 	{
-		vfs_sync(filp->pathname);
+		vfs_sync(filp->dentry->pathname);
 	}
 }

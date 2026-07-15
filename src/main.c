@@ -16,6 +16,7 @@
 #include <printk.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <syscalls.h>
 #include <task.h>
 #include <uart.h>
 #include <vfs.h>
@@ -27,7 +28,7 @@ void kernel_init(void *args)
 	args = args;
 
 	pr_info("/init running...");
-	run_process("/init");
+	// run_process("/init");
 
 	buf = kzalloc(UART_BUF_SIZE);
 	while (1) {

@@ -5,7 +5,7 @@
 #include <string.h>
 #include <types.h>
 
-#define VMAP_AREA_POOL_NR_PAGES 8 /* vmap_area 元数据池占用的页数 */
+#define VMAP_AREA_POOL_NR_PAGES 32 /* vmap_area 元数据池占用的页数 */
 #define KMEM_BASE 0xffff900000000000ULL /* 内核动态映射区虚拟基地址 */
 
 static struct mem_pool vmap_area_pool; /* vmap_area 对象池 */

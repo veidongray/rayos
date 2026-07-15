@@ -14,31 +14,31 @@ enum dentry_type {
 struct fatfs_dentry {
 	char *name;
 	int nmlen;
-	void *data; // 指向具体的 FIL
+	FIL *fp;
+	void *data;
 };
 
 static FATFS fatfs_root;
 
-static struct dentry *fatfs_lookup(const char *path)
+static struct dentry *fatfs_lookup(struct dentry *dentry, const char *path)
 {
-	FIL f;
+	FILINFO fno;
 	FRESULT res;
-	struct dentry *de;
 	struct fatfs_dentry *fd;
 
-	res = f_open(&f, path, FA_READ);
+	res = f_stat(path, &fno);
 	if (res == FR_OK) {
-		de = kzalloc(sizeof(struct dentry));
 		fd = kzalloc(sizeof(struct fatfs_dentry));
+		if (!fd) {
+			return NULL;
+		}
 
 		fd->name = (char *)path;
 		fd->nmlen = strlen(path);
-		fd->name[fd->nmlen] = '\0';
 
-		de->private_data = fd;
+		dentry->private_data = fd;
 
-		f_close(&f);
-		return de;
+		return dentry;
 	} else {
 		return NULL;
 	}
@@ -67,11 +67,12 @@ static int fatfs_creat(const char *path)
 	return 0;
 }
 
-static int fatfs_open(struct dentry *dentry, mode_t mode)
+static int fatfs_open(struct file *filp, mode_t mode)
 {
 	FIL *fp;
 	FRESULT res;
 	struct fatfs_dentry *fd;
+	struct dentry *dentry = filp->dentry;
 	fd = (struct fatfs_dentry *)dentry->private_data;
 
 	fp = kzalloc(sizeof(FIL));
@@ -89,10 +90,14 @@ static int fatfs_open(struct dentry *dentry, mode_t mode)
 	return 0;
 }
 
-static int fatfs_release(struct dentry *dentry)
+static int fatfs_release(struct file *filp)
 {
+	struct dentry *dentry = filp->dentry;
 	struct fatfs_dentry *fd = (struct fatfs_dentry *)dentry->private_data;
-	kfree(fd->data);
+
+	FIL *fp = fd->data;
+	f_close(fp);
+	kfree(fp);
 	return 0;
 }
 

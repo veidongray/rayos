@@ -15,26 +15,29 @@ struct file_system_type;
 struct dentry {
 	int pathlen;
 	char *pathname;
-	void *private_data;
 
+	struct mount *mnt; // 指向对应的 mount
 	struct list_head list;
+
+	atomic_int_t d_ref; // 引用计数
+
+	void *private_data;
 };
 
 struct file {
 	__u32 fd;
-	int pathlen;
-	char *pathname;
 
+	struct dentry *dentry; // 指向对应的 dentry
 	struct list_head list;
 
-	void *priv;
+	void *private_data;
 };
 
 struct file_system_operations {
 	int (*mount)(struct file_system_type *fstype, const char *path);
-	struct dentry *(*lookup)(const char *path);
-	int (*open)(struct dentry *dentry, mode_t mode);
-	int (*release)(struct dentry *dentry);
+	struct dentry *(*lookup)(struct dentry *dentry, const char *path);
+	int (*open)(struct file *filp, mode_t mode);
+	int (*release)(struct file *filp);
 	int (*creat)(const char *path);
 	int (*mkdir)(const char *path);
 	int (*unlink)(const char *path);
