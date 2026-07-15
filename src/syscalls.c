@@ -21,14 +21,7 @@ int sys_open(const char *path, mode_t mode)
 		return -ENOMEM;
 	}
 
-	char *pathbuff = kzalloc(strlen(path) + 1);
-	if (!pathbuff) {
-		kfree(filp);
-		return -ENOMEM;
-	}
-	strcpy(pathbuff, path);
-
-	ret = vfs_open(filp, pathbuff, mode);
+	ret = vfs_open(filp, path, mode);
 	if (ret < 0) {
 		kfree(filp);
 		return ret;

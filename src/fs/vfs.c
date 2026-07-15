@@ -61,8 +61,16 @@ int vfs_open(struct file *filp, const char *path, mode_t mode)
 		return -ENODEV;
 	}
 
+	// 新建 buff 内存区不再操作传递进来的地址
+	char *pathbuff = kzalloc(strlen(path) + 1);
+	if (!pathbuff) {
+		kfree(filp);
+		return -ENOMEM;
+	}
+	strcpy(pathbuff, path);
+
 	char *fs_path =
-	        (char *)path + strlen(mount->mnt_path); // 文件系统内部的路径
+	        (char *)pathbuff + strlen(mount->mnt_path); // 文件系统内部的路径
 	struct file_system_type *type = mount->mnt_fstype;
 
 	/*
@@ -72,7 +80,7 @@ int vfs_open(struct file *filp, const char *path, mode_t mode)
 	struct dentry *dentry;
 	list_for_each_entry(dentry, &dentry_list, list)
 	{
-		if (!strcmp(dentry->pathname, path)) {
+		if (!strcmp(dentry->pathname, pathbuff)) {
 			filp->dentry = dentry;
 			atomic_fetch_add(&dentry->d_ref, 1);
 			return 0;
@@ -87,6 +95,7 @@ int vfs_open(struct file *filp, const char *path, mode_t mode)
 
 	filp->dentry = dentry;
 	if (type->fs_ops->lookup) {
+		// 查找是否存在路径并在路径存在时填充 dentry->private_data
 		if (!type->fs_ops->lookup(filp->dentry, fs_path)) {
 			kfree(dentry);
 			return -ENOENT;
@@ -96,12 +105,22 @@ int vfs_open(struct file *filp, const char *path, mode_t mode)
 		return -ENODEV;
 	}
 
-	type->fs_ops->open(filp, mode);
-
 	// 填充 dentry 剩余部分
-	dentry->pathname = (char *)path;
+	dentry->pathname = (char *)pathbuff;
 	dentry->pathlen = strlen(dentry->pathname) + 1; // 加上末尾 '\0' 的长度
 	dentry->mnt = mount;
+
+	// 此时 filp 填充基本完整
+	// 进入 fsops 的 open 填充剩余部分
+	// 或者根据具体实现填充或不填充需要的部分
+	int ret = type->fs_ops->open(filp, mode);
+	if (ret < 0)
+	{
+		kfree(pathbuff);
+		kfree(dentry);
+		return ret;
+	}
+
 	atomic_store(&dentry->d_ref, 1);
 	list_add_tail(&dentry->list, &dentry_list);
 
