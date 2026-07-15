@@ -101,27 +101,35 @@ static int fatfs_release(struct file *filp)
 	return 0;
 }
 
-static ssize_t fatfs_read(struct dentry *dentry, void *buf, size_t len)
+static ssize_t fatfs_read(struct file *filp, void *buf, size_t len)
 {
 	FIL *fp;
 	UINT ret;
+	FRESULT res;
+	struct dentry *dentry = filp->dentry;
 	struct fatfs_dentry *fd = (struct fatfs_dentry *)dentry->private_data;
 
 	fp = fd->data;
-	f_read(fp, buf, (UINT)len, &ret);
+	res = f_read(fp, buf, (UINT)len, &ret);
+	if (res != FR_OK) {
+		return res;
+	}
 	return ret;
 }
 
-static ssize_t fatfs_write(struct dentry *dentry, const void *buf, size_t len)
+static ssize_t fatfs_write(struct file *filp, const void *buf, size_t len)
 {
 	FIL *fp;
 	UINT ret;
+	FRESULT res;
+	struct dentry *dentry = filp->dentry;
 	struct fatfs_dentry *fd = (struct fatfs_dentry *)dentry->private_data;
 
 	fp = fd->data;
-	f_write(fp, buf, (UINT)len, &ret);
-	while (f_sync(fp) == FR_OK)
-		;
+	res = f_write(fp, buf, (UINT)len, &ret);
+	if (res != FR_OK) {
+		return res;
+	}
 	return ret;
 }
 

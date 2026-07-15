@@ -149,8 +149,9 @@ static int tmpfs_creat(const char *path)
 	return TMPFS_OK;
 }
 
-static ssize_t tmpfs_read(struct dentry *dentry, void *buf, size_t len)
+static ssize_t tmpfs_read(struct file *filp, void *buf, size_t len)
 {
+	struct dentry *dentry = filp->dentry;
 	struct tmpfs_dentry *td = (struct tmpfs_dentry *)dentry->private_data;
 	if (!td || td->type != DENTRY_FILE || !td->data)
 		return TMPFS_ERR_INVAL;
@@ -162,8 +163,9 @@ static ssize_t tmpfs_read(struct dentry *dentry, void *buf, size_t len)
 	return (ssize_t)len;
 }
 
-static ssize_t tmpfs_write(struct dentry *dentry, const void *buf, size_t len)
+static ssize_t tmpfs_write(struct file *filp, const void *buf, size_t len)
 {
+	struct dentry *dentry = filp->dentry;
 	struct tmpfs_dentry *td = (struct tmpfs_dentry *)dentry->private_data;
 	if (!td || td->type != DENTRY_FILE)
 		return TMPFS_ERR_INVAL;

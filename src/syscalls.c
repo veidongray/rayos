@@ -61,7 +61,7 @@ int sys_read(int fd, char *buf, size_t size)
 	list_for_each_entry(filp, &file_list, list)
 	{
 		if (filp->fd == (__u32)fd) {
-			ret = vfs_read(filp->dentry->pathname, buf, size);
+			ret = vfs_read(filp, buf, size);
 			return ret;
 		}
 	}
@@ -77,7 +77,7 @@ int sys_write(int fd, const char *buf, size_t size)
 	list_for_each_entry(filp, &file_list, list)
 	{
 		if (filp->fd == (__u32)fd) {
-			ret = vfs_write(filp->dentry->pathname, buf, size);
+			ret = vfs_write(filp, buf, size);
 			return ret;
 		}
 	}
@@ -93,8 +93,5 @@ int sys_stat(const char *pathname, struct stat *st)
 void sys_sync(void)
 {
 	struct file *filp;
-	list_for_each_entry(filp, &file_list, list)
-	{
-		vfs_sync(filp->dentry->pathname);
-	}
+	list_for_each_entry(filp, &file_list, list) { vfs_sync(filp); }
 }

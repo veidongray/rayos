@@ -16,11 +16,11 @@
 #include <printk.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <syscalls.h>
 #include <task.h>
 #include <uart.h>
 #include <vfs.h>
 #include <x86.h>
-#include <syscalls.h>
 
 void kernel_init(void *args)
 {
@@ -28,14 +28,7 @@ void kernel_init(void *args)
 	args = args;
 
 	pr_info("/init running...");
-	// run_process("/init");
-	int ret, i;
-	for (i = 0; i < 1024; i++)
-	{
-		ret = sys_open("/init", FA_READ);
-		ret = sys_close(ret);
-		if (ret < 0) break;
-	}
+	run_process("/init");
 
 	buf = kzalloc(UART_BUF_SIZE);
 	while (1) {

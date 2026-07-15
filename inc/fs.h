@@ -42,8 +42,8 @@ struct file_system_operations {
 	int (*mkdir)(const char *path);
 	int (*unlink)(const char *path);
 	int (*rename)(const char *oldpath, const char *newpath);
-	ssize_t (*read)(struct dentry *dentry, void *buf, size_t len);
-	ssize_t (*write)(struct dentry *dentry, const void *buf, size_t len);
+	ssize_t (*read)(struct file *filp, void *buf, size_t len);
+	ssize_t (*write)(struct file *filp, const void *buf, size_t len);
 	int (*readdir)(const char *path);
 	int (*stat)(struct dentry *dentry, struct stat *st);
 	void (*sync)(struct dentry *dentry);
