@@ -1,8 +1,8 @@
 #ifndef ELF_H
 #define ELF_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /* ELF Identification */
 #define EI_MAG0 0
@@ -147,11 +147,11 @@
 #define R_386_GOTPC 10
 
 /* Validation helper */
-#define IS_ELF(ehdr)                       \
-    ((ehdr).e_ident[EI_MAG0] == ELFMAG0 && \
-     (ehdr).e_ident[EI_MAG1] == ELFMAG1 && \
-     (ehdr).e_ident[EI_MAG2] == ELFMAG2 && \
-     (ehdr).e_ident[EI_MAG3] == ELFMAG3)
+#define IS_ELF(ehdr)                                                           \
+	((ehdr).e_ident[EI_MAG0] == ELFMAG0 &&                                 \
+	 (ehdr).e_ident[EI_MAG1] == ELFMAG1 &&                                 \
+	 (ehdr).e_ident[EI_MAG2] == ELFMAG2 &&                                 \
+	 (ehdr).e_ident[EI_MAG3] == ELFMAG3)
 
 // --------------------
 // ELF Program Header Types
@@ -180,52 +180,49 @@
 #define PF_W 0x2 // 可写
 #define PF_R 0x4 // 可读
 
-struct elf32_ehdr
-{
-    uint8_t e_ident[EI_NIDENT]; /* ELF 魔数与标识信息 */
-    uint16_t e_type;            /* 目标文件类型 (ET_EXEC, ET_DYN等) */
-    uint16_t e_machine;         /* 目标架构 (EM_386 = 3) */
-    uint32_t e_version;         /* ELF 版本 (EV_CURRENT = 1) */
-    uint32_t e_entry;           /* 程序入口点虚拟地址 */
-    uint32_t e_phoff;           /* Program Header Table 文件偏移 */
-    uint32_t e_shoff;           /* Section Header Table 文件偏移 */
-    uint32_t e_flags;           /* 处理器特定标志 (x86通常为0) */
-    uint16_t e_ehsize;          /* ELF Header 大小 (52字节) */
-    uint16_t e_phentsize;       /* 单个 Program Header 大小 (32字节) */
-    uint16_t e_phnum;           /* Program Header 数量 */
-    uint16_t e_shentsize;       /* 单个 Section Header 大小 (40字节) */
-    uint16_t e_shnum;           /* Section Header 数量 */
-    uint16_t e_shstrndx;        /* Section Name String Table 索引 */
+struct elf32_ehdr {
+	uint8_t e_ident[EI_NIDENT]; /* ELF 魔数与标识信息 */
+	uint16_t e_type;      /* 目标文件类型 (ET_EXEC, ET_DYN等) */
+	uint16_t e_machine;   /* 目标架构 (EM_386 = 3) */
+	uint32_t e_version;   /* ELF 版本 (EV_CURRENT = 1) */
+	uint32_t e_entry;     /* 程序入口点虚拟地址 */
+	uint32_t e_phoff;     /* Program Header Table 文件偏移 */
+	uint32_t e_shoff;     /* Section Header Table 文件偏移 */
+	uint32_t e_flags;     /* 处理器特定标志 (x86通常为0) */
+	uint16_t e_ehsize;    /* ELF Header 大小 (52字节) */
+	uint16_t e_phentsize; /* 单个 Program Header 大小 (32字节) */
+	uint16_t e_phnum;     /* Program Header 数量 */
+	uint16_t e_shentsize; /* 单个 Section Header 大小 (40字节) */
+	uint16_t e_shnum;     /* Section Header 数量 */
+	uint16_t e_shstrndx;  /* Section Name String Table 索引 */
 };
 
-struct elf64_ehdr
-{
-    uint8_t e_ident[EI_NIDENT]; /* ELF 魔数与标识信息 */
-    uint16_t e_type;            /* 目标文件类型 */
-    uint16_t e_machine;         /* 目标架构 (EM_X86_64 = 62) */
-    uint32_t e_version;         /* ELF 版本 */
-    uint64_t e_entry;           /* 程序入口点虚拟地址 */
-    uint64_t e_phoff;           /* Program Header Table 文件偏移 */
-    uint64_t e_shoff;           /* Section Header Table 文件偏移 */
-    uint32_t e_flags;           /* 处理器特定标志 */
-    uint16_t e_ehsize;          /* ELF Header 大小 (64字节) */
-    uint16_t e_phentsize;       /* 单个 Program Header 大小 (56字节) */
-    uint16_t e_phnum;           /* Program Header 数量 */
-    uint16_t e_shentsize;       /* 单个 Section Header 大小 (64字节) */
-    uint16_t e_shnum;           /* Section Header 数量 */
-    uint16_t e_shstrndx;        /* Section Name String Table 索引 */
+struct elf64_ehdr {
+	uint8_t e_ident[EI_NIDENT]; /* ELF 魔数与标识信息 */
+	uint16_t e_type;            /* 目标文件类型 */
+	uint16_t e_machine;         /* 目标架构 (EM_X86_64 = 62) */
+	uint32_t e_version;         /* ELF 版本 */
+	uint64_t e_entry;           /* 程序入口点虚拟地址 */
+	uint64_t e_phoff;           /* Program Header Table 文件偏移 */
+	uint64_t e_shoff;           /* Section Header Table 文件偏移 */
+	uint32_t e_flags;           /* 处理器特定标志 */
+	uint16_t e_ehsize;          /* ELF Header 大小 (64字节) */
+	uint16_t e_phentsize; /* 单个 Program Header 大小 (56字节) */
+	uint16_t e_phnum;     /* Program Header 数量 */
+	uint16_t e_shentsize; /* 单个 Section Header 大小 (64字节) */
+	uint16_t e_shnum;     /* Section Header 数量 */
+	uint16_t e_shstrndx;  /* Section Name String Table 索引 */
 };
 
-struct elf64_phdr
-{
-    uint32_t p_type;
-    uint32_t p_flags;
-    uint64_t p_offset;
-    uint64_t p_vaddr;
-    uint64_t p_paddr;
-    uint64_t p_filesz;
-    uint64_t p_memsz;
-    uint64_t p_align;
+struct elf64_phdr {
+	uint32_t p_type;
+	uint32_t p_flags;
+	uint64_t p_offset;
+	uint64_t p_vaddr;
+	uint64_t p_paddr;
+	uint64_t p_filesz;
+	uint64_t p_memsz;
+	uint64_t p_align;
 };
 
 #endif // ELF_H

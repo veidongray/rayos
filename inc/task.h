@@ -11,47 +11,44 @@
 
 #define TASK_STACK_SIZE_MAX (1024 * 1024)
 
-enum task_status
-{
-    TASK_EXIT,
-    TASK_DEAD,
-    TASK_READY,
-    TASK_RUNNING,
-    TASK_BLOCKED
+enum task_status {
+	TASK_EXIT,
+	TASK_DEAD,
+	TASK_READY,
+	TASK_RUNNING,
+	TASK_BLOCKED
 };
 
-struct task_struct
-{
-    int flags;
-    uint64_t rsp0;
-    uint64_t pml4;
-    uint64_t *rsp;
-    char name[32];
-    uint64_t *stack;
-    struct list_head list;
-    enum task_status status;
+struct task_struct {
+	int flags;
+	uint64_t rsp0;
+	uint64_t pml4;
+	uint64_t *rsp;
+	char name[32];
+	uint64_t *stack;
+	struct list_head list;
+	enum task_status status;
 };
 
-struct context
-{
-    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
-    uint64_t rbp, rdi, rsi, rdx, rcx, rbx, rax;
-    uint64_t rflags;
+struct context {
+	uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
+	uint64_t rbp, rdi, rsi, rdx, rcx, rbx, rax;
+	uint64_t rflags;
 } __attribute__((packed));
 
 typedef void (*thread_func_t)(void *);
 
 void task_exit(void);
 void scheduler(void);
-uint64_t read_cr3(void);
-void task_manager_init(void);
-void write_cr3(uint64_t pml4addr);
+void task_init(void);
 extern void switch_to_user(void); // from switch_to.S
 queue_t *get_task_readyqueue(void);
 extern void switch_to(uint64_t *rsp); // from switch_to.S
 struct task_struct *get_current(void);
-extern void context_switch(uint64_t **cur_rsp, uint64_t **next_rsp); // from switch_to.S
-struct task_struct *run_thread(thread_func_t thread_func, void *args, char *name);
+extern void context_switch(uint64_t **cur_rsp,
+                           uint64_t **next_rsp); // from switch_to.S
+struct task_struct *run_thread(thread_func_t thread_func, void *args,
+                               char *name);
 int run_process(const char *pathname);
 
 #endif // TASK_H

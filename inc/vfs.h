@@ -1,41 +1,20 @@
 #ifndef VFS_H
 #define VFS_H
 
+#include <fs.h>
 #include <list.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <sys/stat.h>
+#include <types.h>
+#include <vfs_errno.h>
 
-enum num_stdfd
-{
-    STDIN,
-    STDOUT,
-    STDERR
-};
-
-enum num_syscall
-{
-    SYS_OPEN,
-    SYS_CLOSE,
-    SYS_READ,
-    SYS_WRITE,
-    SYS_CREATE,
-    SYS_STAT
-};
-
-struct vfs_file
-{
-    int fd;
-    void *priv;
-    struct list_head list;
-};
-
-int vfs_init(void);
-int sys_open(const char *path, __mode_t mode);
-int sys_close(int fd);
-int sys_read(int fd, char *buf, size_t size);
-int sys_write(int fd, const char *buf, size_t size);
-int sys_create(const char *pathname);
-int sys_stat(const char *pathname, struct stat *_sb);
+void vfs_init(void);
+int vfs_open(const char *path, mode_t mode);
+int vfs_close(const char *path);
+int vfs_read(const char *path, void *buf, size_t len);
+int vfs_write(const char *path, const void *buf, size_t len);
+int vfs_stat(const char *path, struct stat *st);
+void vfs_sync(const char *pathname);
 
 #endif // VFS_H

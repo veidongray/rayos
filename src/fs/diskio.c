@@ -7,8 +7,8 @@
 /* storage control modules to the FatFs module with a defined API.       */
 /*-----------------------------------------------------------------------*/
 
-#include <ff.h>		/* Basic definitions of FatFs */
 #include <diskio.h> /* Declarations FatFs MAI */
+#include <ff.h>     /* Basic definitions of FatFs */
 
 /* Example: Declarations of the platform and disk functions in the project */
 // #include "platform.h"
@@ -29,12 +29,10 @@ static struct sata_controller_port_register *__g_sata_controller_port;
 /* Get Drive Status                                                      */
 /*-----------------------------------------------------------------------*/
 
-DSTATUS disk_status(
-	BYTE pdrv /* Physical drive nmuber to identify the drive */
+DSTATUS disk_status(BYTE pdrv /* Physical drive nmuber to identify the drive */
 )
 {
-	switch (pdrv)
-	{
+	switch (pdrv) {
 	default:
 		return 0;
 	}
@@ -45,14 +43,13 @@ DSTATUS disk_status(
 /* Inidialize a Drive                                                    */
 /*-----------------------------------------------------------------------*/
 
-DSTATUS disk_initialize(
-	BYTE pdrv /* Physical drive nmuber to identify the drive */
+DSTATUS
+disk_initialize(BYTE pdrv /* Physical drive nmuber to identify the drive */
 )
 {
 	struct sata_device *sata_dev;
 
-	switch (pdrv)
-	{
+	switch (pdrv) {
 	default:
 		sata_dev = get_sata_device();
 		__g_sata_controller_port = sata_dev->port;
@@ -66,15 +63,13 @@ DSTATUS disk_initialize(
 /* Read Sector(s)                                                        */
 /*-----------------------------------------------------------------------*/
 
-DRESULT disk_read(
-	BYTE pdrv,	  /* Physical drive nmuber to identify the drive */
-	BYTE *buff,	  /* Data buffer to store read data */
-	LBA_t sector, /* Start sector in LBA */
-	UINT count	  /* Number of sectors to read */
+DRESULT disk_read(BYTE pdrv,  /* Physical drive nmuber to identify the drive */
+                  BYTE *buff, /* Data buffer to store read data */
+                  LBA_t sector, /* Start sector in LBA */
+                  UINT count    /* Number of sectors to read */
 )
 {
-	switch (pdrv)
-	{
+	switch (pdrv) {
 	default:
 		ahci_read(__g_sata_controller_port, sector, count, buff);
 		return RES_OK;
@@ -89,17 +84,16 @@ DRESULT disk_read(
 
 #if FF_FS_READONLY == 0
 
-DRESULT disk_write(
-	BYTE pdrv,		  /* Physical drive nmuber to identify the drive */
-	const BYTE *buff, /* Data to be written */
-	LBA_t sector,	  /* Start sector in LBA */
-	UINT count		  /* Number of sectors to write */
+DRESULT disk_write(BYTE pdrv, /* Physical drive nmuber to identify the drive */
+                   const BYTE *buff, /* Data to be written */
+                   LBA_t sector,     /* Start sector in LBA */
+                   UINT count        /* Number of sectors to write */
 )
 {
-	switch (pdrv)
-	{
+	switch (pdrv) {
 	default:
-		ahci_write(__g_sata_controller_port, sector, count, (void *)buff);
+		ahci_write(__g_sata_controller_port, sector, count,
+		           (void *)buff);
 		return RES_OK;
 	}
 
@@ -112,16 +106,14 @@ DRESULT disk_write(
 /* Miscellaneous Functions                                               */
 /*-----------------------------------------------------------------------*/
 
-DRESULT disk_ioctl(
-	BYTE pdrv, /* Physical drive nmuber (0..) */
-	BYTE cmd,  /* Control code */
-	void *buff /* Buffer to send/receive control data */
+DRESULT disk_ioctl(BYTE pdrv, /* Physical drive nmuber (0..) */
+                   BYTE cmd,  /* Control code */
+                   void *buff /* Buffer to send/receive control data */
 )
 {
 	pdrv = cmd;
 	buff = buff;
-	switch (pdrv)
-	{
+	switch (pdrv) {
 	default:
 		break;
 	}

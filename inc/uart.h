@@ -1,9 +1,9 @@
 #ifndef UART_H
 #define UART_H
 
-#include <types.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <types.h>
 
 #define UART_BUF_SIZE 2048
 
@@ -31,11 +31,10 @@
 #define UART_LSR_EMPTY (1 << 5) // 发送保持寄存器为空
 #define UART_LSR_READY (1 << 0) // 接收数据就绪
 
-struct uart_ringbuffer
-{
-    __u8 *data;
-    volatile size_t head; // ISR 写入位置
-    volatile size_t tail; // 上层读取位置
+struct uart_ringbuffer {
+	__u8 *data;
+	volatile size_t head; // ISR 写入位置
+	volatile size_t tail; // 上层读取位置
 };
 
 // 初始化并启用 UART
