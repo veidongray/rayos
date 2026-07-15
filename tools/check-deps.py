@@ -52,6 +52,7 @@ def main():
         "mkfs.fat",
         "gdb",
         "ld",
+        "mtools",
     ]
 
     CUSTOM_PATH = None

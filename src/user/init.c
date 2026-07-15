@@ -4,8 +4,7 @@
 int main(void)
 {
 	int fd = open("/init", FA_READ | FA_WRITE);
-	if (fd >= 0)
-	{
+	if (fd >= 0) {
 		write(fd, "fffffffffffffffffffffffuck", 27);
 		sync();
 	}

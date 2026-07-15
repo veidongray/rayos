@@ -1,122 +1,207 @@
-# RayOS 构建脚本
-# 负责编译内核、生成可启动镜像、运行 QEMU 以及清理构建产物。
+# =============================================================================
+# RayOS Build Script (Parallel-Safe)
+# =============================================================================
 
-# 最终参与链接的内核对象文件列表。
-# 这些对象文件分别来自汇编启动代码、内核主体、文件系统以及基础库。
-BUILT-IN = 	src/asm/built-in.o			\
-			src/built-in.o				\
-			src/fs/built-in.o			\
-			src/lib/built-in.o			\
-			src/mm/built-in.o
+SHELL       := /bin/bash
+.SHELLFLAGS := -euo pipefail -c
 
-# 头文件搜索路径。
-# 将内核公共头文件目录以及字符串/打印库头文件目录加入编译器搜索路径。
-INCDIR = -I $(CURDIR)/inc -I $(CURDIR)/inc/lib -I $(CURDIR)/inc/user
+# -----------------------------------------------------------------------------
+# Global Configuration
+# -----------------------------------------------------------------------------
+DISK_SIZE_MB := 128
+MEM_SIZE     := 128M
+CPU_CORES    := 2
+ISO_FILE     := rayos.iso
+QEMU         := qemu-system-x86_64
 
-# 用于构建 freestanding 内核的编译选项。
-# 这些参数会关闭大部分标准库依赖和栈保护机制，适合裸机/内核环境。
-CFLAGS = -m64 -fno-pic                      \
-    -ffreestanding                          \
-    -fno-builtin                            \
-    -fno-stack-protector                    \
-    -mno-red-zone                           \
-    -mno-sse -mno-sse2 -mno-mmx -mno-80387  \
-    -Wall -Wextra                           \
-    -g -fno-omit-frame-pointer              \
-    -fno-asynchronous-unwind-tables         \
-	-nostdlib 								\
-    -std=gnu99                              \
-	-mcmodel=large							\
+# -----------------------------------------------------------------------------
+# Kernel Object Files
+# -----------------------------------------------------------------------------
+BUILTIN_OBJS := src/asm/built-in.o \
+                src/built-in.o     \
+                src/fs/built-in.o  \
+                src/lib/built-in.o \
+                src/mm/built-in.o
+
+# -----------------------------------------------------------------------------
+# Include Paths
+# -----------------------------------------------------------------------------
+INCDIR := -I$(CURDIR)/inc -I$(CURDIR)/inc/lib -I$(CURDIR)/inc/user
+
+# -----------------------------------------------------------------------------
+# Compiler Flags
+# -m64                    Generate code for the x86-64 (64-bit) architecture.
+# -fno-pic                Disable position-independent code generation; not
+#                         needed and potentially unsafe in freestanding kernels.
+# -ffreestanding          Assert that the target environment lacks a standard
+#                         library; compiler will not assume hosted runtime.
+# -fno-builtin            Disable implicit built-in versions of standard
+#                         functions to avoid references to unavailable symbols.
+# -fno-stack-protector    Turn off stack canary insertion, which requires
+#                         runtime support absent in bare-metal environments.
+# -mno-red-zone           Prohibit use of the 128-byte red zone below RSP so
+#                         interrupt/exception handlers cannot corrupt local data.
+# -mno-sse                Disable SSE instruction emission.
+# -mno-sse2               Disable SSE2 instruction emission.
+# -mno-mmx                Disable MMX instruction emission.
+# -mno-80387              Disable x87 FPU instruction emission.
+#                         (The four flags above prevent any SIMD/FP usage,
+#                          eliminating the need to save/restore FPU state.)
+# -Wall                   Enable all commonly useful warning diagnostics.
+# -Wextra                 Enable additional warnings beyond those from -Wall.
+# -g                      Embed DWARF debugging information for GDB/debuggers.
+# -fno-omit-frame-pointer Preserve the frame pointer register for reliable
+#                         stack unwinding during debugging and profiling.
+# -fno-asynchronous-unwind-tables
+#                         Suppress .eh_frame generation to reduce binary size;
+#                         exception handling is unused in the kernel.
+# -nostdlib               Do not link against host startup files or standard
+#                         libraries, ensuring zero host runtime dependencies.
+# -std=gnu99              Select the GNU dialect of ISO C99 as the language
+#                         standard, providing C99 semantics plus GNU extensions.
+# -mcmodel=large          Use the large code model, allowing code and data to
+#                         reside anywhere in the 64-bit address space.
+# -MMD                    Emit a .d dependency file listing included headers,
+#                         excluding system headers, for incremental rebuilds.
+# -MP                     Add phony targets for each header in the .d file so
+#                         deleting a header does not break make with an error.
+# $(INCDIR)               Project-specific include search paths defined above.
+# -----------------------------------------------------------------------------
+CFLAGS := -m64 -fno-pic                      \
+    -ffreestanding                           \
+    -fno-builtin                             \
+    -fno-stack-protector                     \
+    -mno-red-zone                            \
+    -mno-sse -mno-sse2 -mno-mmx -mno-80387   \
+    -Wall -Wextra                            \
+    -g -fno-omit-frame-pointer               \
+    -fno-asynchronous-unwind-tables          \
+    -nostdlib                                \
+    -std=gnu99                               \
+    -mcmodel=large                           \
+    -MMD -MP                                 \
     $(INCDIR)
 
-# 链接器使用的 ELF64 x86_64 目标格式。
-LDFLAGS = -m elf_x86_64
+LDFLAGS := -m elf_x86_64
 
-# 输出 ISO 镜像文件名。
-ISO := rayos.iso
+# -----------------------------------------------------------------------------
+# QEMU Options
+# -----------------------------------------------------------------------------
+QEMU_OPTS     := -M q35 -smp $(CPU_CORES) -m $(MEM_SIZE) \
+                 -cdrom $(ISO_FILE) -boot d              \
+                 -drive file=disk.img,if=none,id=disk0,format=raw \
+                 -device ide-hd,drive=disk0,bus=ide.0
 
-# QEMU 虚拟机执行器路径。
-QEMU := qemu-system-x86_64
+QEMU_DBG_OPTS := -no-reboot -serial file:serial0.log \
+                 -d int,guest_errors,mmu -D qemu.log
 
-# QEMU 的基础启动参数。
-# 使用 q35 平台、2 核 CPU、128MB 内存，并挂载 ISO 和磁盘镜像。
-QEMU_FLAGS := -M q35 -smp 2 -m 128M \
-    -cdrom $(ISO) -boot d \
-    -drive file=disk.img,if=none,id=disk0,format=raw \
-    -device ide-hd,drive=disk0,bus=ide.0
+export INCDIR CFLAGS LDFLAGS
 
-# 调试模式下额外使用的日志参数。
-# 这些参数有助于输出中断、MMU 和 guest 错误信息，方便定位问题。
-QEMU_DBG_FLAGS := -no-reboot -serial file:serial0.log -d int,guest_errors,mmu -D qemu.log
+# -----------------------------------------------------------------------------
+# Automatic Dependency Tracking
+# -----------------------------------------------------------------------------
+DEPS := $(shell find src -name "*.d" 2>/dev/null)
+-include $(DEPS)
 
-# 将编译和链接参数导出给子 Makefile 使用。
-export INCDIR
-export CFLAGS
-export LDFLAGS
+# -----------------------------------------------------------------------------
+# Phony Targets
+# -----------------------------------------------------------------------------
+.PHONY: help check-deps format \
+		build iso disk \
+		qemu qemudbg qemugdb \
+        clean rebuild distclean \
+        build-lib build-asm build-fs \
+		build-mm build-user build-src
 
-# 声明伪目标，避免与实际文件名冲突。
-.PHONY: build iso qemu qemudbg qemugdb clean rebuild builddisk cleandisk cleanall format check-deps
+# =============================================================================
+# Targets
+# =============================================================================
 
-## help
+## help: Show help message
 help:
 	python3 tools/make_help.py
 
-## 检查软件依赖
+## check-deps: Check software dependencies
 check-deps:
 	python3 tools/check-deps.py
 
-## 编译整个内核及其依赖模块，并生成最终可启动镜像。
-build: check-deps
-	$(MAKE) -C src/lib built-in.o
-	$(MAKE) -C src/asm built-in.o
-	$(MAKE) -C src/fs built-in.o
-	$(MAKE) -C src/mm built-in.o
-	$(MAKE) -C src/user init
-	$(MAKE) -C src built-in.o
-	$(LD) $(LDFLAGS) -T linker.ld -o vmrayos $(BUILT-IN)
-	find src -name "*.o" ! -name "built-in.o" -type f -exec rm -f {} +
+# -----------------------------------------------------------------------------
+# Parallel-safe sub-module targets
+# Each module is an independent phony target so make can schedule them in
+# parallel when invoked with -j. Inter-module ordering constraints are
+# expressed via prerequisites rather than sequential recipe lines.
+# -----------------------------------------------------------------------------
 
-## 创建一个 FAT32 格式的磁盘镜像，并将用户态初始化程序复制进去。
-builddisk:
-	dd if=/dev/zero of=disk.img bs=1M count=128
-	mkfs.fat -F 32 disk.img
-	sudo mount disk.img /mnt
-	sudo cp src/user/init /mnt
-	sudo umount /mnt
+build-lib: check-deps
+	@$(MAKE) --no-print-directory -C src/lib built-in.o
 
-## 删除构建生成的磁盘镜像。
-cleandisk:
+build-asm: check-deps
+	@$(MAKE) --no-print-directory -C src/asm built-in.o
+
+build-fs: check-deps
+	@$(MAKE) --no-print-directory -C src/fs built-in.o
+
+build-mm: check-deps
+	@$(MAKE) --no-print-directory -C src/mm built-in.o
+
+build-user: check-deps
+	@$(MAKE) --no-print-directory -C src/user init
+
+# src/built-in.o depends on all other modules being complete before linking.
+# If additional inter-module header dependencies exist, add them here, e.g.:
+#   build-fs: build-lib
+build-src: build-lib build-asm build-fs build-mm build-user
+	@$(MAKE) --no-print-directory -C src built-in.o
+
+## build: Compile kernel and generate executable (parallel-safe)
+build: build-src
+	@echo "[LINK] vmrayos"
+	@for obj in $(BUILTIN_OBJS); do \
+		if [ ! -f "$$obj" ]; then \
+			echo "ERROR: Missing object file: $$obj" >&2; exit 1; \
+		fi; \
+	done
+	$(LD) $(LDFLAGS) -T linker.ld -o vmrayos $(BUILTIN_OBJS)
+
+## disk: Create FAT32 disk image (incremental)
+disk: check-deps disk.img
+disk.img: src/user/init
+	@echo "[DISK] Creating $@ ($(DISK_SIZE_MB)MB FAT32)"
+	dd if=/dev/zero of=$@ bs=1M count=$(DISK_SIZE_MB) status=none
+	mkfs.fat -F 32 $@ >/dev/null
+	mcopy -i $@ $< ::/init
+
+## iso: Generate bootable GRUB ISO
+iso: build
+	@echo "[ISO] Generating $(ISO_FILE)"
+	cp vmrayos iso/boot/
+	grub-mkrescue -o $(ISO_FILE) iso/ 2>/dev/null
+
+## qemu: Run system in QEMU
+qemu: iso disk
+	$(QEMU) $(QEMU_OPTS)
+
+## qemudbg: Run QEMU with debug logging
+qemudbg: iso disk
+	$(QEMU) $(QEMU_OPTS) $(QEMU_DBG_OPTS)
+
+## qemugdb: Run QEMU and wait for GDB connection
+qemugdb: iso disk
+	$(QEMU) $(QEMU_OPTS) $(QEMU_DBG_OPTS) -S -s
+
+## clean: Remove build artifacts except disk image
+clean:
+	find . -type f \( -name "*.o" -o -name "*.d" -o -name "*.log" \) -delete
+	$(RM) $(ISO_FILE) vmrayos iso/boot/vmrayos
+
+## distclean: Remove all build artifacts including user programs and disk
+distclean: clean
+	$(MAKE) -C src/user clean
 	$(RM) disk.img
 
-## 生成可引导的 GRUB ISO 镜像。
-iso: build
-	cp vmrayos iso/boot/
-	grub-mkrescue -o $(ISO) iso/
+## rebuild: Clean and rebuild from scratch
+rebuild: distclean build
 
-## 启动 QEMU 运行系统镜像。
-qemu: iso builddisk
-	$(QEMU) $(QEMU_FLAGS)
-
-## 启动 QEMU 并输出详细调试日志。
-qemudbg: iso builddisk
-	$(QEMU) $(QEMU_FLAGS) $(QEMU_DBG_FLAGS)
-
-## 启动 QEMU 并等待 GDB 连接。
-qemugdb: iso builddisk
-	$(QEMU) $(QEMU_FLAGS) $(QEMU_DBG_FLAGS) -S -s
-
-## 清理编译产物、日志和生成的 ISO 文件。
-clean:
-	find . -type f \( -name "*.o" -o -name "*.log" -o -name "*.iso" \) -exec rm -f {} +
-	$(RM) *.iso vmrayos iso/boot/vmrayos *.log
-
-## 清理所有构建产物，并进一步清理用户态构建结果。
-cleanall: clean cleandisk
-	$(MAKE) -C src/user clean
-
-## 从干净状态重新构建整个项目。
-rebuild: cleanall build
-
-## 进行所有C/C++源码的格式化
+## format: Format all C/C++ source files
 format:
 	python3 tools/format.py
