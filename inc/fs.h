@@ -16,8 +16,13 @@ struct dentry {
 	int pathlen;
 	char *pathname;
 
-	struct mount *mnt; // 指向对应的 mount
-	struct list_head list;
+	struct mount *mnt; // 指向对应的 mount，如果这里不是挂载点为 NULL
+	struct list_head sibling_list; // 嵌入父 dentry 的 list 节点
+	struct list_head subdirs_list; // 子节点 list 头
+	struct list_head list;         // dentry_list 全局 dentry 列表节点
+	struct list_head *subdir;
+
+	struct dentry *d_parent;
 
 	atomic_int_t d_ref; // 引用计数
 
