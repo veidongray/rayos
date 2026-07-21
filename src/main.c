@@ -1,6 +1,7 @@
 #include <acpi.h>
 #include <bitmap.h>
 #include <elf.h>
+#include <fcntl.h>
 #include <ff.h>
 #include <gdt.h>
 #include <init.h>
@@ -29,6 +30,10 @@ void kernel_init(void *args)
 {
 	char *buf;
 	args = args;
+
+	sys_creat("/stdin", S_IRWXU);
+	sys_creat("/stdout", S_IRWXU);
+	sys_creat("/stderr", S_IRWXU);
 
 	pr_info("/init running...");
 	run_process("/init");

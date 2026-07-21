@@ -95,3 +95,17 @@ void sys_sync(void)
 	struct file *filp;
 	list_for_each_entry(filp, &file_list, list) { vfs_sync(filp); }
 }
+
+int sys_creat(const char *pathname, mode_t mode)
+{
+	int ret;
+	char *path = kzalloc(strlen(pathname) + 1);
+	if (!path) {
+		return -ENOMEM;
+	}
+	strcpy(path, pathname);
+
+	ret = vfs_creat(pathname, mode);
+	kfree(path);
+	return ret;
+}

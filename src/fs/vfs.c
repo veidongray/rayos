@@ -236,3 +236,15 @@ void vfs_sync(struct file *filp)
 		}
 	}
 }
+
+int vfs_creat(const char *pathname, mode_t mode)
+{
+	mode = mode;
+	struct mount *mount = mount_get_by_name(pathname);
+	if (!mount) {
+		return -ENODEV;
+	}
+
+	struct file_system_type *fstype = mount->mnt_fstype;
+	return fstype->fs_ops->creat(pathname);
+}

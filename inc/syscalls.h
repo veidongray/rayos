@@ -22,5 +22,6 @@ int sys_read(int fd, char *buf, size_t size);
 int sys_write(int fd, const char *buf, size_t size);
 int sys_stat(const char *pathname, struct stat *st);
 void sys_sync(void);
+int sys_creat(const char *pathname, mode_t mode);
 
 #endif // SYSCALLS_H
