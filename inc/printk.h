@@ -2,6 +2,7 @@
 #define PRINTK_H
 
 #include <printf.h>
+#include <timer.h>
 
 #define PR_DEBUG 1
 

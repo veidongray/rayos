@@ -10,7 +10,7 @@ SHELL       := /bin/bash
 # -----------------------------------------------------------------------------
 DISK_SIZE_MB := 128
 MEM_SIZE     := 128M
-CPU_CORES    := 2
+CPU_CORES    := 8
 ISO_FILE     := rayos.iso
 QEMU         := qemu-system-x86_64
 

@@ -69,8 +69,6 @@ int vfs_open(struct file *filp, const char *path, mode_t mode)
 	}
 	strcpy(pathbuff, path);
 
-	char *fs_path = (char *)pathbuff +
-	                strlen(mount->mnt_path); // 文件系统内部的路径
 	struct file_system_type *type = mount->mnt_fstype;
 
 	/*
@@ -96,7 +94,7 @@ int vfs_open(struct file *filp, const char *path, mode_t mode)
 	filp->dentry = dentry;
 	if (type->fs_ops->lookup) {
 		// 查找是否存在路径并在路径存在时填充 dentry->private_data
-		if (!type->fs_ops->lookup(filp->dentry, fs_path)) {
+		if (!type->fs_ops->lookup(filp->dentry, pathbuff)) {
 			kfree(dentry);
 			return -ENOENT;
 		}

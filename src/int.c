@@ -68,12 +68,6 @@ void isr_divide_error_handler(void)
 	// Do nothing
 }
 
-void lapic_timer_handler(void)
-{
-	scheduler();
-	lapic_send_eoi();
-}
-
 void isr_page_fault_handler(__u64 __error, __u64 *__pagefault_addr)
 {
 	printk("Page fault! %#llx, error code %#llx", __pagefault_addr,

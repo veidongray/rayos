@@ -132,6 +132,8 @@ struct task_struct *run_thread(thread_func_t thread_func, void *args,
 {
 	struct task_struct *task;
 
+	local_irq_disable();
+
 	task = (struct task_struct *)kzalloc(sizeof(struct task_struct));
 	if (task == NULL)
 		return NULL;
@@ -151,6 +153,7 @@ struct task_struct *run_thread(thread_func_t thread_func, void *args,
 
 	queue_enqueue(&task_readyqueue, &task->list);
 
+	local_irq_enable();
 	return task;
 }
 
@@ -162,6 +165,7 @@ int run_process(const char *pathname)
 	struct stat sb;
 	struct task_struct *task;
 
+	local_irq_disable();
 	fd = sys_open(pathname, FA_READ);
 	if (fd >= 0) {
 		task = (struct task_struct *)kzalloc(
@@ -241,6 +245,7 @@ int run_process(const char *pathname)
 	}
 	sys_close(fd);
 	kfree(elf);
+	local_irq_enable();
 	return 0;
 }
 

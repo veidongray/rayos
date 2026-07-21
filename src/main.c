@@ -14,10 +14,13 @@
 #include <pci.h>
 #include <pic.h>
 #include <printk.h>
+#include <smp.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <syscalls.h>
 #include <task.h>
+#include <timer.h>
+#include <tsc.h>
 #include <uart.h>
 #include <vfs.h>
 #include <x86.h>
@@ -55,6 +58,8 @@ void start_kernel(void)
 	acpi_init();
 	lapic_init();
 	ioapic_init();
+	tsc_init();
+	smp_init();
 	pci_init();
 	do_initcalls();
 	vfs_init();
