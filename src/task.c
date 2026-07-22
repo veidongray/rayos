@@ -30,7 +30,7 @@ static inline int __kerntask_create(struct task_struct *task,
 	*(--task->rsp) = (uint64_t)task_exit;
 	*(--task->rsp) = (uint64_t)thread_func;
 
-	task->rsp0 = (uint64_t)0x0;
+	task->rsp0 = (uint64_t)kzalloc(TASK_STACK_SIZE_MAX) + TASK_STACK_SIZE_MAX;
 	task->rsp = (uint64_t *)((uint64_t)task->rsp - sizeof(struct context));
 	context = (struct context *)task->rsp;
 	context->r15 = 0;
@@ -142,16 +142,17 @@ struct task_struct *run_thread(thread_func_t thread_func, void *args,
 
 	task->flags = TASK_FLAGS_KERN;
 	task->status = TASK_READY;
+	int len = strlen(name);
 	memset(task->name, 0x0, 32);
-	memcpy(task->name, name, strlen(name));
+	memcpy(task->name, name, len > 31 ? 31 : len);
+
+	queue_enqueue(&task_readyqueue, &task->list);
 
 	if (current == NULL) {
 		current = task;
 		task->status = TASK_RUNNING;
 		switch_to(task->rsp);
 	}
-
-	queue_enqueue(&task_readyqueue, &task->list);
 
 	local_irq_enable();
 	return task;
@@ -214,8 +215,9 @@ int run_process(const char *pathname)
 
 			task->flags = TASK_FLAGS_USER;
 			task->status = TASK_READY;
+			len = strlen(pathname);
 			memset(task->name, 0x0, 32);
-			memcpy(task->name, "name", strlen("name"));
+			memcpy(task->name, pathname, len > 31 ? 31 : len);
 
 			queue_enqueue(&task_readyqueue, &task->list);
 

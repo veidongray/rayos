@@ -2,14 +2,15 @@
 #include <task.h>
 #include <timer.h>
 #include <types.h>
+#include <printk.h>
 
 static volatile uint64_t jiffies = 0;
 
 void lapic_timer_handler(void)
 {
+	lapic_send_eoi();
 	jiffies++;
 	scheduler();
-	lapic_send_eoi();
 }
 
 uint64_t get_uptime_ms(void)
