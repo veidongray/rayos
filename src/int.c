@@ -108,6 +108,10 @@ int isr_syscall_handler(struct context *ctx)
 		sys_sync();
 		break;
 
+	case SYS_EXIT:
+		sys_exit((int)ctx->rdi);
+		break;
+
 	default:
 		ctx->rax = -1;
 		break;

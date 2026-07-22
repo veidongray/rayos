@@ -186,31 +186,24 @@ int vfs_write(struct file *filp, const void *buf, size_t len)
 	}
 }
 
-int vfs_stat(const char *path, struct stat *st)
+int vfs_stat(const char *pathname, struct stat *st)
 {
 	int ret = -1;
 	struct mount *mnt;
 	struct file_system_type *type;
 
-	mnt = mount_get_by_name(path);
+	mnt = mount_get_by_name(pathname);
 	if (mnt == NULL) {
 		return ret;
 	}
 	type = mnt->mnt_fstype;
 
-	struct dentry *pos;
-	list_for_each_entry(pos, &dentry_list, list)
-	{
-		if (!strcmp(path, pos->pathname)) {
-			if (type->fs_ops->stat) {
-				ret = type->fs_ops->stat(pos, st);
-				return ret;
-			}
-			return -ENODEV;
-		}
+	if (type->fs_ops->stat) {
+		ret = type->fs_ops->stat(pathname, st);
+		return ret;
 	}
 
-	return -ENOENT;
+	return -ENODEV;
 }
 
 void vfs_sync(struct file *filp)
@@ -239,12 +232,11 @@ void vfs_sync(struct file *filp)
 
 int vfs_creat(const char *pathname, mode_t mode)
 {
-	mode = mode;
 	struct mount *mount = mount_get_by_name(pathname);
 	if (!mount) {
 		return -ENODEV;
 	}
 
 	struct file_system_type *fstype = mount->mnt_fstype;
-	return fstype->fs_ops->creat(pathname);
+	return fstype->fs_ops->creat(pathname, mode);
 }

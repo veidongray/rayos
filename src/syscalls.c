@@ -109,3 +109,9 @@ int sys_creat(const char *pathname, mode_t mode)
 	kfree(path);
 	return ret;
 }
+
+void sys_exit(int status)
+{
+	// Do nothin.
+	pr_info("SYS EXIT %d", status);
+}

@@ -26,23 +26,34 @@
 #include <vfs.h>
 #include <x86.h>
 
+void thread(void *args)
+{
+	while (1) {
+		args = args;
+		kerntask_exit(0);
+	}
+}
+
 void kernel_init(void *args)
 {
 	char *buf;
 	args = args;
 
-	sys_creat("/stdin", S_IRWXU);
-	sys_creat("/stdout", S_IRWXU);
-	sys_creat("/stderr", S_IRWXU);
+	sys_creat("/stdin", O_SYNC);
+	sys_creat("/stdout", O_SYNC);
+	sys_creat("/stderr", O_SYNC);
 
 	pr_info("/init running...");
-	run_process("/init");
+	for (int i = 0; i < 64; i++) {
+		run_process("/init");
+		run_thread(thread, NULL, "thread");
+	}
 
 	buf = kzalloc(UART_BUF_SIZE);
 	while (1) {
 		// Do nothing.
 		memset(buf, 0, UART_BUF_SIZE);
-		uart_putc('>');
+		uart_puts("# ");
 		uart_gets(buf);
 		if (!strncmp(buf, "meminfo", 7)) {
 			pr_info("total mem: %llu, used %llu, used percent "

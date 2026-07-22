@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <ff.h>
 #include <fs.h>
 #include <init.h>
@@ -44,7 +45,7 @@ static struct dentry *fatfs_lookup(struct dentry *dentry, const char *path)
 	}
 }
 
-static int fatfs_creat(const char *path)
+static int fatfs_creat(const char *path, mode_t mode)
 {
 	FIL fp;
 	FRESULT res;
@@ -55,9 +56,11 @@ static int fatfs_creat(const char *path)
 		return res;
 	}
 
-	do {
-		res = f_sync(&fp);
-	} while (res != FR_OK);
+	if (mode & O_SYNC) {
+		do {
+			res = f_sync(&fp);
+		} while (res != FR_OK);
+	}
 
 	res = f_close(&fp);
 	if (res != FR_OK) {
@@ -231,15 +234,14 @@ static int fatfs_mkdir(const char *path)
 }
 
 /* 获取节点属性 */
-static int fatfs_stat(struct dentry *dentry, struct stat *st)
+static int fatfs_stat(const char *pathname, struct stat *st)
 {
 	FILINFO fno;
-	struct fatfs_dentry *fd = (struct fatfs_dentry *)dentry->private_data;
-	FRESULT res = f_stat(fd->name, &fno);
+	FRESULT res = f_stat(pathname, &fno);
 
 	if (res == FR_OK) {
 		if (fno.fattrib & AM_DIR) {
-			pr_info("%s is dir", fd->name);
+			pr_info("%s is dir", pathname);
 		} else {
 			st->st_size = fno.fsize;
 		}

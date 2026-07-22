@@ -104,8 +104,9 @@ static struct tmpfs_dentry *tmpfs_lookup(const char *path)
 	return cur;
 }
 
-static int tmpfs_creat(const char *path)
+static int tmpfs_creat(const char *path, mode_t mode)
 {
+	mode = mode;
 	if (!path || path[0] != '/' || path[1] == '\0')
 		return TMPFS_ERR_INVAL;
 
@@ -280,13 +281,12 @@ static int tmpfs_mkdir(const char *path)
 }
 
 /* 获取节点属性 */
-static int tmpfs_stat(struct dentry *dentry, struct stat *st)
+static int tmpfs_stat(const char *pathname, struct stat *st)
 {
 	if (!st)
 		return TMPFS_ERR_INVAL;
 
-	struct tmpfs_dentry *t = (struct tmpfs_dentry *)dentry->private_data;
-	struct tmpfs_dentry *de = tmpfs_lookup(t->name);
+	struct tmpfs_dentry *de = tmpfs_lookup(pathname);
 	if (!de)
 		return TMPFS_ERR_NOENT;
 

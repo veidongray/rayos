@@ -9,6 +9,7 @@ int main(void)
 		sync();
 	}
 
+	exit(1234);
 	while (1)
 		;
 	return 0;

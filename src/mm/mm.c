@@ -94,7 +94,7 @@ void *kzalloc(size_t size)
 }
 
 /* 释放内核内存：解映射 + 归还物理页 + 归还元数据 */
-void kfree(void *virtaddr)
+int kfree(void *virtaddr)
 {
 	size_t order;
 	__u64 physaddr;
@@ -102,6 +102,10 @@ void kfree(void *virtaddr)
 
 	/* 通过虚拟地址反查元数据 */
 	vm = __find_vmap_area((__u64)virtaddr);
+	if (!vm) {
+		return -1;
+	}
+
 	list_del(&vm->list);
 
 	/* 按分配时的 order 释放物理页 */
@@ -112,6 +116,7 @@ void kfree(void *virtaddr)
 	/* 解除虚拟映射并归还元数据到对象池 */
 	unmap_page_range((__u64)virtaddr, vm->va_nrpages);
 	pool_free(&vmap_area_pool, vm);
+	return 0;
 }
 
 void *krealloc(void *ptr, size_t new_size)

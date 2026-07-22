@@ -52,3 +52,5 @@ ssize_t write(int fd, const void *buf, size_t count)
 }
 
 void sync(void) { syscall(SYS_SYNC, 0, 0, 0, 0); }
+
+void exit(int status) { syscall(SYS_EXIT, status, 0, 0, 0); }

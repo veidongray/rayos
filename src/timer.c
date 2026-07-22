@@ -1,8 +1,8 @@
 #include <lapic.h>
+#include <printk.h>
 #include <task.h>
 #include <timer.h>
 #include <types.h>
-#include <printk.h>
 
 static volatile uint64_t jiffies = 0;
 
