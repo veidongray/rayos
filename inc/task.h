@@ -20,10 +20,25 @@ enum task_status {
 struct task_struct {
 	int flags;
 	uint64_t rsp0;
+	uint64_t rsp0_base; // record rsp0 base for task exit
 	uint64_t pml4;
 	uint64_t *rsp;
 	char name[32];
-	uint64_t *stack;
+
+	uint64_t stack_basephys; // stack down physaddr for task exit
+	uint64_t stack_order; // stack space order for task exit
+	uint64_t *stack; // record stack base for task exit
+
+	uint64_t user_pml4_phys;
+	uint64_t user_pdpt_phys;
+	uint64_t user_pd_phys;
+	uint64_t user_pt_phys;
+
+	uint64_t user_pml4_order;
+	uint64_t user_pdpt_order;
+	uint64_t user_pd_order;
+	uint64_t user_pt_order;
+
 	struct list_head list;
 	enum task_status status;
 };
@@ -75,5 +90,6 @@ struct task_struct *run_thread(thread_func_t thread_func, void *args,
                                char *name);
 int run_process(const char *pathname);
 void kerntask_exit(int code);
+void usertask_exit(int code);
 
 #endif // TASK_H

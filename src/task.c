@@ -78,10 +78,13 @@ static inline int __kerntask_create(struct task_struct *task,
 	if (task->stack == NULL)
 		return -1;
 
+	
+	task->rsp0_base = (uint64_t)kzalloc(KRSP0_SIZE);
+	task->rsp0 = task->rsp0_base + KRSP0_SIZE;
+
 	task->rsp = (uint64_t *)((uint64_t)task->stack + KSTACK_SIZE);
 	*(--task->rsp) = (uint64_t)thread_func;
 
-	task->rsp0 = (uint64_t)kzalloc(KRSP0_SIZE) + KRSP0_SIZE;
 	task->rsp = (uint64_t *)((uint64_t)task->rsp - sizeof(struct context));
 	struct context *context = (struct context *)task->rsp;
 	memset(context, 0, sizeof(struct context));
@@ -99,6 +102,18 @@ void kerntask_exit(int code)
 	task->status = TASK_EXIT;
 
 	local_irq_disable();
+	scheduler();
+}
+
+void usertask_exit(int code)
+{
+	code = code;
+	struct task_struct *task;
+
+	task = get_current();
+	task->status = TASK_EXIT;
+
+	// It deson't call irq_disable() because it from syscall, which is auto disable IRQ
 	scheduler();
 }
 
@@ -137,60 +152,71 @@ static inline int __usertask_create(struct task_struct *task, uint64_t end,
 
 	// 因为kmalloc不能保证返回的地址4K对齐
 	// 所以这里使用手动分配页再映射的方式确保对齐
-	uint64_t user_pml4_phys = alloc_pages(pages_to_order(pml4_count));
+	uint64_t user_pml4_order = size_to_order(pml4_count * sizeof(uint64_t));
+	uint64_t user_pml4_phys = alloc_pages(user_pml4_order);
+	task->user_pml4_order = user_pml4_order;
+	task->user_pml4_phys = user_pml4_phys;
 	map_page_range(user_pml4_phys, (uint64_t)user_pml4, MAP_USER_RW,
 	               pml4_count);
-	uint64_t user_pdpt_phys = alloc_pages(pages_to_order(pdpt_count));
+
+	uint64_t user_pdpt_order = size_to_order(pdpt_count * sizeof(uint64_t));
+	uint64_t user_pdpt_phys = alloc_pages(user_pdpt_order);
+	task->user_pdpt_order = user_pdpt_order;
+	task->user_pdpt_phys = user_pdpt_phys;
 	map_page_range(user_pdpt_phys, (uint64_t)user_pdpt, MAP_USER_RW,
 	               pdpt_count);
-	uint64_t user_pd_phys = alloc_pages(pages_to_order(pd_count));
+
+	uint64_t user_pd_order = size_to_order(pd_count * sizeof(uint64_t));
+	uint64_t user_pd_phys = alloc_pages(user_pd_order);
+	task->user_pd_order = user_pd_order;
+	task->user_pd_phys = user_pd_phys;
 	map_page_range(user_pd_phys, (uint64_t)user_pd, MAP_USER_RW, pd_count);
-	uint64_t user_pt_phys = alloc_pages(pages_to_order(pt_count));
+
+	uint64_t user_pt_order = size_to_order(pt_count * sizeof(uint64_t));
+	uint64_t user_pt_phys = alloc_pages(user_pt_order);
+	task->user_pt_order = user_pt_order;
+	task->user_pt_phys = user_pt_phys;
 	map_page_range(user_pt_phys, (uint64_t)user_pt, MAP_USER_RW, pt_count);
 
-	// 页表内容清零
-	memset(user_pml4, 0, pml4_count * PAGE_SIZE);
-	memset(user_pdpt, 0, pdpt_count * PAGE_SIZE);
-	memset(user_pd, 0, pd_count * PAGE_SIZE);
-	memset(user_pt, 0, pt_count * PAGE_SIZE);
-
 	// 配置页表
-	task->pml4 = get_physaddr((uint64_t)user_pml4);
+	task->pml4 = user_pml4_phys;
 
 	// 复制内核上半部页表
 	for (int index = 256; index < 511; index++) {
 		user_pml4[index] =
 		        ((volatile uint64_t *)(PML4_BASE << PAGE_SHIFT))[index];
 	}
-	user_pml4[511] = get_physaddr((uint64_t)user_pml4) | MAP_USER_RW;
+	user_pml4[511] = ((uint64_t)user_pml4_phys) | MAP_USER_RW;
 
 	// 填充页表
 	for (size_t i = 0; i < pml4_count; i++) {
 		user_pml4[pml4_idx + i] =
-		        get_physaddr((uint64_t)user_pdpt + (i * PAGE_SIZE)) |
+		        ((uint64_t)user_pdpt_phys + (i * PAGE_SIZE)) |
 		        MAP_USER_RW;
 	}
 	for (size_t i = 0; i < pdpt_count; i++) {
 		user_pdpt[pdpt_idx + i] =
-		        get_physaddr((uint64_t)user_pd + (i * PAGE_SIZE)) |
+		        ((uint64_t)user_pd_phys + (i * PAGE_SIZE)) |
 		        MAP_USER_RW;
 	}
 	for (size_t i = 0; i < pd_count; i++) {
 		user_pd[pd_idx + i] =
-		        get_physaddr((uint64_t)user_pt + (i * PAGE_SIZE)) |
+		        ((uint64_t)user_pt_phys + (i * PAGE_SIZE)) |
 		        MAP_USER_RW;
 	}
-	for (size_t i = 0; i < nr_pages; i++) {
+	for (size_t i = 0; i < pt_count; i++) {
 		user_pt[pt_idx + i] =
 		        get_physaddr((uint64_t)start + (i * PAGE_SIZE)) |
 		        MAP_USER_RW;
 	}
 
 	// 分配 tss rsp0
-	task->rsp0 = (uint64_t)kzalloc(URSP0_SIZE) + URSP0_SIZE;
+	task->rsp0_base = (uint64_t)kzalloc(URSP0_SIZE);
+	task->rsp0 = task->rsp0_base + URSP0_SIZE;
 
 	// 初始化栈
-	task->rsp = (uint64_t *)(end - sizeof(struct task_user_init_stack));
+	task->stack = (uint64_t *)end;
+	task->rsp = (uint64_t *)((uint64_t)task->stack - sizeof(struct task_user_init_stack));
 	struct task_user_init_stack *init_stack =
 	        (struct task_user_init_stack *)task->rsp;
 	init_stack->iret.ss = (uint64_t)UDATA_SELECTOR;
@@ -290,6 +316,8 @@ static inline int make_elf64_task(int fd, char *elf, struct task_struct *task,
 	__usertask_create(task, stack_top, (void *)start, (void *)ehdr->e_entry,
 	                  0);
 
+	task->stack_basephys = stack_phys;
+	task->stack_order = stack_order;
 	task->flags = TASK_FLAGS_USER;
 	task->status = TASK_READY;
 	int len = strlen(pathname);
@@ -383,9 +411,22 @@ void scheduler(void)
 			struct task_struct *task =
 			        container_of(queue_dequeue(&task_exitqueue),
 			                     struct task_struct, list);
-			// kfree(task->rsp0);
-			// kfree(task->stack);
-			// kfree(task);
+			if (task->flags == TASK_FLAGS_KERN)
+			{
+				kfree((void *)task->rsp0_base);
+				kfree(task->stack);
+				kfree(task);
+			}
+			else
+			{
+				free_pages(task->user_pml4_phys, task->user_pml4_order);
+				free_pages(task->user_pdpt_phys, task->user_pdpt_order);
+				free_pages(task->user_pd_phys, task->user_pd_order);
+				free_pages(task->user_pt_phys, task->user_pt_order);
+				free_pages(task->stack_basephys, task->stack_order);
+				kfree((void *)task->rsp0_base);
+				kfree(task);
+			}
 		}
 
 		if (!queue_empty(&task_readyqueue)) {

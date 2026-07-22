@@ -44,8 +44,12 @@ void kernel_init(void *args)
 	sys_creat("/stderr", O_SYNC);
 
 	pr_info("/init running...");
-	for (int i = 0; i < 64; i++) {
+	for (int i = 0; i < 128; i++)
+	{
 		run_process("/init");
+	}
+	
+	for (int i = 0; i < 128; i++) {
 		run_thread(thread, NULL, "thread");
 	}
 

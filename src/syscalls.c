@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <syscalls.h>
 #include <vfs.h>
+#include <task.h>
+#include <int.h>
 
 static __u32 fd_count = 0;
 static LIST_HEAD(file_list);
@@ -112,6 +114,5 @@ int sys_creat(const char *pathname, mode_t mode)
 
 void sys_exit(int status)
 {
-	// Do nothin.
-	pr_info("SYS EXIT %d", status);
+	usertask_exit(status);
 }
