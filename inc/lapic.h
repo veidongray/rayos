@@ -39,5 +39,6 @@ void lapic_send_sipi(uint8_t apic_id, uint8_t vector);
 void lapic_init(void);
 void lapic_send_eoi(void);
 void lapic_calibrate(void);
+void ap_lapic_init(void);
 
 #endif // APIC_H

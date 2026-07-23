@@ -24,6 +24,11 @@ BUILTIN_OBJS := src/asm/built-in.o \
                 src/mm/built-in.o
 
 # -----------------------------------------------------------------------------
+# C Defines
+# -----------------------------------------------------------------------------
+CDEFINES := -DMAX_CPUS=$(CPU_CORES)
+
+# -----------------------------------------------------------------------------
 # Include Paths
 # -----------------------------------------------------------------------------
 INCDIR := -I$(CURDIR)/inc -I$(CURDIR)/inc/lib -I$(CURDIR)/inc/user
@@ -80,7 +85,8 @@ CFLAGS := -m64 -fno-pic                      \
     -std=gnu99                               \
     -mcmodel=large                           \
     -MMD -MP                                 \
-    $(INCDIR)
+    $(INCDIR)								 \
+	$(CDEFINES)
 
 LDFLAGS := -m elf_x86_64
 

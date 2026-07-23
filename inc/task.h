@@ -26,8 +26,8 @@ struct task_struct {
 	char name[32];
 
 	uint64_t stack_basephys; // stack down physaddr for task exit
-	uint64_t stack_order; // stack space order for task exit
-	uint64_t *stack; // record stack base for task exit
+	uint64_t stack_order;    // stack space order for task exit
+	uint64_t *stack;         // record stack base for task exit
 
 	uint64_t user_pml4_phys;
 	uint64_t user_pdpt_phys;

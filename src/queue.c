@@ -4,6 +4,7 @@
 void queue_enqueue(queue_t *q, struct list_head *node)
 {
 	spinlock_lock(&q->lock);
+	q->nr_list++;
 	list_add_tail(node, &q->head); // 加到 tail
 	spinlock_unlock(&q->lock);
 }
@@ -14,6 +15,7 @@ struct list_head *queue_dequeue(queue_t *q)
 	struct list_head *node = NULL;
 	spinlock_lock(&q->lock);
 	if (!list_empty(&q->head)) {
+		q->nr_list--;
 		node = q->head.next;
 		list_del(node);
 	}

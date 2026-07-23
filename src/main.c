@@ -30,6 +30,8 @@ void thread(void *args)
 {
 	while (1) {
 		args = args;
+		// 运行一段时间然后退出
+		sdelay(10);
 		kerntask_exit(0);
 	}
 }
@@ -37,25 +39,24 @@ void thread(void *args)
 void kernel_init(void *args)
 {
 	char *buf;
+	char name[32];
 	args = args;
-
-	sys_creat("/stdin", O_SYNC);
-	sys_creat("/stdout", O_SYNC);
-	sys_creat("/stderr", O_SYNC);
 
 	pr_info("/init running...");
 	for (int i = 0; i < 128; i++)
-	{
 		run_process("/init");
+
+	for (int i = 0; i < 512; i++) {
+		sprintf(name, "thread%d", i);
+		run_thread(thread, NULL, name);
 	}
-	
-	for (int i = 0; i < 128; i++) {
-		run_thread(thread, NULL, "thread");
-	}
+
+	uint64_t up_time = get_uptime_ms();
+	pr_info("Up time %llum%llu.%llus", up_time / 1000 / 60,
+	        (up_time / 1000) % 60, up_time % 1000);
 
 	buf = kzalloc(UART_BUF_SIZE);
 	while (1) {
-		// Do nothing.
 		memset(buf, 0, UART_BUF_SIZE);
 		uart_puts("# ");
 		uart_gets(buf);
@@ -64,6 +65,7 @@ void kernel_init(void *args)
 			        "%llu%%",
 			        get_total_mem(), memused(), memused_percent());
 		}
+		hlt();
 	}
 }
 
@@ -74,20 +76,22 @@ void start_kernel(void)
 	page_init();
 	mm_init();
 	int_init();
+	pic_remap(0x20, 0x28);
+	pic_timer_init();
 	uart_init();
 	acpi_init();
 	lapic_init();
 	ioapic_init();
 	tsc_init();
-	smp_init();
 	pci_init();
 	do_initcalls();
 	vfs_init();
 	task_init();
+	smp_init();
 
 	run_thread(kernel_init, NULL, "kernel_init");
 
 	while (1) {
-		asm volatile("hlt");
+		hlt();
 	}
 }

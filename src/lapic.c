@@ -152,6 +152,27 @@ void lapic_init(void)
 	__lapic_write(LAPIC_TPR, 0);
 }
 
+void ap_lapic_init(void)
+{
+	__lapic_write(LAPIC_SVR, 0x1FF);
+
+	// setup APIC timer
+	__lapic_write(LAPIC_TICFG, 0x3);
+	__lapic_write(LAPIC_LVT_TMR, 0x20000 | X86_APIC_TIMER_VECTOR);
+	__lapic_write(LAPIC_TIC, ticks_per_1ms);
+
+	__lapic_write(LAPIC_LVT_LINT0, 0x10000); // Masked
+	__lapic_write(LAPIC_LVT_LINT1, 0x10000); // Masked
+
+	__lapic_write(LAPIC_LVT_ERR, X86_APIC_ERROR_VECTOR); // 错误中断向量号
+
+	__lapic_write(LAPIC_ESR, 0);
+	__lapic_write(LAPIC_ESR, 0); // 连续写两次是Intel手册建议的
+
+	__lapic_write(LAPIC_EOI, 0);
+	__lapic_write(LAPIC_TPR, 0);
+}
+
 void lapic_calibrate(void)
 {
 	uint32_t current_tick;

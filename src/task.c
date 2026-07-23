@@ -1,3 +1,4 @@
+#include <algo.h>
 #include <align.h>
 #include <elf.h>
 #include <ff.h>
@@ -7,6 +8,7 @@
 #include <page.h>
 #include <printk.h>
 #include <queue.h>
+#include <smp.h>
 #include <string.h>
 #include <syscalls.h>
 #include <task.h>
@@ -25,14 +27,34 @@
 #define USER_SPACE_PD_BASE 0x0000700000002000ULL
 #define USER_SPACE_PT_BASE 0x0000700000003000ULL
 
-static struct task_struct *current = NULL;
-static queue_t task_readyqueue;
-static queue_t task_exitqueue;
+static struct task_struct *current[MAX_CPUS];
+static queue_t task_readyqueue[MAX_CPUS];
+static queue_t task_exitqueue[MAX_CPUS];
+static spinlock_t run_process_spinlock;
+static spinlock_t run_thread_spinlock;
 
 void task_init(void)
 {
-	QUEUE_INIT(&task_readyqueue);
-	QUEUE_INIT(&task_exitqueue);
+	for (int i = 0; i < MAX_CPUS; i++) {
+		current[i] = NULL;
+		QUEUE_INIT(&task_readyqueue[i]);
+		QUEUE_INIT(&task_exitqueue[i]);
+	}
+	spinlock_init(&run_process_spinlock);
+	spinlock_init(&run_thread_spinlock);
+}
+
+/* 将任务放入当前负载最低的就绪队列 */
+static inline void sched_enqueue_balanced(struct task_struct *task)
+{
+	int loadlist[MAX_CPUS];
+	for (int i = 0; i < MAX_CPUS; i++)
+		loadlist[i] = task_readyqueue[i].nr_list;
+
+	int idx = find_extreme_index(loadlist, MAX_CPUS, min_cmp);
+	uint32_t *ap_ids = get_ap_ids();
+
+	queue_enqueue(&task_readyqueue[ap_ids[idx]], &task->list);
 }
 
 /**
@@ -78,7 +100,6 @@ static inline int __kerntask_create(struct task_struct *task,
 	if (task->stack == NULL)
 		return -1;
 
-	
 	task->rsp0_base = (uint64_t)kzalloc(KRSP0_SIZE);
 	task->rsp0 = task->rsp0_base + KRSP0_SIZE;
 
@@ -113,7 +134,8 @@ void usertask_exit(int code)
 	task = get_current();
 	task->status = TASK_EXIT;
 
-	// It deson't call irq_disable() because it from syscall, which is auto disable IRQ
+	// It deson't call irq_disable() because it from syscall, which is auto
+	// disable IRQ
 	scheduler();
 }
 
@@ -216,7 +238,8 @@ static inline int __usertask_create(struct task_struct *task, uint64_t end,
 
 	// 初始化栈
 	task->stack = (uint64_t *)end;
-	task->rsp = (uint64_t *)((uint64_t)task->stack - sizeof(struct task_user_init_stack));
+	task->rsp = (uint64_t *)((uint64_t)task->stack -
+	                         sizeof(struct task_user_init_stack));
 	struct task_user_init_stack *init_stack =
 	        (struct task_user_init_stack *)task->rsp;
 	init_stack->iret.ss = (uint64_t)UDATA_SELECTOR;
@@ -241,6 +264,7 @@ struct task_struct *run_thread(thread_func_t thread_func, void *args,
 	struct task_struct *task;
 
 	local_irq_disable();
+	spinlock_lock(&run_thread_spinlock);
 
 	task = (struct task_struct *)kzalloc(sizeof(struct task_struct));
 	if (task == NULL)
@@ -254,14 +278,17 @@ struct task_struct *run_thread(thread_func_t thread_func, void *args,
 	memset(task->name, 0x0, 32);
 	memcpy(task->name, name, len > 31 ? 31 : len);
 
-	queue_enqueue(&task_readyqueue, &task->list);
+	uint64_t cpuid = get_current_cpuid();
 
-	if (current == NULL) {
-		current = task;
+	if (current[cpuid] == NULL) {
+		current[cpuid] = task;
 		task->status = TASK_RUNNING;
+		spinlock_unlock(&run_thread_spinlock);
 		switch_to(task->rsp);
 	}
 
+	sched_enqueue_balanced(task);
+	spinlock_unlock(&run_thread_spinlock);
 	local_irq_enable();
 	return task;
 }
@@ -324,8 +351,6 @@ static inline int make_elf64_task(int fd, char *elf, struct task_struct *task,
 	memset(task->name, 0x0, 32);
 	memcpy(task->name, pathname, len > 31 ? 31 : len);
 
-	queue_enqueue(&task_readyqueue, &task->list);
-
 	// 清除临时映射
 	phdr = (void *)((uint8_t *)elf + ehdr->e_phoff);
 	for (int i = 0; i < ehdr->e_phnum; i++) {
@@ -360,6 +385,7 @@ int run_process(const char *pathname)
 	struct task_struct *task;
 
 	local_irq_disable();
+	spinlock_lock(&run_process_spinlock);
 	ret = sys_stat(pathname, &sb);
 	if (ret < 0) {
 		local_irq_enable();
@@ -378,9 +404,15 @@ int run_process(const char *pathname)
 		        sizeof(struct task_struct));
 		sys_read(fd, elf, sb.st_size);
 		if (elf[4] == ELFCLASS32) {
-			make_elf32_task(fd, elf, task, pathname);
+			ret = make_elf32_task(fd, elf, task, pathname);
+			if (ret < 0) {
+				goto err;
+			}
 		} else if (elf[4] == ELFCLASS64) {
-			make_elf64_task(fd, elf, task, pathname);
+			ret = make_elf64_task(fd, elf, task, pathname);
+			if (ret < 0) {
+				goto err;
+			}
 		} else {
 			printk("%s: ELF NONE", pathname);
 			goto err;
@@ -390,12 +422,15 @@ int run_process(const char *pathname)
 	}
 	sys_close(fd);
 	kfree(elf);
+	sched_enqueue_balanced(task);
+	spinlock_unlock(&run_process_spinlock);
 	local_irq_enable();
 	return 0;
 
 err:
 	sys_close(fd);
 	kfree(elf);
+	spinlock_unlock(&run_process_spinlock);
 	local_irq_enable();
 	return -1;
 }
@@ -404,50 +439,69 @@ void scheduler(void)
 {
 	struct task_struct *old_task, *new_task;
 
+	uint64_t cpuid = get_current_cpuid();
+
 	// 这一层判断是为了防止系统启动开启时钟中断后 current
 	// 还没被设置导致空指针访问
-	if (current) {
-		while (!queue_empty(&task_exitqueue)) {
-			struct task_struct *task =
-			        container_of(queue_dequeue(&task_exitqueue),
-			                     struct task_struct, list);
-			if (task->flags == TASK_FLAGS_KERN)
-			{
+	if (current[cpuid]) {
+		while (!queue_empty(&task_exitqueue[cpuid])) {
+			struct task_struct *task = container_of(
+			        queue_dequeue(&task_exitqueue[cpuid]),
+			        struct task_struct, list);
+			switch (task->flags) {
+			case TASK_FLAGS_KERN:
 				kfree((void *)task->rsp0_base);
 				kfree(task->stack);
 				kfree(task);
-			}
-			else
-			{
-				free_pages(task->user_pml4_phys, task->user_pml4_order);
-				free_pages(task->user_pdpt_phys, task->user_pdpt_order);
-				free_pages(task->user_pd_phys, task->user_pd_order);
-				free_pages(task->user_pt_phys, task->user_pt_order);
-				free_pages(task->stack_basephys, task->stack_order);
+				break;
+			case TASK_FLAGS_USER:
+				free_pages(task->user_pml4_phys,
+				           task->user_pml4_order);
+				free_pages(task->user_pdpt_phys,
+				           task->user_pdpt_order);
+				free_pages(task->user_pd_phys,
+				           task->user_pd_order);
+				free_pages(task->user_pt_phys,
+				           task->user_pt_order);
+				free_pages(task->stack_basephys,
+				           task->stack_order);
 				kfree((void *)task->rsp0_base);
 				kfree(task);
+				break;
 			}
 		}
 
-		if (!queue_empty(&task_readyqueue)) {
+		if (!queue_empty(&task_readyqueue[cpuid])) {
 			// 就绪队列不为空才进入任务切换
-			old_task = current;
-			new_task = container_of(queue_dequeue(&task_readyqueue),
-			                        struct task_struct, list);
+			old_task = current[cpuid];
+			new_task = container_of(
+			        queue_dequeue(&task_readyqueue[cpuid]),
+			        struct task_struct, list);
 
 			new_task->status = TASK_RUNNING;
-			if (old_task->status == TASK_RUNNING) {
-				// 如果被切换任务是正常运行的TASK_RUNNIN状态才将其移到队列末尾
-				old_task->status = TASK_READY;
-				queue_enqueue(&task_readyqueue,
+			switch (old_task->status) {
+			// 如果被切换任务是正常运行的TASK_RUNNIN状态才将其移到队列末尾
+			case TASK_RUNNING:
+				queue_enqueue(&task_readyqueue[cpuid],
 				              &old_task->list);
-			} else if (old_task->status == TASK_EXIT) {
+				break;
+			case TASK_EXIT:
 				// 如果是 EXIT 状态说明这次是主动调用 exit
 				// 系列函数 那么就加入 exitqueue
-				queue_enqueue(&task_exitqueue, &old_task->list);
+				queue_enqueue(&task_exitqueue[cpuid],
+				              &old_task->list);
+				break;
+
+			case TASK_BLOCKED:
+			case TASK_DEAD:
+			case TASK_READY:
+			default:
+				break;
 			}
 
-			current = new_task;
+			// pr_info("Scheduler %u Core task %s", cpuid,
+			// new_task->name);
+			current[cpuid] = new_task;
 			write_cr3(new_task->pml4);
 			update_tss_rsp0(new_task->rsp0);
 			context_switch(&old_task->rsp, &new_task->rsp);
@@ -455,6 +509,14 @@ void scheduler(void)
 	}
 }
 
-struct task_struct *get_current(void) { return current; }
+struct task_struct *get_current(void)
+{
+	uint64_t cpuid = get_current_cpuid();
+	return current[cpuid];
+}
 
-queue_t *get_task_readyqueue(void) { return &task_readyqueue; }
+queue_t *get_task_readyqueue(void)
+{
+	uint64_t cpuid = get_current_cpuid();
+	return &task_readyqueue[cpuid];
+}

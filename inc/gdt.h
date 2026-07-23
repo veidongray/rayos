@@ -33,6 +33,7 @@ struct tss_entry {
 } __attribute__((packed));
 
 void gdt_init(void);
+void ap_gdt_init(void);
 void update_tss_rsp0(__u64 rsp0);
 
 #endif // GDT_H

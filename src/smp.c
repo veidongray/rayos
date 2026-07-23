@@ -2,26 +2,32 @@
 #include <cpuid.h>
 #include <int.h>
 #include <lapic.h>
+#include <mm.h>
 #include <page.h>
 #include <printk.h>
 #include <smp.h>
 #include <string.h>
 #include <types.h>
+#include <x86.h>
 
-#define AP_MAX 64
 #define AP_BASE 0x8000ULL
+#define AP_STACK_SIZE (512 * 1024)
 #define TRAMPOLINE_VECTOR (AP_BASE >> 12) // = 0x08
 
 static __u32 bsp_id = 0;
 static __u32 ap_count = 0;
-static uint32_t ap_ids[AP_MAX];
+static uint32_t ap_ids[MAX_CPUS];
 
-// 从 trampoline.S 中引入 trampoline
-extern char trampoline[];
-extern char trampoline_end[];
+// 从 trampoline.S 中引入
+extern char ap_trampoline_start[];
+extern char ap_trampoline_end[];
+extern uint64_t ap_cr3[];
+extern uint64_t ap_lapic_addr[];
+extern uint64_t ap_stack_array[];
 
 void ap_startup(uint8_t apic_id)
 {
+	pr_info("Reset AP Core %u", apic_id);
 	// 发送 INIT
 	lapic_send_init(apic_id);
 	mdelay(10); // Intel 手册要求等 10ms
@@ -41,6 +47,8 @@ int smp_init(void)
 {
 	int ret;
 	bsp_id = __get_current_apic_id();
+	pr_info("Boot in %u Core", bsp_id);
+
 	ap_count = acpi_madt_smp_counter(ap_ids);
 	pr_info("ap count %u", ap_count);
 
@@ -56,10 +64,27 @@ int smp_init(void)
 		break;
 	}
 
-	char *ptr = trampoline;
-	char *end = trampoline_end;
+	char *ptr = ap_trampoline_start;
+	char *end = ap_trampoline_end;
 	// 复制 trampoline 到 0x8000
 	memcpy((void *)AP_BASE, ptr, end - ptr);
+
+	uint64_t *ap_cr3_slot =
+	        (uint64_t *)((uint64_t)ap_cr3 - (uint64_t)ap_trampoline_start +
+	                     AP_BASE);
+	ap_cr3_slot[0] = read_cr3();
+
+	// 为每个 AP 分配栈空间
+	uint64_t *ap_stack_array_slot =
+	        (uint64_t *)((uint64_t)ap_stack_array -
+	                     (uint64_t)ap_trampoline_start + AP_BASE);
+	for (uint32_t i = 0; i < ap_count; i++) {
+		if (ap_ids[i] == bsp_id) {
+			continue;
+		}
+		ap_stack_array_slot[i] =
+		        (uint64_t)kzalloc(AP_STACK_SIZE) + AP_STACK_SIZE;
+	}
 
 	local_irq_enable();
 	// 发送 SIPI
@@ -88,3 +113,7 @@ __u32 __get_current_apic_id(void)
 	__cpuid(1, eax, ebx, ecx, edx);
 	return (ebx >> 24) & 0xFF;
 }
+
+uint64_t get_bsp_id(void) { return bsp_id; }
+
+uint32_t *get_ap_ids(void) { return ap_ids; }
