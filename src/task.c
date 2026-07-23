@@ -293,12 +293,10 @@ struct task_struct *run_thread(thread_func_t thread_func, void *args,
 	return task;
 }
 
-static inline int make_elf64_task(int fd, char *elf, struct task_struct *task,
+static inline int make_elf64_task(char *elf, struct task_struct *task,
                                   const char *pathname)
 {
-	struct elf64_ehdr *ehdr;
-	sys_read(fd, elf, sizeof(struct elf64_ehdr));
-	ehdr = (struct elf64_ehdr *)elf;
+	struct elf64_ehdr *ehdr = (struct elf64_ehdr *)elf;
 
 	/**
 	 * 临时映射ELF需要的内存地址进行操作
@@ -317,15 +315,34 @@ static inline int make_elf64_task(int fd, char *elf, struct task_struct *task,
 			uint64_t order = size_to_order(
 			        ALIGN_UP((phdr->p_memsz), PAGE_SIZE));
 			uint64_t phys = alloc_pages(order);
-			map_page_range(phys, phdr->p_vaddr, 0x7,
-			               (ALIGN_UP((phdr->p_memsz), PAGE_SIZE) >>
-			                PAGE_SHIFT));
+			size_t len = (ALIGN_UP((phdr->p_memsz), PAGE_SIZE) >> PAGE_SHIFT);
+			map_page_range(phys, phdr->p_vaddr, 0x7, len);
 			memcpy((void *)phdr->p_vaddr,
 			       (const void *)((uint64_t)elf + phdr->p_offset),
 			       phdr->p_filesz);
 			// 记录最后一个 LOAD 段的地址和大小
 			last_vaddr = phdr->p_vaddr;
 			last_memsz = phdr->p_memsz;
+
+			struct load_segment_address *new_ls_addr = (struct load_segment_address *)kzalloc(sizeof(struct load_segment_address));
+			new_ls_addr->phys = phys;
+			new_ls_addr->order = order;
+			new_ls_addr->next = NULL;
+			if (task->ls_addr == NULL)
+			{
+				task->ls_addr = new_ls_addr;
+			}
+			else
+			{
+				struct load_segment_address *pos = task->ls_addr;
+
+				// 找到鏈表末尾
+				while (pos->next)
+				{
+					pos = pos->next;
+				}
+				pos->next = new_ls_addr;
+			}
 		}
 		phdr++;
 	}
@@ -355,10 +372,8 @@ static inline int make_elf64_task(int fd, char *elf, struct task_struct *task,
 	phdr = (void *)((uint8_t *)elf + ehdr->e_phoff);
 	for (int i = 0; i < ehdr->e_phnum; i++) {
 		if (phdr->p_type == PT_LOAD) {
-			unmap_page_range(
-			        phdr->p_vaddr,
-			        (ALIGN_UP((phdr->p_memsz), PAGE_SIZE) >>
-			         PAGE_SHIFT));
+			size_t len = (ALIGN_UP((phdr->p_memsz), PAGE_SIZE) >> PAGE_SHIFT);
+			unmap_page_range(phdr->p_vaddr, len);
 		}
 		phdr++;
 	}
@@ -409,7 +424,7 @@ int run_process(const char *pathname)
 				goto err;
 			}
 		} else if (elf[4] == ELFCLASS64) {
-			ret = make_elf64_task(fd, elf, task, pathname);
+			ret = make_elf64_task(elf, task, pathname);
 			if (ret < 0) {
 				goto err;
 			}
@@ -465,6 +480,17 @@ void scheduler(void)
 				           task->user_pt_order);
 				free_pages(task->stack_basephys,
 				           task->stack_order);
+				struct load_segment_address *pos = task->ls_addr;
+				while (pos)
+				{
+					uint64_t phys = pos->phys;
+					uint64_t order = pos->order;
+					free_pages(phys, order);
+					
+					struct load_segment_address *old = pos;
+					pos = pos->next;
+					kfree(old);
+				}
 				kfree((void *)task->rsp0_base);
 				kfree(task);
 				break;

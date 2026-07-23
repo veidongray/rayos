@@ -101,6 +101,7 @@ static int fatfs_release(struct file *filp)
 	FIL *fp = fd->data;
 	f_close(fp);
 	kfree(fp);
+	kfree(fd);
 	return 0;
 }
 

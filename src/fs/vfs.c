@@ -79,6 +79,7 @@ int vfs_open(struct file *filp, const char *path, mode_t mode)
 	list_for_each_entry(dentry, &dentry_list, list)
 	{
 		if (!strcmp(dentry->pathname, pathbuff)) {
+			kfree(pathbuff);
 			filp->dentry = dentry;
 			atomic_fetch_add(&dentry->d_ref, 1);
 			return 0;

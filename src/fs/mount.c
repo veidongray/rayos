@@ -49,10 +49,12 @@ struct mount *mount_get_by_name(const char *path)
 		list_for_each_entry(pos, &mount_list, mnt_list)
 		{
 			if ((!strncmp(pos->mnt_path, match_path, match_len))) {
+				kfree(path_buff);
 				return pos;
 			}
 		}
 	}
 
+	kfree(path_buff);
 	return NULL;
 }
