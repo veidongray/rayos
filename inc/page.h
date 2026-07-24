@@ -28,6 +28,23 @@
 #define MAP_USER_RW (PTE_PRESENT | PTE_WRITABLE | PTE_USER)
 #define MAP_USER_RO (PTE_PRESENT | PTE_USER)
 
+/* map 错误码 */
+#define MAP_OK 0
+
+#define MAP_ERR_NOMEM 12
+#define MAP_ERR_INVAL 22
+#define MAP_ERR_EXIST 17
+#define MAP_ERR_FAULT 14
+#define MAP_ERR_BUSY 16
+#define MAP_ERR_PERM 1
+#define MAP_ERR_RANGE 34
+#define MAP_ERR_ALIGN 106
+
+/* 自定义错误 */
+#define MAP_ERR_NOTMAPPED 100
+#define MAP_ERR_ORDER 110
+#define MAP_ERR_FRAGMENT 111
+
 #define order_to_pages(order) (0x1ULL << (order))
 
 // 找出一个非零数的最高位位置（1-based），等价于 fls

@@ -4,26 +4,11 @@
 #include <ioapic.h>
 #include <page.h>
 #include <printk.h>
+#include <smp.h>
 #include <types.h>
 #include <x86.h>
 
 static volatile __u32 *ioapic_base; /* MMIO 映射后的虚拟地址 */
-
-static inline __u32 __get_current_apic_id(void)
-{
-	unsigned int eax, ebx, ecx, edx;
-
-	/* 尝试 Leaf 0xB (Extended Topology Enumeration) */
-	if (__get_cpuid_max(0, NULL) >= 0xB) {
-		__cpuid_count(0xB, 0, eax, ebx, ecx, edx);
-		if (ebx != 0)       /* SMT/Core 层级有效时 EBX != 0 */
-			return edx; /* EDX = x2APIC ID (32-bit) */
-	}
-
-	/* 回退: Leaf 1 EBX[31:24] = 8-bit Initial APIC ID */
-	__cpuid(1, eax, ebx, ecx, edx);
-	return (ebx >> 24) & 0xFF;
-}
 
 static inline void ioapic_write(__u8 reg, __u32 val)
 {

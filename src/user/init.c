@@ -1,15 +1,9 @@
-#include <ff.h>
 #include <libc.h>
 
 int main(void)
 {
-	int fd = open("/init", FA_READ | FA_WRITE);
-	if (fd >= 0) {
-		write(fd, "fffffffffffffffffffffffuck", 27);
-		sync();
-	}
-
-	while (1)
+	// 运行一段时间然后退出
+	for (int i = 0; i < 0xfffffff; i++)
 		;
-	return 0;
+	exit(0);
 }

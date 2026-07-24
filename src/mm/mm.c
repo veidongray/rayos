@@ -2,14 +2,17 @@
 #include <mm.h>
 #include <page.h>
 #include <printk.h>
+#include <spinlock.h>
 #include <string.h>
 #include <types.h>
 
-#define VMAP_AREA_POOL_NR_PAGES 8 /* vmap_area 元数据池占用的页数 */
+#define VMAP_AREA_POOL_NR_PAGES 32 /* vmap_area 元数据池占用的页数 */
 #define KMEM_BASE 0xffff900000000000ULL /* 内核动态映射区虚拟基地址 */
 
 static struct mem_pool vmap_area_pool; /* vmap_area 对象池 */
 static LIST_HEAD(vmap_area_list);      /* 已分配 vmap_area 全局链表 */
+
+static spinlock_t mm_spinlock; // 内存分配和释放的自旋锁
 
 static struct vmap_area *__vmap_area_alloc(__u64 start, __u64 nr_pages)
 {
@@ -63,6 +66,7 @@ void *kmalloc(size_t size)
 	__u64 va;
 	struct vmap_area *vm;
 
+	spinlock_lock(&mm_spinlock);
 	if (size == 0)
 		return NULL;
 
@@ -76,6 +80,7 @@ void *kmalloc(size_t size)
 	if (vm == NULL)
 		return NULL;
 
+	spinlock_unlock(&mm_spinlock);
 	return (void *)vm->va_start;
 }
 
@@ -94,14 +99,19 @@ void *kzalloc(size_t size)
 }
 
 /* 释放内核内存：解映射 + 归还物理页 + 归还元数据 */
-void kfree(void *virtaddr)
+int kfree(void *virtaddr)
 {
 	size_t order;
 	__u64 physaddr;
 	struct vmap_area *vm;
 
+	spinlock_lock(&mm_spinlock);
 	/* 通过虚拟地址反查元数据 */
 	vm = __find_vmap_area((__u64)virtaddr);
+	if (!vm) {
+		return -1;
+	}
+
 	list_del(&vm->list);
 
 	/* 按分配时的 order 释放物理页 */
@@ -112,6 +122,9 @@ void kfree(void *virtaddr)
 	/* 解除虚拟映射并归还元数据到对象池 */
 	unmap_page_range((__u64)virtaddr, vm->va_nrpages);
 	pool_free(&vmap_area_pool, vm);
+
+	spinlock_unlock(&mm_spinlock);
+	return 0;
 }
 
 void *krealloc(void *ptr, size_t new_size)
@@ -144,4 +157,6 @@ void mm_init(void)
 	/* 用映射后的虚拟地址初始化固定大小对象池 */
 	pool_init(&vmap_area_pool, (void *)va, VMAP_AREA_POOL_NR_PAGES,
 	          sizeof(struct vmap_area));
+
+	spinlock_init(&mm_spinlock);
 }

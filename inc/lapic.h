@@ -23,23 +23,22 @@
 #define LAPIC_TIC 0x0380       // 初始计数
 #define LAPIC_TCC 0x0390       // 当前计数
 
-// 读写内存映射寄存器的辅助函数
-static inline uint32_t lapic_read(uint32_t reg)
-{
-	// 先将 64 位基地址与 32 位偏移量相加，得到完整的 64
-	// 位虚拟地址，再强转为指针
-	return *(volatile uint32_t *)((uintptr_t)(KERNEL_BASE + LAPIC_BASE +
-	                                          reg));
-}
+// ICR 字段
+#define ICR_INIT 0x00000500         // Delivery Mode = INIT
+#define ICR_SIPI 0x00000600         // Delivery Mode = SIPI
+#define ICR_LEVEL_ASSERT 0x00004000 // Level = Assert
+#define ICR_PHYSICAL 0x00000000     // Destination Mode = Physical
+#define ICR_FIXED 0x00000000        // Delivery Mode = Fixed (for INIT)
 
-static inline void lapic_write(uint32_t reg, uint32_t data)
-{
-	*(volatile uint32_t *)((uintptr_t)(KERNEL_BASE + LAPIC_BASE + reg)) =
-	        data;
-}
-
+// 等待 IPI 发送完成
+void lapic_wait_ipi(void);
+// 发送 INIT IPI
+void lapic_send_init(uint8_t apic_id);
+// 发送 SIPI
+void lapic_send_sipi(uint8_t apic_id, uint8_t vector);
 void lapic_init(void);
 void lapic_send_eoi(void);
 void lapic_calibrate(void);
+void ap_lapic_init(void);
 
 #endif // APIC_H

@@ -2,6 +2,7 @@
 #define ACPI_H
 
 #include <stdint.h>
+#include <types.h>
 
 struct acpi_rsdp {
 	/* ================= ACPI 1.0 基础字段 (前 20 字节) ================= */
@@ -241,5 +242,6 @@ uint32_t *__acpi_find_madt_ioapic_base(void);
 uint32_t __acpi_find_gsi_for_irq(uint8_t irq);
 struct acpi_rsdp *acpi_find_rsdp(void);
 void acpi_init(void);
+__u32 acpi_madt_smp_counter(uint32_t *ap_ids);
 
 #endif // ACPI_H

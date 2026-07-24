@@ -52,4 +52,6 @@ static inline uint64_t read_cr3(void)
 	return retval;
 }
 
+static inline void hlt(void) { asm volatile("hlt"); }
+
 #endif // X86_H

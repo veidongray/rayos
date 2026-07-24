@@ -15,34 +15,37 @@ struct file_system_type;
 struct dentry {
 	int pathlen;
 	char *pathname;
-	void *private_data;
 
-	struct list_head list;
+	struct mount *mnt;     // 指向对应的 mount
+	struct list_head list; // dentry_list 全局 dentry 列表节点
+
+	atomic_int_t d_ref; // 引用计数
+
+	void *private_data;
 };
 
 struct file {
 	__u32 fd;
-	int pathlen;
-	char *pathname;
 
+	struct dentry *dentry; // 指向对应的 dentry
 	struct list_head list;
 
-	void *priv;
+	void *private_data;
 };
 
 struct file_system_operations {
 	int (*mount)(struct file_system_type *fstype, const char *path);
-	struct dentry *(*lookup)(const char *path);
-	int (*open)(struct dentry *dentry, mode_t mode);
-	int (*release)(struct dentry *dentry);
-	int (*creat)(const char *path);
+	struct dentry *(*lookup)(struct dentry *dentry, const char *path);
+	int (*open)(struct file *filp, mode_t mode);
+	int (*release)(struct file *filp);
+	int (*creat)(const char *path, mode_t mode);
 	int (*mkdir)(const char *path);
 	int (*unlink)(const char *path);
 	int (*rename)(const char *oldpath, const char *newpath);
-	ssize_t (*read)(struct dentry *dentry, void *buf, size_t len);
-	ssize_t (*write)(struct dentry *dentry, const void *buf, size_t len);
+	ssize_t (*read)(struct file *filp, void *buf, size_t len);
+	ssize_t (*write)(struct file *filp, const void *buf, size_t len);
 	int (*readdir)(const char *path);
-	int (*stat)(struct dentry *dentry, struct stat *st);
+	int (*stat)(const char *path, struct stat *st);
 	void (*sync)(struct dentry *dentry);
 };
 

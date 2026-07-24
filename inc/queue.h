@@ -6,11 +6,13 @@
 
 typedef struct {
 	struct list_head head; // 哨兵节点
+	int nr_list;
 	spinlock_t lock;
 } queue_t;
 
 #define QUEUE_INIT(q)                                                          \
 	do {                                                                   \
+		(q)->nr_list = 0;                                              \
 		INIT_LIST_HEAD(&(q)->head);                                    \
 		spinlock_init(&(q)->lock);                                     \
 	} while (0)

@@ -10,7 +10,7 @@ SHELL       := /bin/bash
 # -----------------------------------------------------------------------------
 DISK_SIZE_MB := 128
 MEM_SIZE     := 128M
-CPU_CORES    := 2
+CPU_CORES    := 8
 ISO_FILE     := rayos.iso
 QEMU         := qemu-system-x86_64
 
@@ -22,6 +22,11 @@ BUILTIN_OBJS := src/asm/built-in.o \
                 src/fs/built-in.o  \
                 src/lib/built-in.o \
                 src/mm/built-in.o
+
+# -----------------------------------------------------------------------------
+# C Defines
+# -----------------------------------------------------------------------------
+CDEFINES := -DMAX_CPUS=$(CPU_CORES)
 
 # -----------------------------------------------------------------------------
 # Include Paths
@@ -80,7 +85,8 @@ CFLAGS := -m64 -fno-pic                      \
     -std=gnu99                               \
     -mcmodel=large                           \
     -MMD -MP                                 \
-    $(INCDIR)
+    $(INCDIR)								 \
+	$(CDEFINES)
 
 LDFLAGS := -m elf_x86_64
 

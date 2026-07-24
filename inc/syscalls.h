@@ -13,7 +13,8 @@ enum num_syscall {
 	SYS_READ,
 	SYS_WRITE,
 	SYS_STAT,
-	SYS_SYNC
+	SYS_SYNC,
+	SYS_EXIT
 };
 
 int sys_open(const char *path, mode_t mode);
@@ -22,5 +23,7 @@ int sys_read(int fd, char *buf, size_t size);
 int sys_write(int fd, const char *buf, size_t size);
 int sys_stat(const char *pathname, struct stat *st);
 void sys_sync(void);
+int sys_creat(const char *pathname, mode_t mode);
+void sys_exit(int status);
 
 #endif // SYSCALLS_H

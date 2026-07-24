@@ -1,89 +1,96 @@
+<p align="center">
+  <b>English</b> | <a href="./README_CN.md">中文</a>
+</p>
+
 # RayOS
 
-RayOS 是一个基于 x86_64 架构的实验型操作系统内核项目，目标是从零开始实现一个可引导、可运行、且便于继续扩展的裸机内核原型。项目重点放在操作系统内核核心机制的理解与验证，而不是追求完整桌面系统体验。
+RayOS is an experimental operating system kernel project based on the x86_64 architecture. It aims to build a bootable, runnable, and extensible bare-metal kernel prototype from scratch. The project focuses on understanding and verifying core OS kernel mechanisms rather than delivering a complete desktop experience.
 
 ## Project Positioning
 
--   教学/实验型内核项目
--   以源码阅读、机制验证和逐步扩展为主
--   当前重点是引导、内存管理、中断处理、任务调度、文件系统与用户态交互等基础能力
+- Educational and experimental kernel project.
+- Focuses on source code reading, mechanism verification, and incremental extension.
+- Current priorities include booting, memory management, interrupt handling, task scheduling, file systems, and user-space interaction.
 
 ## Current Implementation Status
 
-项目已经具备较完整的内核雏形，并且基本能够通过 GRUB 引导进入内核并运行。当前已实现的核心模块包括：
+The project has achieved a relatively complete kernel prototype and can successfully boot and run via GRUB. Currently implemented core modules include:
 
--   引导与启动
-    -   GRUB / Multiboot2 引导环境支持
-    -   汇编入口和 C 语言内核初始化流程
--   CPU 与中断
-    -   GDT / IDT 初始化
-    -   PIC、IOAPIC、LAPIC 中断控制器驱动
-    -   基础异常与中断处理框架
--   内存管理
-    -   物理内存初始化
-    -   分页与页表管理
-    -   基础内存池 / 分配器相关实现
--   任务与调度
-    -   基础线程与任务创建框架
-    -   简易的内核线程运行流程
-    -   用户态 ELF 程序加载与执行流程
--   设备与输入输出
-    -   UART 串口输出与基础输入处理
-    -   ACPI 与 PCI 初始化逻辑
--   文件系统
-    -   VFS 抽象层
-    -   文件系统管理相关代码
-    -   块设备、磁盘镜像与文件访问接口
-    -   tmpfs / FAT32 等相关文件系统支持
--   用户态支持
-    -   简单的用户态 init 程序
-    -   系统调用框架与基础 libc 封装
+- **Boot & Startup**
+  - GRUB / Multiboot2 boot environment support.
+  - Assembly entry point and C language kernel initialization flow.
+- **CPU & Interrupts**
+  - GDT / IDT initialization.
+  - PIC, IOAPIC, and LAPIC interrupt controller drivers.
+  - Basic exception and interrupt handling framework.
+  - Multi-core detection and AP startup based on ACPI MADT.
+  - Secondary CPU initialization via LAPIC INIT/SIPI and AP trampoline.
+- **Memory Management**
+  - Physical memory initialization.
+  - Paging and page table management.
+  - Basic memory pool / allocator implementation.
+- **Kernel Utilities**
+  - Simple algorithm modules for general-purpose internal computations.
+- **Tasks & Scheduling**
+  - Basic thread and task creation framework.
+  - Simple kernel thread execution flow.
+  - User-space ELF program loading and execution.
+  - Support for core idle threads and multi-core task startup.
+- **Devices & I/O**
+  - UART serial output and basic input handling.
+  - ACPI and PCI initialization logic.
+- **File System**
+  - VFS abstraction layer.
+  - File system management infrastructure.
+  - Block device, disk image, and file access interfaces.
+  - tmpfs / FAT32 file system support.
+- **User-Space Support**
+  - Simple user-space init program.
+  - System call framework and basic libc wrappers.
 
 ## Project Goals
 
-RayOS 的主要目标是：
-
--   理解 x86_64 架构下操作系统内核的基本工作方式
--   通过实际代码搭建完整的引导、初始化和内核运行流程
--   逐步完善内存管理、中断处理、任务调度和文件系统能力
--   为后续增加 shell、驱动、用户态程序和更稳定的系统服务打基础
+- Understand the fundamental workings of an OS kernel on x86_64 architecture.
+- Build a complete boot, initialization, and runtime flow through practical coding.
+- Incrementally improve memory management, interrupt handling, task scheduling, and file system capabilities.
+- Lay the foundation for future additions like shells, drivers, user-space applications, and stable system services.
 
 ## Project Structure
 
 ```text
 .
-├── inc/                  # 内核头文件与公共接口定义
-│   ├── asm/              # 汇编相关头文件
-│   ├── lib/              # 字符串/打印库头文件
-│   ├── user/             # 用户态系统调用头文件
-│   └── ...               # 内存、任务、PCI、VFS 等模块头文件
-├── src/                  # 内核实现源码
-│   ├── asm/              # 汇编启动代码与中断桩代码
-│   ├── fs/               # 文件系统实现
-│   ├── mm/               # 内存管理相关实现
-│   ├── lib/              # 字符串格式化处理库相关实现
-│   ├── user/             # 用户态 init 与系统调用实现
-│   └── ...               # 中断、任务、PCI、UART 等模块源码
-├── iso/                  # GRUB 配置与 ISO 镜像构建文件
-├── linker.ld             # 内核链接脚本
-├── Makefile              # 构建、运行与调试脚本
-└── tools/                # 构建辅助脚本与检查脚本
+├── inc/                  # Kernel headers & public API definitions
+│   ├── asm/              # Assembly-related headers
+│   ├── lib/              # String/print library headers
+│   ├── user/             # User-space syscall headers
+│   └── ...               # Memory, task, PCI, VFS headers
+├── src/                  # Kernel implementation source
+│   ├── asm/              # Assembly boot & interrupt stubs
+│   ├── fs/               # File system implementation
+│   ├── mm/               # Memory management implementation
+│   ├── lib/              # String formatting library
+│   ├── user/             # User-space init & syscalls
+│   └── ...               # Interrupt, task, PCI, UART sources
+├── iso/                  # GRUB config & ISO build files
+├── linker.ld             # Kernel linker script
+├── Makefile              # Build, run & debug scripts
+└── tools/                # Build helper & check scripts
 ```
 
 ## Prerequisites
 
-建议在 Ubuntu 或其他基于 Debian 的 Linux 发行版上构建和运行，至少需要安装以下依赖：
+It is recommended to build and run on Ubuntu or other Debian-based Linux distributions. The following dependencies are required:
 
--   make
--   gcc / clang
--   ld
--   grub-mkrescue / xorriso
--   qemu-system-x86_64
--   mkfs.fat
--   mtools
--   gdb
+- make
+- gcc / clang
+- ld
+- grub-mkrescue / xorriso
+- qemu-system-x86_64
+- mkfs.fat
+- mtools
+- gdb
 
-也可以先执行下面的脚本检查当前环境是否满足构建条件：
+You can verify your environment by running:
 
 ```bash
 make check-deps
@@ -121,38 +128,40 @@ make qemugdb
 
 ## Common Commands
 
-```bash
-help         help: Show help message
-check-deps   check-deps: Check software dependencies
-build        build: Compile kernel and generate executable (parallel-safe)
-disk         disk: Create FAT32 disk image (incremental)
-iso          iso: Generate bootable GRUB ISO
-qemu         qemu: Run system in QEMU
-qemudbg      qemudbg: Run QEMU with debug logging
-qemugdb      qemugdb: Run QEMU and wait for GDB connection
-clean        clean: Remove build artifacts except disk image
-distclean    distclean: Remove all build artifacts including user programs and disk
-rebuild      rebuild: Clean and rebuild from scratch
-format       format: Format all C/C++ source files
-```
+| Command | Description |
+| :--- | :--- |
+| `help` | Show help message |
+| `check-deps` | Check software dependencies |
+| `build` | Compile kernel and generate executable (parallel-safe) |
+| `disk` | Create FAT32 disk image (incremental) |
+| `iso` | Generate bootable GRUB ISO |
+| `qemu` | Run system in QEMU |
+| `qemudbg` | Run QEMU with debug logging |
+| `qemugdb` | Run QEMU and wait for GDB connection |
+| `clean` | Remove build artifacts except disk image |
+| `distclean` | Remove all build artifacts including user programs and disk |
+| `rebuild` | Clean and rebuild from scratch |
+| `format` | Format all C/C++ source files |
 
 ## Features & Limitations
 
--   当前仍属于教学 / 实验型内核实现，适合学习和源码阅读。
--   用户态能力仍较基础，尚未提供完整 shell 或复杂应用环境。
--   部分子系统仍在演进中，稳定性与兼容性还有待进一步验证。
--   代码风格偏向教学与可维护性，部分实现仍有继续优化的空间。
+- This is currently an educational/experimental kernel implementation, suitable for learning and source code reading.
+- User-space capabilities remain basic; no complete shell or complex application environment is provided yet.
+- Some subsystems are still evolving; stability and compatibility require further verification.
+- Code style prioritizes readability and maintainability for educational purposes, leaving room for further optimization.
 
 ## Roadmap
 
-接下来可以继续推进以下方向：
-
--   完善进程与线程调度逻辑
--   增强系统调用机制与用户态交互
--   提升文件系统功能与稳定性
--   引入更友好的 shell 与终端交互
--   补充更多调试工具与测试流程
+- Improve process and thread scheduling logic.
+- Enhance system call mechanisms and user-space interaction.
+- Improve file system functionality and stability.
+- Introduce a more user-friendly shell and terminal interface.
+- Add more debugging tools and testing workflows.
 
 ## License
 
-本项目当前尚未显式声明许可证。如果你希望参与开发或进行二次使用，请先与项目维护者确认。
+This project is licensed under the [MIT License](LICENSE).
+
+You are free to use, copy, modify, merge, publish, distribute, sublicense, and sell copies of this software for any purpose, including commercial use, provided that the copyright notice and permission notice are included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. See the [LICENSE](LICENSE) file for full details.

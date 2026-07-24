@@ -116,7 +116,7 @@ int map_page_range(uint64_t physaddr, uint64_t virtaddr, uint64_t flags,
 		if (map_pt[pt_idx] & 0x1ULL) {
 			// already map
 			unmap_page_range(virtaddr, i);
-			return -1;
+			return -MAP_ERR_EXIST;
 		}
 		map_pt[pt_idx] = (pa & ~0xfff) | flags | 0x1ULL;
 		asm volatile("movq %cr3, %rax\r\n"
@@ -186,16 +186,16 @@ uint64_t get_physaddr(uint64_t virtaddr)
 
 	map_pml4 = (uint64_t *)(PML4_BASE << 12ULL);
 	if (!(map_pml4[pml4_idx] & 0x1ULL)) {
-		return -1;
+		return -MAP_ERR_NOTMAPPED;
 	}
 	map_pdpt = (uint64_t *)((PML4_BASE << 21ULL) + (pml4_idx << 12ULL));
 	if (!(map_pdpt[pdpt_idx] & 0x1ULL)) {
-		return -1;
+		return -MAP_ERR_NOTMAPPED;
 	}
 	map_pd = (uint64_t *)((PML4_BASE << 30ULL) + (pml4_idx << 21ULL) +
 	                      (pdpt_idx << 12ULL));
 	if (!(map_pd[pd_idx] & 0x1ULL)) {
-		return -1;
+		return -MAP_ERR_NOTMAPPED;
 	}
 	map_pt = (uint64_t *)((PML4_BASE << 39ULL) + (pml4_idx << 30ULL) +
 	                      (pdpt_idx << 21ULL) + (pd_idx << 12ULL));
@@ -203,7 +203,7 @@ uint64_t get_physaddr(uint64_t virtaddr)
 		// already map
 		return (map_pt[pt_idx] & ~0xfff) + (virtaddr & 0xfff);
 	}
-	return -1;
+	return -MAP_ERR_NOTMAPPED;
 }
 
 void load_pml4(uint64_t pml4_physaddr)

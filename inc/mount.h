@@ -7,6 +7,7 @@ struct mount {
 	char *mnt_path;
 	int mnt_pathlen;
 
+	struct dentry *root_dentry;
 	struct file_system_type *mnt_fstype;
 
 	struct list_head mnt_list;

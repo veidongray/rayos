@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <ff.h>
 #include <fs.h>
 #include <init.h>
@@ -14,37 +15,37 @@ enum dentry_type {
 struct fatfs_dentry {
 	char *name;
 	int nmlen;
-	void *data; // 指向具体的 FIL
+	FIL *fp;
+	void *data;
 };
 
 static FATFS fatfs_root;
 
-static struct dentry *fatfs_lookup(const char *path)
+static struct dentry *fatfs_lookup(struct dentry *dentry, const char *path)
 {
-	FIL f;
+	FILINFO fno;
 	FRESULT res;
-	struct dentry *de;
 	struct fatfs_dentry *fd;
 
-	res = f_open(&f, path, FA_READ);
+	res = f_stat(path, &fno);
 	if (res == FR_OK) {
-		de = kzalloc(sizeof(struct dentry));
 		fd = kzalloc(sizeof(struct fatfs_dentry));
+		if (!fd) {
+			return NULL;
+		}
 
 		fd->name = (char *)path;
 		fd->nmlen = strlen(path);
-		fd->name[fd->nmlen] = '\0';
 
-		de->private_data = fd;
+		dentry->private_data = fd;
 
-		f_close(&f);
-		return de;
+		return dentry;
 	} else {
 		return NULL;
 	}
 }
 
-static int fatfs_creat(const char *path)
+static int fatfs_creat(const char *path, mode_t mode)
 {
 	FIL fp;
 	FRESULT res;
@@ -55,9 +56,11 @@ static int fatfs_creat(const char *path)
 		return res;
 	}
 
-	do {
-		res = f_sync(&fp);
-	} while (res != FR_OK);
+	if (mode & O_SYNC) {
+		do {
+			res = f_sync(&fp);
+		} while (res != FR_OK);
+	}
 
 	res = f_close(&fp);
 	if (res != FR_OK) {
@@ -67,11 +70,12 @@ static int fatfs_creat(const char *path)
 	return 0;
 }
 
-static int fatfs_open(struct dentry *dentry, mode_t mode)
+static int fatfs_open(struct file *filp, mode_t mode)
 {
 	FIL *fp;
 	FRESULT res;
 	struct fatfs_dentry *fd;
+	struct dentry *dentry = filp->dentry;
 	fd = (struct fatfs_dentry *)dentry->private_data;
 
 	fp = kzalloc(sizeof(FIL));
@@ -89,34 +93,47 @@ static int fatfs_open(struct dentry *dentry, mode_t mode)
 	return 0;
 }
 
-static int fatfs_release(struct dentry *dentry)
+static int fatfs_release(struct file *filp)
 {
+	struct dentry *dentry = filp->dentry;
 	struct fatfs_dentry *fd = (struct fatfs_dentry *)dentry->private_data;
-	kfree(fd->data);
+
+	FIL *fp = fd->data;
+	f_close(fp);
+	kfree(fp);
+	kfree(fd);
 	return 0;
 }
 
-static ssize_t fatfs_read(struct dentry *dentry, void *buf, size_t len)
+static ssize_t fatfs_read(struct file *filp, void *buf, size_t len)
 {
 	FIL *fp;
 	UINT ret;
+	FRESULT res;
+	struct dentry *dentry = filp->dentry;
 	struct fatfs_dentry *fd = (struct fatfs_dentry *)dentry->private_data;
 
 	fp = fd->data;
-	f_read(fp, buf, (UINT)len, &ret);
+	res = f_read(fp, buf, (UINT)len, &ret);
+	if (res != FR_OK) {
+		return res;
+	}
 	return ret;
 }
 
-static ssize_t fatfs_write(struct dentry *dentry, const void *buf, size_t len)
+static ssize_t fatfs_write(struct file *filp, const void *buf, size_t len)
 {
 	FIL *fp;
 	UINT ret;
+	FRESULT res;
+	struct dentry *dentry = filp->dentry;
 	struct fatfs_dentry *fd = (struct fatfs_dentry *)dentry->private_data;
 
 	fp = fd->data;
-	f_write(fp, buf, (UINT)len, &ret);
-	while (f_sync(fp) == FR_OK)
-		;
+	res = f_write(fp, buf, (UINT)len, &ret);
+	if (res != FR_OK) {
+		return res;
+	}
 	return ret;
 }
 
@@ -218,15 +235,14 @@ static int fatfs_mkdir(const char *path)
 }
 
 /* 获取节点属性 */
-static int fatfs_stat(struct dentry *dentry, struct stat *st)
+static int fatfs_stat(const char *pathname, struct stat *st)
 {
 	FILINFO fno;
-	struct fatfs_dentry *fd = (struct fatfs_dentry *)dentry->private_data;
-	FRESULT res = f_stat(fd->name, &fno);
+	FRESULT res = f_stat(pathname, &fno);
 
 	if (res == FR_OK) {
 		if (fno.fattrib & AM_DIR) {
-			pr_info("%s is dir", fd->name);
+			pr_info("%s is dir", pathname);
 		} else {
 			st->st_size = fno.fsize;
 		}

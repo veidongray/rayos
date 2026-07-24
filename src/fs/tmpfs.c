@@ -104,8 +104,9 @@ static struct tmpfs_dentry *tmpfs_lookup(const char *path)
 	return cur;
 }
 
-static int tmpfs_creat(const char *path)
+static int tmpfs_creat(const char *path, mode_t mode)
 {
+	mode = mode;
 	if (!path || path[0] != '/' || path[1] == '\0')
 		return TMPFS_ERR_INVAL;
 
@@ -149,8 +150,9 @@ static int tmpfs_creat(const char *path)
 	return TMPFS_OK;
 }
 
-static ssize_t tmpfs_read(struct dentry *dentry, void *buf, size_t len)
+static ssize_t tmpfs_read(struct file *filp, void *buf, size_t len)
 {
+	struct dentry *dentry = filp->dentry;
 	struct tmpfs_dentry *td = (struct tmpfs_dentry *)dentry->private_data;
 	if (!td || td->type != DENTRY_FILE || !td->data)
 		return TMPFS_ERR_INVAL;
@@ -162,8 +164,9 @@ static ssize_t tmpfs_read(struct dentry *dentry, void *buf, size_t len)
 	return (ssize_t)len;
 }
 
-static ssize_t tmpfs_write(struct dentry *dentry, const void *buf, size_t len)
+static ssize_t tmpfs_write(struct file *filp, const void *buf, size_t len)
 {
+	struct dentry *dentry = filp->dentry;
 	struct tmpfs_dentry *td = (struct tmpfs_dentry *)dentry->private_data;
 	if (!td || td->type != DENTRY_FILE)
 		return TMPFS_ERR_INVAL;
@@ -278,13 +281,12 @@ static int tmpfs_mkdir(const char *path)
 }
 
 /* 获取节点属性 */
-static int tmpfs_stat(struct dentry *dentry, struct stat *st)
+static int tmpfs_stat(const char *pathname, struct stat *st)
 {
 	if (!st)
 		return TMPFS_ERR_INVAL;
 
-	struct tmpfs_dentry *t = (struct tmpfs_dentry *)dentry->private_data;
-	struct tmpfs_dentry *de = tmpfs_lookup(t->name);
+	struct tmpfs_dentry *de = tmpfs_lookup(pathname);
 	if (!de)
 		return TMPFS_ERR_NOENT;
 
@@ -367,8 +369,9 @@ static int tmpfs_rename(const char *oldpath, const char *newpath)
 	return TMPFS_OK;
 }
 
-static int tmpfs_open(struct dentry *dentry, mode_t mode)
+static int tmpfs_open(struct file *filp, mode_t mode)
 {
+	struct dentry *dentry = filp->dentry;
 	struct tmpfs_dentry *t;
 	struct tmpfs_dentry *td = (struct tmpfs_dentry *)dentry->private_data;
 
@@ -380,9 +383,9 @@ static int tmpfs_open(struct dentry *dentry, mode_t mode)
 	return 0;
 }
 
-static int tmpfs_release(struct dentry *dentry)
+static int tmpfs_release(struct file *filp)
 {
-	dentry = dentry;
+	filp = filp;
 	return 0;
 }
 

@@ -3,15 +3,18 @@
 #include <lapic.h>
 #include <pic.h>
 #include <printk.h>
+#include <smp.h>
 #include <syscalls.h>
 #include <task.h>
 #include <types.h>
 #include <uart.h>
 #include <vfs.h>
+#include <x86.h>
 
-__attribute__((aligned(4096))) static idtr_t __idtr;
+__attribute__((aligned(4096))) static idtr_t __idtr[MAX_CPUS];
 __attribute__((aligned(4096))) static idt_entry_t
-        __idt[256]; // Create an array of IDT entries; aligned for performance
+        __idt[MAX_CPUS]
+             [256]; // Create an array of IDT entries; aligned for performance
 
 /**
  * From isr_stubs.S
@@ -41,17 +44,16 @@ void int_init(void)
 	                   IDT_FLAG_USER_INT);
 	idt_set_descriptor(X86_IRQ_COM1, isr_com1_stub, IDT_FLAG_KERNEL_INT);
 
-	__idtr.base = (__u64)__idt;
-	__idtr.limit = sizeof(__idt) - 1;
-	asm volatile("lidt %0" : : "m"(__idtr));
-
-	pic_remap(0x20, 0x28);
-	pic_timer_init();
+	uint64_t cpuid = get_current_cpuid();
+	__idtr[cpuid].base = (__u64)__idt[cpuid];
+	__idtr[cpuid].limit = sizeof(__idt[cpuid]) - 1;
+	asm volatile("lidt %0" : : "m"(__idtr[cpuid]));
 }
 
 void idt_set_descriptor(__u8 __vector, void *__isr, __u8 __flags)
 {
-	idt_entry_t *descriptor = &__idt[__vector];
+	uint64_t cpuid = get_current_cpuid();
+	idt_entry_t *descriptor = &__idt[cpuid][__vector];
 
 	descriptor->isr_low = (__u64)__isr & 0xFFFF;
 	descriptor->kernel_cs = KCODE_SELECTOR;
@@ -68,17 +70,12 @@ void isr_divide_error_handler(void)
 	// Do nothing
 }
 
-void lapic_timer_handler(void)
-{
-	scheduler();
-	lapic_send_eoi();
-}
-
 void isr_page_fault_handler(__u64 __error, __u64 *__pagefault_addr)
 {
-	printk("Page fault! %#llx, error code %#llx", __pagefault_addr,
-	       __error);
-	asm volatile("hlt");
+	uint64_t cpuid = get_current_cpuid();
+	printk("Core %u Page fault! %#llx, error code %#llx", cpuid,
+	       __pagefault_addr, __error);
+	hlt();
 }
 
 void isr_com1_handler(void)
@@ -112,6 +109,10 @@ int isr_syscall_handler(struct context *ctx)
 
 	case SYS_SYNC:
 		sys_sync();
+		break;
+
+	case SYS_EXIT:
+		sys_exit((int)ctx->rdi);
 		break;
 
 	default:

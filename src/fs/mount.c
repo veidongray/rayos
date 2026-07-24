@@ -26,7 +26,6 @@ int mount_nodev(struct file_system_type *fstype, const char *path)
 	for (char *p = &mnt->mnt_path[len - 1]; *p == '/'; p--) {
 		*p = '\0';
 	}
-	pr_info("%s", mnt->mnt_path);
 
 	list_add_tail(&mnt->mnt_list, &mount_list);
 
@@ -50,10 +49,12 @@ struct mount *mount_get_by_name(const char *path)
 		list_for_each_entry(pos, &mount_list, mnt_list)
 		{
 			if ((!strncmp(pos->mnt_path, match_path, match_len))) {
+				kfree(path_buff);
 				return pos;
 			}
 		}
 	}
 
+	kfree(path_buff);
 	return NULL;
 }

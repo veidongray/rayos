@@ -8,6 +8,40 @@
 /* ACPI MCFG 表指针（PCIe ECAM/MMIO 配置空间） */
 static struct acpi_mcfg *mcfg;
 
+/*
+ * ACPI MADT (Multiple APIC Description Table) 结构注释
+ *
+ * 整体布局：
+ * ┌─────────────────────────────────────────────────────────────────┐
+ * │ SDT Header (36 bytes)                                           │
+ * ├─────────────────────────────────────────────────────────────────┤
+ * │ MADT 专有头部 (8 bytes)                                         │
+ * ├─────────────────────────────────────────────────────────────────┤
+ * │                                                                 │
+ * │ Interrupt Controller Structures (变长，假设 smp == 4)            │
+ * │                                                                 │
+ * │   ┌──────────────────┐                                          │
+ * │   │ Entry 0 (Type 0) │ Processor Local APIC                    │
+ * │   ├──────────────────┤                                          │
+ * │   │ Entry 1 (Type 0) │ Processor Local APIC                    │
+ * │   ├──────────────────┤                                          │
+ * │   │ Entry 2 (Type 0) │ Processor Local APIC                    │
+ * │   ├──────────────────┤                                          │
+ * │   │ Entry 3 (Type 0) │ Processor Local APIC                    │
+ * │   ├──────────────────┤                                          │
+ * │   │ Entry 4 (Type 1) │ I/O APIC                                │
+ * │   ├──────────────────┤                                          │
+ * │   │ Entry 5 (Type 2) │ Interrupt Source Override               │
+ * │   ├──────────────────┤                                          │
+ * │   │ Entry 6 (Type 2) │ Interrupt Source Override               │
+ * │   ├──────────────────┤                                          │
+ * │   │ Entry 7 (Type 4) │ Local APIC NMI                          │
+ * │   ├──────────────────┤                                          │
+ * │   │ ...              │                                         │
+ * │   └──────────────────┘                                          │
+ * └─────────────────────────────────────────────────────────────────┘
+ */
+
 /* ACPI MADT 表指针（APIC/LAPIC 信息） */
 static struct acpi_madt *madt;
 
@@ -35,6 +69,30 @@ uint64_t acpi_find_mcfg_pci_mmio_base(uint64_t offset)
  * 获取 LAPIC（Local APIC）物理地址
  */
 uint64_t acpi_find_madt_lapic_base(void) { return madt->local_apic_address; }
+
+/*
+ * 统计 smp 数量
+ */
+__u32 acpi_madt_smp_counter(uint32_t *ap_ids)
+{
+	char *ptr, *end;
+	struct acpi_madt_local_apic *local =
+	        (struct acpi_madt_local_apic *)madt->entries;
+
+	__u32 count = 0;
+	ptr = (char *)local;
+	end = ptr + madt->header.length;
+	while (ptr < end) {
+		if ((((struct acpi_madt_local_apic *)ptr)->header.type == 0) &&
+		    (((struct acpi_madt_local_apic *)ptr)->flags & 1)) {
+			ap_ids[count] = ((struct acpi_madt_local_apic *)ptr)
+			                        ->processor_id;
+			count++;
+		}
+		ptr += ((struct acpi_madt_local_apic *)ptr)->header.length;
+	}
+	return count;
+}
 
 /**
  * 获取 IOAPIC 物理基地址 (MADT Type 1)
