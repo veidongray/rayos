@@ -17,8 +17,7 @@ enum task_status {
 	TASK_BLOCKED
 };
 
-struct load_segment_address
-{
+struct load_segment_address {
 	uint64_t phys;
 	uint64_t order;
 	struct load_segment_address *next;

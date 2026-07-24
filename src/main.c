@@ -43,13 +43,9 @@ void kernel_init(void *args)
 	args = args;
 
 	pr_info("/init running...");
-	for (int i = 0; i < 128; i++)
-		run_process("/init");
+	run_process("/init");
 
-	for (int i = 0; i < 512; i++) {
-		sprintf(name, "thread%d", i);
-		run_thread(thread, NULL, name);
-	}
+	run_thread(thread, NULL, name);
 
 	uint64_t up_time = get_uptime_ms();
 	pr_info("Up time %llum%llu.%llus", up_time / 1000 / 60,

@@ -315,7 +315,8 @@ static inline int make_elf64_task(char *elf, struct task_struct *task,
 			uint64_t order = size_to_order(
 			        ALIGN_UP((phdr->p_memsz), PAGE_SIZE));
 			uint64_t phys = alloc_pages(order);
-			size_t len = (ALIGN_UP((phdr->p_memsz), PAGE_SIZE) >> PAGE_SHIFT);
+			size_t len = (ALIGN_UP((phdr->p_memsz), PAGE_SIZE) >>
+			              PAGE_SHIFT);
 			map_page_range(phys, phdr->p_vaddr, 0x7, len);
 			memcpy((void *)phdr->p_vaddr,
 			       (const void *)((uint64_t)elf + phdr->p_offset),
@@ -324,21 +325,20 @@ static inline int make_elf64_task(char *elf, struct task_struct *task,
 			last_vaddr = phdr->p_vaddr;
 			last_memsz = phdr->p_memsz;
 
-			struct load_segment_address *new_ls_addr = (struct load_segment_address *)kzalloc(sizeof(struct load_segment_address));
+			struct load_segment_address *new_ls_addr =
+			        (struct load_segment_address *)kzalloc(
+			                sizeof(struct load_segment_address));
 			new_ls_addr->phys = phys;
 			new_ls_addr->order = order;
 			new_ls_addr->next = NULL;
-			if (task->ls_addr == NULL)
-			{
+			if (task->ls_addr == NULL) {
 				task->ls_addr = new_ls_addr;
-			}
-			else
-			{
-				struct load_segment_address *pos = task->ls_addr;
+			} else {
+				struct load_segment_address *pos =
+				        task->ls_addr;
 
 				// 找到鏈表末尾
-				while (pos->next)
-				{
+				while (pos->next) {
 					pos = pos->next;
 				}
 				pos->next = new_ls_addr;
@@ -372,7 +372,8 @@ static inline int make_elf64_task(char *elf, struct task_struct *task,
 	phdr = (void *)((uint8_t *)elf + ehdr->e_phoff);
 	for (int i = 0; i < ehdr->e_phnum; i++) {
 		if (phdr->p_type == PT_LOAD) {
-			size_t len = (ALIGN_UP((phdr->p_memsz), PAGE_SIZE) >> PAGE_SHIFT);
+			size_t len = (ALIGN_UP((phdr->p_memsz), PAGE_SIZE) >>
+			              PAGE_SHIFT);
 			unmap_page_range(phdr->p_vaddr, len);
 		}
 		phdr++;
@@ -480,13 +481,13 @@ void scheduler(void)
 				           task->user_pt_order);
 				free_pages(task->stack_basephys,
 				           task->stack_order);
-				struct load_segment_address *pos = task->ls_addr;
-				while (pos)
-				{
+				struct load_segment_address *pos =
+				        task->ls_addr;
+				while (pos) {
 					uint64_t phys = pos->phys;
 					uint64_t order = pos->order;
 					free_pages(phys, order);
-					
+
 					struct load_segment_address *old = pos;
 					pos = pos->next;
 					kfree(old);
