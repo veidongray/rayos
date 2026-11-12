@@ -1,5 +1,5 @@
-#ifndef AHCI_H
-#define AHCI_H
+#ifndef SATA_H
+#define SATA_H
 
 #include <stdint.h>
 
@@ -238,8 +238,8 @@ struct ahci_cmd_table {
 } __attribute__((packed));
 
 // 判定函数
-sata_dev_t ahci_check_device_type(volatile uint32_t signature);
-void ahci_init(uintptr_t ahci_base);
+sata_dev_t sata_controller_check_device_type(volatile uint32_t signature);
+void sata_controller_init(uintptr_t ahci_base);
 int ahci_read(struct sata_controller_port_register *port, uint64_t lba,
               uint16_t count, void *target_buf_virt);
 int ahci_write(struct sata_controller_port_register *port, uint64_t lba,
@@ -249,4 +249,4 @@ int ahci_write(struct sata_controller_port_register *port, uint64_t lba,
 struct hba_memory_registers *get_host_bus_adapter(void);
 struct sata_device *get_sata_device(void);
 
-#endif // AHCI_H
+#endif // SATA_H

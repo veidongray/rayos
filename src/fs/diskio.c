@@ -14,7 +14,7 @@
 // #include "platform.h"
 // #include "storage.h"
 
-#include <ahci.h>
+#include <sata.h>
 #include <fat32.h>
 
 /* Example: Mapping of physical drive number for each drive */

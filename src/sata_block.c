@@ -1,4 +1,4 @@
-#include <ahci.h>
+#include <sata.h>
 #include <align.h>
 #include <block_device.h>
 #include <fat32.h>
@@ -158,7 +158,7 @@ int blkdev_ahci_write(struct block_device *blkdev, uint64_t lba, uint32_t count,
 }
 
 // 判定函数
-sata_dev_t ahci_check_device_type(volatile uint32_t signature)
+sata_dev_t sata_controller_check_device_type(volatile uint32_t signature)
 {
 	// 根据签名精准断定
 	switch (signature) {
@@ -178,15 +178,15 @@ sata_dev_t ahci_check_device_type(volatile uint32_t signature)
 struct block_device_ops blkops = {.read = blkdev_ahci_read,
                                   .write = blkdev_ahci_write};
 
-void ahci_init(uintptr_t ahci_base)
+void sata_controller_init(uintptr_t base)
 {
 	size_t nr_ports;
 	uint32_t port_implements;
 
-	printk("AHCI base %#llx", ahci_base);
-	hba = (struct hba_memory_registers *)((uint64_t)ahci_base +
+	printk("sata controller base %#llx", base);
+	hba = (struct hba_memory_registers *)((uint64_t)base +
 	                                      KERNEL_BASE);
-	map_page_range((uint64_t)ahci_base, (uint64_t)ahci_base + KERNEL_BASE,
+	map_page_range((uint64_t)base, (uint64_t)base + KERNEL_BASE,
 	               MAP_KERN_MMIO,
 	               (sizeof(struct hba_memory_registers) >> PAGE_SHIFT) + 1);
 
@@ -199,8 +199,8 @@ void ahci_init(uintptr_t ahci_base)
 
 	nr_ports = (hba->ghc.cap & 0x1f) + 1;
 	port_implements = hba->ghc.pi;
-	printk("AHCI nr_ports %u", nr_ports);
-	printk("AHCI port_implements %lx", port_implements);
+	printk("sata controller nr_ports %u", nr_ports);
+	printk("sata controller port_implements %lx", port_implements);
 
 	for (size_t i = 0; i < nr_ports; i++) {
 		if (!(port_implements & (1U << i)))
@@ -215,7 +215,7 @@ void ahci_init(uintptr_t ahci_base)
 		if (((hba->ports[i].PxSSTS & 0xfU) == 0x3U) &&
 		    (((hba->ports[i].PxSSTS & 0xf00U) >> 8) == 0x1U)) {
 			sata_dev_t dev_type =
-			        ahci_check_device_type(hba->ports[i].PxSIG);
+			        sata_controller_check_device_type(hba->ports[i].PxSIG);
 			if (dev_type == SATA_DEV_SATA) {
 				printk("[Port %d] -> Found SATA Hard Disk "
 				       "(HDD/SSD).",
@@ -296,6 +296,8 @@ void ahci_init(uintptr_t ahci_base)
 					sprintf(blkdev->info.bd_name, "sata%d",
 					        i);
 					blkdev->priv = priv;
+
+					// 注册到块设备子系统
 					blkdev_register(blkdev, &blkops);
 				} else {
 					printk("[Port %d] -> DMA Engine failed "

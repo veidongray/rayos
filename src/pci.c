@@ -1,5 +1,5 @@
 #include <acpi.h>
-#include <ahci.h>
+#include <sata.h>
 #include <mm.h>
 #include <page.h>
 #include <pci.h>
@@ -76,24 +76,25 @@ void pci_probe(void)
 				if (pc.header.prof_if == 0x01 &&
 				    pc.header.sub_class_code == 0x06 &&
 				    pc.header.base_class_code == 0x01) {
-					struct pci_config *ahci =
+					/* 找到sata控制器 */
+					struct pci_config *sata_controller =
 					        (struct pci_config *)kmalloc(
 					                sizeof(struct
 					                       pci_config));
 
-					memcpy(ahci, &pc,
+					memcpy(sata_controller, &pc,
 					       sizeof(struct pci_config));
-					printk("AHCI Device Found %x:%x",
-					       ahci->header.vendor_id,
-					       ahci->header.device_id);
-					printk("AHCI bar5 %#llx",
-					       ahci->type0.bar[5]);
-					printk("AHCI interrupt line %u",
-					       ahci->type0.interrupt_line);
-					printk("AHCI interrupt pin %u",
-					       ahci->type0.interrupt_pin);
-					ahci_init(
-					        (uintptr_t)ahci->type0.bar[5]);
+					printk("SATA Controller Found %x:%x",
+					       sata_controller->header.vendor_id,
+					       sata_controller->header.device_id);
+					printk("SATA bar5 %#llx",
+					       sata_controller->type0.bar[5]);
+					printk("SATA interrupt line %u",
+					       sata_controller->type0.interrupt_line);
+					printk("SATA interrupt pin %u",
+					       sata_controller->type0.interrupt_pin);
+					sata_controller_init(
+					        (uintptr_t)sata_controller->type0.bar[5]);
 				}
 				if ((pc.header.vendor_id != 0xffff) &&
 				    (pc.header.vendor_id != 0x0000)) {

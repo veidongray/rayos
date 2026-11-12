@@ -89,6 +89,7 @@ It is recommended to build and run on Ubuntu or other Debian-based Linux distrib
 - mkfs.fat
 - mtools
 - gdb
+- grub-pc-bin
 
 You can verify your environment by running:
 

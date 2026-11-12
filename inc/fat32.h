@@ -1,5 +1,5 @@
 #ifndef FAT32_H
-#define FAT32_h
+#define FAT32_H
 
 #include <list.h>
 #include <stddef.h>
