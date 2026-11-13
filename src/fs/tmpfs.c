@@ -9,12 +9,12 @@
 /* 简易错误码定义，替代标准 errno */
 enum tmpfs_err {
 	TMPFS_OK = 0,
-	TMPFS_ERR_INVAL = -1,   /* 参数无效 */
-	TMPFS_ERR_NOMEM = -2,   /* 内存分配失败 */
-	TMPFS_ERR_TOOLONG = -3, /* 名称超长 */
-	TMPFS_ERR_ISDIR = -4,   /* 目标是目录，不能作为文件操作 */
-	TMPFS_ERR_NOTDIR = -5,  /* 目标不是目录 */
-	TMPFS_ERR_NOENT = -6,   /* 节点不存在 */
+	TMPFS_ERR_INVAL = -1,    /* 参数无效 */
+	TMPFS_ERR_NOMEM = -2,    /* 内存分配失败 */
+	TMPFS_ERR_TOOLONG = -3,  /* 名称超长 */
+	TMPFS_ERR_ISDIR = -4,    /* 目标是目录，不能作为文件操作 */
+	TMPFS_ERR_NOTDIR = -5,   /* 目标不是目录 */
+	TMPFS_ERR_NOENT = -6,    /* 节点不存在 */
 	TMPFS_ERR_NOTEMPTY = -7, /* 目录非空，无法删除/覆盖 */
 };
 

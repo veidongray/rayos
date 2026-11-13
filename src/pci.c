@@ -1,11 +1,15 @@
 #include <acpi.h>
-#include <sata.h>
+#include <list.h>
 #include <mm.h>
 #include <page.h>
 #include <pci.h>
 #include <printk.h>
+#include <sata.h>
 #include <string.h>
 #include <x86.h>
+
+static LIST_HEAD(pci_device_list);
+static LIST_HEAD(pci_driver_list);
 
 void pci_read_config_pio(uint32_t bus, uint32_t slot, uint32_t func,
                          struct pci_config *pci_config)
@@ -64,7 +68,52 @@ void pci_read_config(uint32_t bus, uint32_t slot, uint32_t func,
 #endif
 }
 
-void pci_probe(void)
+static int pci_device_match(struct pci_driver *driver)
+{
+	struct pci_device *dev;
+	list_for_each_entry(dev, &pci_device_list, list)
+	{
+		if (dev->config->header.vendor_id ==
+		            driver->id_table->vendor_id &&
+		    dev->config->header.device_id ==
+		            driver->id_table->device_id &&
+		    dev->config->header.base_class_code ==
+		            driver->id_table->base_class_code &&
+		    dev->config->header.sub_class_code ==
+		            driver->id_table->sub_class_code &&
+		    dev->config->header.prof_if == driver->id_table->prof_if) {
+			dev->driver = driver;
+			driver->device = dev;
+			if (driver->probe) {
+				driver->probe(dev);
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+
+int pci_register_driver(struct pci_driver *driver)
+{
+	list_add_tail(&driver->list, &pci_driver_list);
+	/* 尝试匹配device */
+	return pci_device_match(driver);
+}
+
+void pci_unregister_driver(struct pci_driver *driver)
+{
+	list_del(&driver->list);
+}
+
+int pci_add_device(struct pci_device *dev)
+{
+	list_add_tail(&dev->list, &pci_device_list);
+	return 0;
+}
+
+void pci_remove_device(struct pci_device *dev) { list_del(&dev->list); }
+
+void pci_device_detect(void)
 {
 	struct pci_config pc;
 	uint32_t bus, slot, func;
@@ -73,36 +122,23 @@ void pci_probe(void)
 		for (slot = 0; slot < 32; slot++) {
 			for (func = 0; func < 8; func++) {
 				pci_read_config(bus, slot, func, &pc);
-				if (pc.header.prof_if == 0x01 &&
-				    pc.header.sub_class_code == 0x06 &&
-				    pc.header.base_class_code == 0x01) {
-					/* 找到sata控制器 */
-					struct pci_config *sata_controller =
-					        (struct pci_config *)kmalloc(
-					                sizeof(struct
-					                       pci_config));
-
-					memcpy(sata_controller, &pc,
-					       sizeof(struct pci_config));
-					printk("SATA Controller Found %x:%x",
-					       sata_controller->header.vendor_id,
-					       sata_controller->header.device_id);
-					printk("SATA bar5 %#llx",
-					       sata_controller->type0.bar[5]);
-					printk("SATA interrupt line %u",
-					       sata_controller->type0.interrupt_line);
-					printk("SATA interrupt pin %u",
-					       sata_controller->type0.interrupt_pin);
-					sata_controller_init(
-					        (uintptr_t)sata_controller->type0.bar[5]);
-				}
 				if ((pc.header.vendor_id != 0xffff) &&
 				    (pc.header.vendor_id != 0x0000)) {
-					printk("PCI %04llx:%04llx, HeaderType "
-					       "%02llx",
-					       pc.header.vendor_id,
-					       pc.header.device_id,
-					       pc.header.header_type);
+					/* 探测到可用pci设备则创建pci_device并加入pci_device_list
+					 */
+					struct pci_device *dev =
+					        (struct pci_device *)kmalloc(
+					                sizeof(struct
+					                       pci_device));
+					dev->bus = bus;
+					dev->slot = slot;
+					dev->func = func;
+					dev->config = (struct pci_config *)
+					        kmalloc(sizeof(
+					                struct pci_config));
+					memcpy(dev->config, &pc,
+					       sizeof(struct pci_config));
+					pci_add_device(dev);
 				}
 			}
 		}
@@ -114,5 +150,5 @@ void pci_init(void)
 	map_page_range((uint64_t)acpi_find_mcfg_pci_mmio_base(0),
 	               (uint64_t)acpi_find_mcfg_pci_mmio_base(0) + KERNEL_BASE,
 	               0x1b, 65536);
-	pci_probe();
+	pci_device_detect();
 }

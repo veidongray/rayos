@@ -46,7 +46,7 @@
 #define X86_IRQ_SECONDARY_ATA (X86_IRQ_BASE_SLAVE + 7)
 
 /* IOAPIC 中断向量 (GSI 重映射后的目标向量) */
-#define X86_IOAPIC_VECTOR_BASE 0x30 /* IOAPIC 向量起始, 避开 PIC 范围 */
+#define X86_IOAPIC_VECTOR_BASE 0x30  /* IOAPIC 向量起始, 避开 PIC 范围 */
 #define X86_IOAPIC_VECTOR_TIMER 0x30 /* IOAPIC Timer (替代 PIT) */
 #define X86_IOAPIC_VECTOR_KEYBOARD 0x31
 #define X86_IOAPIC_VECTOR_COM1 0x32
@@ -88,7 +88,7 @@
 
 /* ========== 特权级 DPL (Bits 14:13) ========== */
 #define IDT_DPL_KERNEL (0 << 5) /* Ring 0: 仅内核态可触发 (int指令) */
-#define IDT_DPL_USER (3 << 5) /* Ring 3: 用户态可通过 int 指令触发 */
+#define IDT_DPL_USER (3 << 5)   /* Ring 3: 用户态可通过 int 指令触发 */
 
 /* ========== 存在位 (Bit 15) ========== */
 #define IDT_PRESENT (1 << 7) /* 段/门有效标志 */

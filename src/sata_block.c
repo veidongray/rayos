@@ -1,11 +1,13 @@
-#include <sata.h>
 #include <align.h>
 #include <block_device.h>
 #include <fat32.h>
+#include <init.h>
 #include <list.h>
 #include <mm.h>
 #include <page.h>
+#include <pci.h>
 #include <printk.h>
+#include <sata.h>
 #include <string.h>
 
 __attribute__((aligned(256))) static uint8_t fis_buffer[256];
@@ -32,28 +34,28 @@ int ahci_dma_transfer(int write, struct sata_controller_port_register *port,
 {
 	/*
 	[HBA Port 寄存器]
-	     │
-	     ▼ (PxCLB 物理指针指向...)
-      ┌──────────────────────────────────────────────────────────┐
-      │ 1024 字节的 Command List (命令列表，共 32 个 Slot 挂钩)   │
-      ├──────────────┬──────────────┬──────────────┬─────────────┤
-      │   Slot 0     │   Slot 1     │   Slot 2     │    ...      │
-      └──────┬───────┴──────┬───────┴──────┬───────┴─────────────┘
-	     │              │              │
-	     │ (ctba 指针)  └─► 指向另一个独立的 Table...
-	     ▼
-      ┌──────────────────────────────────────────────────────────┐
-      │ 某个具体的 Command Table (命令表，大小开足 4KB 页)       │
-      ├──────────────────────────────────────────────────────────┤
-      │  1. CFIS (Command FIS) ──► 主机写给硬盘的指令条 (如读/写) │
-      ├──────────────────────────────────────────────────────────┤
-      │  2. ACMD               ──► ATAPI 光驱高级命令 (日常清零)  │
-      ├──────────────────────────────────────────────────────────┤
-      │  3. PRDT (散集表阵列)  ──► 数据的真正目的地               │
-      │     ├── prdt[0] ──► [物理地址 DBA] + [操作字节数 DBC] ───┼─► 丢进内核的
-      sector_data │     └── prdt[1] ──► [物理地址 DBA] + [操作字节数 DBC] ───┼─►
-      (若有多块内存，继续往后接...)
-      └──────────────────────────────────────────────────────────┘
+	         │
+	         ▼ (PxCLB 物理指针指向...)
+	  ┌──────────────────────────────────────────────────────────┐
+	  │ 1024 字节的 Command List (命令列表，共 32 个 Slot 挂钩)   │
+	  ├──────────────┬──────────────┬──────────────┬─────────────┤
+	  │   Slot 0     │   Slot 1     │   Slot 2     │    ...      │
+	  └──────┬───────┴──────┬───────┴──────┬───────┴─────────────┘
+	         │              │              │
+	         │ (ctba 指针)  └─► 指向另一个独立的 Table...
+	         ▼
+	  ┌──────────────────────────────────────────────────────────┐
+	  │ 某个具体的 Command Table (命令表，大小开足 4KB 页)       │
+	  ├──────────────────────────────────────────────────────────┤
+	  │  1. CFIS (Command FIS) ──► 主机写给硬盘的指令条 (如读/写) │
+	  ├──────────────────────────────────────────────────────────┤
+	  │  2. ACMD               ──► ATAPI 光驱高级命令 (日常清零)  │
+	  ├──────────────────────────────────────────────────────────┤
+	  │  3. PRDT (散集表阵列)  ──► 数据的真正目的地               │
+	  │     ├── prdt[0] ──► [物理地址 DBA] + [操作字节数 DBC] ───┼─►
+	丢进内核的 sector_data │     └── prdt[1] ──► [物理地址 DBA] +
+	[操作字节数 DBC] ───┼─► (若有多块内存，继续往后接...)
+	  └──────────────────────────────────────────────────────────┘
 	*/
 
 	// 确保任何历史挂起中断已被冲刷掉
@@ -184,8 +186,7 @@ void sata_controller_init(uintptr_t base)
 	uint32_t port_implements;
 
 	printk("sata controller base %#llx", base);
-	hba = (struct hba_memory_registers *)((uint64_t)base +
-	                                      KERNEL_BASE);
+	hba = (struct hba_memory_registers *)((uint64_t)base + KERNEL_BASE);
 	map_page_range((uint64_t)base, (uint64_t)base + KERNEL_BASE,
 	               MAP_KERN_MMIO,
 	               (sizeof(struct hba_memory_registers) >> PAGE_SHIFT) + 1);
@@ -214,8 +215,8 @@ void sata_controller_init(uintptr_t base)
 
 		if (((hba->ports[i].PxSSTS & 0xfU) == 0x3U) &&
 		    (((hba->ports[i].PxSSTS & 0xf00U) >> 8) == 0x1U)) {
-			sata_dev_t dev_type =
-			        sata_controller_check_device_type(hba->ports[i].PxSIG);
+			sata_dev_t dev_type = sata_controller_check_device_type(
+			        hba->ports[i].PxSIG);
 			if (dev_type == SATA_DEV_SATA) {
 				printk("[Port %d] -> Found SATA Hard Disk "
 				       "(HDD/SSD).",
@@ -316,3 +317,58 @@ void sata_controller_init(uintptr_t base)
 		}
 	}
 }
+
+struct pci_device_id pci_device_ids[] = {
+        {0x8086, 0x2922, 0x01, 0x06, 0x01}, // Intel ICH9 AHCI Controller
+        // {0x8086, 0x1E02, 0x01, 0x06, 0x01}, // Intel ICH10 AHCI Controller
+        // {0x8086, 0x3A22, 0x01, 0x06, 0x01}, // Intel Panther Point AHCI
+        // Controller {0x8086, 0x8C02, 0x01, 0x06, 0x01}, // Intel Wildcat Point
+        // AHCI Controller {0x8086, 0x9C03, 0x01, 0x06, 0x01}, // Intel Sunrise
+        // Point AHCI Controller {0x8086, 0xA102, 0x01, 0x06, 0x01}, // Intel
+        // Kaby Lake AHCI Controller {0x8086, 0xA1C2, 0x01, 0x06, 0x01}, //
+        // Intel Coffee Lake AHCI Controller
+        {0xffff, 0xffff, 0xff, 0xff,
+         0xff} // End of list marker (vendor_id = device_id = base_class_code =
+               // sub_class_code = prof_if = -1)
+};
+
+int sata_controller_probe(struct pci_device *dev)
+{
+	printk("Probing SATA Controller at %02x:%02x.%d", dev->bus, dev->slot,
+	       dev->func);
+	struct pci_config *sata_controller_config = dev->config;
+
+	printk("SATA Controller Found %x:%x",
+	       sata_controller_config->header.vendor_id,
+	       sata_controller_config->header.device_id);
+	printk("SATA bar5 %#llx", sata_controller_config->type0.bar[5]);
+	printk("SATA interrupt line %u",
+	       sata_controller_config->type0.interrupt_line);
+	printk("SATA interrupt pin %u",
+	       sata_controller_config->type0.interrupt_pin);
+	sata_controller_init((uintptr_t)sata_controller_config->type0.bar[5]);
+	return 0;
+}
+
+void sata_controller_remove(struct pci_device *dev)
+{
+	printk("Removing SATA Controller at %02x:%02x.%d", dev->bus, dev->slot,
+	       dev->func);
+}
+
+struct pci_driver sata_controller_driver = {
+        .name = "sata_controller_driver",
+        .id_table = pci_device_ids,
+        .probe = sata_controller_probe,
+        .remove = sata_controller_remove,
+};
+
+int satactl_init(void)
+{
+	pci_register_driver(&sata_controller_driver);
+	return 0;
+}
+module_init(satactl_init);
+
+void satactl_exit(void) { pci_unregister_driver(&sata_controller_driver); }
+module_exit(satactl_exit);

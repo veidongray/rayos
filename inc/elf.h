@@ -182,19 +182,19 @@
 
 struct elf32_ehdr {
 	uint8_t e_ident[EI_NIDENT]; /* ELF 魔数与标识信息 */
-	uint16_t e_type;      /* 目标文件类型 (ET_EXEC, ET_DYN等) */
-	uint16_t e_machine;   /* 目标架构 (EM_386 = 3) */
-	uint32_t e_version;   /* ELF 版本 (EV_CURRENT = 1) */
-	uint32_t e_entry;     /* 程序入口点虚拟地址 */
-	uint32_t e_phoff;     /* Program Header Table 文件偏移 */
-	uint32_t e_shoff;     /* Section Header Table 文件偏移 */
-	uint32_t e_flags;     /* 处理器特定标志 (x86通常为0) */
-	uint16_t e_ehsize;    /* ELF Header 大小 (52字节) */
-	uint16_t e_phentsize; /* 单个 Program Header 大小 (32字节) */
-	uint16_t e_phnum;     /* Program Header 数量 */
-	uint16_t e_shentsize; /* 单个 Section Header 大小 (40字节) */
-	uint16_t e_shnum;     /* Section Header 数量 */
-	uint16_t e_shstrndx;  /* Section Name String Table 索引 */
+	uint16_t e_type;            /* 目标文件类型 (ET_EXEC, ET_DYN等) */
+	uint16_t e_machine;         /* 目标架构 (EM_386 = 3) */
+	uint32_t e_version;         /* ELF 版本 (EV_CURRENT = 1) */
+	uint32_t e_entry;           /* 程序入口点虚拟地址 */
+	uint32_t e_phoff;           /* Program Header Table 文件偏移 */
+	uint32_t e_shoff;           /* Section Header Table 文件偏移 */
+	uint32_t e_flags;           /* 处理器特定标志 (x86通常为0) */
+	uint16_t e_ehsize;          /* ELF Header 大小 (52字节) */
+	uint16_t e_phentsize;       /* 单个 Program Header 大小 (32字节) */
+	uint16_t e_phnum;           /* Program Header 数量 */
+	uint16_t e_shentsize;       /* 单个 Section Header 大小 (40字节) */
+	uint16_t e_shnum;           /* Section Header 数量 */
+	uint16_t e_shstrndx;        /* Section Name String Table 索引 */
 };
 
 struct elf64_ehdr {
@@ -207,11 +207,11 @@ struct elf64_ehdr {
 	uint64_t e_shoff;           /* Section Header Table 文件偏移 */
 	uint32_t e_flags;           /* 处理器特定标志 */
 	uint16_t e_ehsize;          /* ELF Header 大小 (64字节) */
-	uint16_t e_phentsize; /* 单个 Program Header 大小 (56字节) */
-	uint16_t e_phnum;     /* Program Header 数量 */
-	uint16_t e_shentsize; /* 单个 Section Header 大小 (64字节) */
-	uint16_t e_shnum;     /* Section Header 数量 */
-	uint16_t e_shstrndx;  /* Section Name String Table 索引 */
+	uint16_t e_phentsize;       /* 单个 Program Header 大小 (56字节) */
+	uint16_t e_phnum;           /* Program Header 数量 */
+	uint16_t e_shentsize;       /* 单个 Section Header 大小 (64字节) */
+	uint16_t e_shnum;           /* Section Header 数量 */
+	uint16_t e_shstrndx;        /* Section Name String Table 索引 */
 };
 
 struct elf64_phdr {

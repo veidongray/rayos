@@ -14,8 +14,8 @@
 // #include "platform.h"
 // #include "storage.h"
 
-#include <sata.h>
 #include <fat32.h>
+#include <sata.h>
 
 /* Example: Mapping of physical drive number for each drive */
 // #define DEV_FLASH 0 /* Map FTL to physical drive 0 */

@@ -1,11 +1,11 @@
 #ifndef VFS_ERRNO_H
 #define VFS_ERRNO_H
 
-#define ENOENT 2   /* No such file or directory: 路径分量不存在 */
-#define EACCES 13  /* Permission denied: 缺少读/写/执行权限 */
-#define EPERM 1    /* Operation not permitted: 操作被禁止(如immutable) */
-#define ENOTDIR 20 /* Not a directory: 路径中间分量不是目录 */
-#define ELOOP 40   /* Too many symbolic links: 符号链接解析超限 */
+#define ENOENT 2        /* No such file or directory: 路径分量不存在 */
+#define EACCES 13       /* Permission denied: 缺少读/写/执行权限 */
+#define EPERM 1         /* Operation not permitted: 操作被禁止(如immutable) */
+#define ENOTDIR 20      /* Not a directory: 路径中间分量不是目录 */
+#define ELOOP 40        /* Too many symbolic links: 符号链接解析超限 */
 #define ENAMETOOLONG 36 /* File name too long: 文件名或路径超长 */
 #define ESTALE 116      /* Stale file handle: NFS inode/dentry已失效 */
 

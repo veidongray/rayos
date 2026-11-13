@@ -68,13 +68,49 @@ struct pci_config {
 	};
 };
 
+struct pci_device_id {
+	uint16_t vendor_id;
+	uint16_t device_id;
+	uint8_t base_class_code;
+	uint8_t sub_class_code;
+	uint8_t prof_if;
+};
+
+struct pci_device {
+	uint32_t bus;
+	uint32_t slot;
+	uint32_t func;
+
+	struct pci_config *config;
+	struct pci_driver *driver;
+
+	struct list_head list;
+};
+
+struct pci_driver {
+	char *name;
+
+	struct pci_device *device;
+	struct pci_device_id *id_table;
+
+	int (*probe)(struct pci_device *dev);
+	void (*remove)(struct pci_device *dev);
+
+	struct list_head list;
+};
+
 void pci_read_config_pio(uint32_t bus, uint32_t slot, uint32_t func,
                          struct pci_config *pci_config);
 void pci_read_config_mmio(uint32_t bus, uint32_t slot, uint32_t func,
                           struct pci_config *pci_config);
 void pci_read_config(uint32_t bus, uint32_t slot, uint32_t func,
                      struct pci_config *pci_config);
-void pci_probe(void);
+
 void pci_init(void);
+
+int pci_register_driver(struct pci_driver *driver);
+void pci_unregister_driver(struct pci_driver *driver);
+int pci_add_device(struct pci_device *dev);
+void pci_remove_device(struct pci_device *dev);
 
 #endif // PCI_H

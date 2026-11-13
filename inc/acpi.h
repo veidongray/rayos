@@ -14,7 +14,7 @@ struct acpi_rsdp {
 
 	/* ================= ACPI 2.0+ 扩展字段 (后 16 字节) =================
 	 */
-	uint32_t length; // 整个 RSDP 结构体的长度（包含扩展部分）
+	uint32_t length;           // 整个 RSDP 结构体的长度（包含扩展部分）
 	uint64_t xsdt_address;     // 64位 XSDT 表的物理地址
 	uint8_t extended_checksum; // 包含扩展字段在内的全表校验和
 	uint8_t reserved[3];       // 保留字段，填充为 0
@@ -55,13 +55,13 @@ struct mcfg_entry {
 struct acpi_mcfg {
 	struct acpi_sdt_header header; // 签名 = "MCFG"
 	uint64_t reserved;             // MCFG 特有：8 字节保留字段
-	struct mcfg_entry entries[]; // 可变长度数组，可有多个条目
+	struct mcfg_entry entries[];   // 可变长度数组，可有多个条目
 } __attribute__((packed));
 
 struct acpi_madt {
 	struct acpi_sdt_header header; // 36 字节的 ACPI 标准表头
-	uint32_t local_apic_address; // 局部 APIC (Local APIC) 的物理基地址
-	                             // (用于 APIC 模式)
+	uint32_t local_apic_address;   // 局部 APIC (Local APIC) 的物理基地址
+	                               // (用于 APIC 模式)
 	uint32_t flags; // 属性标志：Bit 0 置 1 表示系统支持双 8259
 	                // 中断控制器兼容模式
 

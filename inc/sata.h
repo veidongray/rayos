@@ -73,9 +73,9 @@ struct sata_controller_port_register {
 	                 // (命令列表基物理地址
 	                 // - 高32位)
 
-	uint32_t PxFB; // 0x08: FIS Base Address (接收FIS缓冲区基物理地址 -
-	               // 低32位)
-	               //       - 必须 256 字节对齐！
+	uint32_t PxFB;  // 0x08: FIS Base Address (接收FIS缓冲区基物理地址 -
+	                // 低32位)
+	                //       - 必须 256 字节对齐！
 	uint32_t PxFBU; // 0x0C: FIS Base Address Upper (接收FIS缓冲区基物理地址
 	                // - 高32位)
 
@@ -229,8 +229,8 @@ struct ahci_prdt_entry {
 
 // 完整的命令表结构体 (Command Table) - 开足 4096 字节安全空间
 struct ahci_cmd_table {
-	uint8_t cfis[64]; // 0x00 ~ 0x3F: 容纳各种类型的 CFIS 包 (包含上面的
-	                  // fis_reg_h2d)
+	uint8_t cfis[64];     // 0x00 ~ 0x3F: 容纳各种类型的 CFIS 包 (包含上面的
+	                      // fis_reg_h2d)
 	uint8_t acmd[32];     // 0x40 ~ 0x5F: ATAPI 命令空间
 	uint8_t reserved[32]; // 0x6F ~ 0x7F: 保留
 	struct ahci_prdt_entry
